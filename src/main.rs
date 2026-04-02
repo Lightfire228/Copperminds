@@ -1,17 +1,20 @@
-use std::{io, process::{Command, Output}};
+use std::{env, iter, path::{Path, PathBuf}};
+
+use walkdir::{DirEntry, IntoIter, WalkDir};
+
+use crate::vault::Index;
+
+mod vault;
 
 
-mod yaml;
-mod obsidian;
 
 fn main() {
-    println!("Hello, world!");
 
-    yaml::scan("");
+    let index = Index::build();
 
-    let files = obsidian::get_all_md_files();
-
-    obsidian::get_all_inboxes(&files);
+    for f in index.md_files {
+        println!("{:?}", f.file_name());
+    }
 
 }
 
