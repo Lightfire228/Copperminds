@@ -30,11 +30,16 @@ impl Index {
             .collect  ()
         ;
 
-
-
         Self {
             md_files,
         }
+    }
+
+    pub fn needs_inbox(&self) -> Vec<&MdFile> {
+        self.md_files
+            .iter   ()
+            .filter (|f| f.inbox.is_none())
+            .collect()
     }
 }
 
