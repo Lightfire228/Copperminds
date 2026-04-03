@@ -1,8 +1,15 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::PathBuf, sync::LazyLock};
 
 use regex::Regex;
 use walkdir::{DirEntry, WalkDir};
-use yaml_serde::Mapping;
+use yaml_serde::{Mapping, Value};
+
+macro_rules! regex {
+    ($i:ident = $r:expr) => {
+        // https://docs.rs/regex/latest/regex/#avoid-re-compiling-regexes-especially-in-a-loop
+        static $i: LazyLock<Regex> = LazyLock::new(|| Regex::new($r).unwrap());
+    };
+}
 
 
 pub struct Index {
@@ -14,6 +21,7 @@ pub struct MdFile {
     pub entry:       DirEntry,
     pub frontmatter: Option<Mapping>,
     pub inbox:       Option<String>,
+    pub text:        String,
 }
 
 impl Index {
@@ -22,11 +30,9 @@ impl Index {
 
         let md_files = md_files(&files);
 
-        let re       = frontmatter_regex();
-
         let md_files = md_files
             .iter     ()
-            .map      (|f| parse_md_file(&re, &f))
+            .map      (parse_md_file)
             .collect  ()
         ;
 
@@ -41,8 +47,37 @@ impl Index {
             .filter (|f| f.inbox.is_none())
             .collect()
     }
+
 }
 
+
+impl MdFile {
+
+    pub fn assign_inbox(&mut self, inbox: String) {
+        
+        let mut fm = self.frontmatter.take().unwrap_or_else(|| Mapping::new());
+        
+        let key = Value::String("inbox".to_owned());
+        let val = Value::String(inbox.clone());
+        fm.insert(key, val);
+
+        self.inbox       = Some(inbox);
+        self.frontmatter = Some(fm);
+    }
+
+    pub fn write_file(&self) {
+        let Some(fm) = &self.frontmatter else {
+            fs::write(self.entry.path(), &self.text).unwrap();
+            return;
+        };
+
+        let fm_text = yaml_serde::to_string(fm).unwrap();
+        let text    = format!("---\n{fm_text}\n---\n{}", self.text);
+
+        fs::write(self.entry.path(), &text).unwrap();
+    }
+
+}
 
 
 fn vault_folder() -> PathBuf {
@@ -84,23 +119,26 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
 }
 
 
-fn parse_md_file(re: &Regex, file: &DirEntry) -> MdFile {
+fn parse_md_file(file: &DirEntry) -> MdFile {
 
     
-    let blank = || {
+    let blank = |text| {
         MdFile {
             entry:       file.clone(),
             frontmatter: None,
             inbox:       None,
+            text,
         }
     };
 
-    let Some(text) = get_frontmatter_text(&re, &file) else {
-        return blank();
+    let (fm_text, text) = get_frontmatter_text(&file);
+
+    let Some(fm_text) = fm_text else {
+        return blank(text);
     };
 
-    let Some(fm)   = yaml_serde::from_str::<Mapping>(&text).ok() else {
-        return blank();
+    let Some(fm)   = yaml_serde::from_str::<Mapping>(&fm_text).ok() else {
+        return blank(text);
     };
 
     MdFile {
@@ -111,22 +149,26 @@ fn parse_md_file(re: &Regex, file: &DirEntry) -> MdFile {
             .map     (|i| i.to_owned())
         ,
         frontmatter: Some(fm),
+        text,
     }
 
 }
 
 
-fn get_frontmatter_text(re: &Regex, file: &DirEntry) -> Option<String> {
+fn get_frontmatter_text(file: &DirEntry) -> (Option<String>, String) {
 
-    let text     = fs::read_to_string(file.path()).unwrap();
-    
-    let captures = re.captures(&text)?;
-    
-    Some(captures[1].to_owned())
-}
-
-fn frontmatter_regex() -> Regex {
     // m     multi-line mode: ^ and $ match begin/end of line
     // s     allow . to match \n
-    Regex::new(r"(?ms)^---\s*(.+?)^---\s*$(.*)").unwrap()
+    regex!(RE = r"(?ms)^---\s*(.+?)^---\s*$(.*)");
+
+    let text = fs::read_to_string(file.path()).unwrap();
+    
+    let Some(captures) = RE.captures(&text) else {
+        return (None, text);
+    };
+    
+    (
+        Some(captures[1].to_owned()),
+        captures[2].to_owned()
+    )
 }
