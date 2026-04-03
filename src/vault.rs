@@ -1,17 +1,34 @@
-use std::{env, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 
+use regex::Regex;
 use walkdir::{DirEntry, WalkDir};
+use yaml_serde::Mapping;
 
 
 pub struct Index {
-    pub md_files: Vec<DirEntry>
+    pub md_files: Vec<MdFile>,
+    
+}
+
+pub struct MdFile {
+    pub entry:       DirEntry,
+    pub frontmatter: Option<Mapping>,
+    pub inbox:       Option<String>,
 }
 
 impl Index {
     pub fn build() -> Self {
-        let files = scan_vault();
+        let files    = scan_vault();
 
         let md_files = md_files(&files);
+
+        let re       = frontmatter_regex();
+
+        let md_files = md_files
+            .iter     ()
+            .map      (|f| parse_md_file(&re, &f))
+            .collect  ()
+        ;
 
 
 
@@ -20,6 +37,7 @@ impl Index {
         }
     }
 }
+
 
 
 fn vault_folder() -> PathBuf {
@@ -60,3 +78,50 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
         .unwrap_or(false)
 }
 
+
+fn parse_md_file(re: &Regex, file: &DirEntry) -> MdFile {
+
+    
+    let blank = || {
+        MdFile {
+            entry:       file.clone(),
+            frontmatter: None,
+            inbox:       None,
+        }
+    };
+
+    let Some(text) = get_frontmatter_text(&re, &file) else {
+        return blank();
+    };
+
+    let Some(fm)   = yaml_serde::from_str::<Mapping>(&text).ok() else {
+        return blank();
+    };
+
+    MdFile {
+        entry:       file.clone(),
+        inbox:       fm
+            .get     ("inbox")
+            .and_then(|i| i.as_str())
+            .map     (|i| i.to_owned())
+        ,
+        frontmatter: Some(fm),
+    }
+
+}
+
+
+fn get_frontmatter_text(re: &Regex, file: &DirEntry) -> Option<String> {
+
+    let text     = fs::read_to_string(file.path()).unwrap();
+    
+    let captures = re.captures(&text)?;
+    
+    Some(captures[1].to_owned())
+}
+
+fn frontmatter_regex() -> Regex {
+    // m     multi-line mode: ^ and $ match begin/end of line
+    // s     allow . to match \n
+    Regex::new(r"(?ms)^---\s*(.+?)^---\s*$(.*)").unwrap()
+}
