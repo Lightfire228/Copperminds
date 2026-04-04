@@ -1,4 +1,4 @@
-use std::{env, fs, path::PathBuf, sync::LazyLock};
+use std::{env, fs, ops::Deref, path::PathBuf, sync::LazyLock};
 
 use regex::Regex;
 use walkdir::{DirEntry, WalkDir};
@@ -11,6 +11,8 @@ macro_rules! regex {
     };
 }
 
+pub(crate) use regex;
+
 
 pub struct Index {
     pub md_files: Vec<MdFile>,
@@ -21,6 +23,7 @@ pub struct MdFile {
     pub entry:       DirEntry,
     pub frontmatter: Option<Mapping>,
     pub inbox:       Option<String>,
+    pub file_name:   String,
     pub text:        String,
 }
 
@@ -28,11 +31,9 @@ impl Index {
     pub fn build() -> Self {
         let files    = scan_vault();
 
-        let md_files = md_files(&files);
-
-        let md_files = md_files
-            .iter     ()
-            .map      (parse_md_file)
+        let md_files = files
+            .filter   (|f| ends_with(f, ".md"))
+            .map      (|f| parse_md_file(&f))
             .collect  ()
         ;
 
@@ -41,11 +42,36 @@ impl Index {
         }
     }
 
-    pub fn needs_inbox(&self) -> Vec<&MdFile> {
+    pub fn needs_inbox(&self) -> impl Iterator<Item = &MdFile> {
         self.md_files
             .iter   ()
             .filter (|f| f.inbox.is_none())
-            .collect()
+    }
+    
+    pub fn needs_inbox_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
+        self.md_files
+            .iter_mut()
+            .filter  (|f| f.inbox.is_none())
+    }
+
+    pub fn bulk_assign_inbox_by_name<F>(&mut self, inbox: &str, filter: F)
+        where F: Fn(&MdFile) -> bool
+    {
+
+        let filtered = self.needs_inbox_mut()
+            .filter(|f| filter(&f))
+        ;
+
+        let mut count = 0;
+
+        for file in filtered {
+            count += 1;
+
+            file.assign_inbox(inbox.to_owned());
+            file.write_file();
+        }
+
+        println!("assigned: {}", count);
     }
 
 }
@@ -72,7 +98,7 @@ impl MdFile {
         };
 
         let fm_text = yaml_serde::to_string(fm).unwrap();
-        let text    = format!("---\n{fm_text}\n---\n{}", self.text);
+        let text    = format!("---\n{fm_text}---\n{}", self.text);
 
         fs::write(self.entry.path(), &text).unwrap();
     }
@@ -86,20 +112,11 @@ fn vault_folder() -> PathBuf {
     home.join("Notes")
 }
 
-fn scan_vault() -> Vec<DirEntry> {
+fn scan_vault() -> impl Iterator<Item = DirEntry> {
     WalkDir::new(vault_folder())
         .into_iter   ()
         .filter_entry(|e| !is_hidden(e))
         .filter_map  (|e| e.ok())
-        .collect     ()
-}
-
-fn md_files(files: &[DirEntry]) -> Vec<DirEntry> {
-    files
-        .iter  ()
-        .filter(|f| ends_with(f, ".md"))
-        .map   (|f| f.clone())
-        .collect()
 }
 
 fn is_hidden(entry: &DirEntry) -> bool {
@@ -121,12 +138,15 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
 
 fn parse_md_file(file: &DirEntry) -> MdFile {
 
+    let name = || file.file_name().to_str().unwrap().to_owned();
+    
     
     let blank = |text| {
         MdFile {
             entry:       file.clone(),
             frontmatter: None,
             inbox:       None,
+            file_name:   name(),
             text,
         }
     };
@@ -149,6 +169,7 @@ fn parse_md_file(file: &DirEntry) -> MdFile {
             .map     (|i| i.to_owned())
         ,
         frontmatter: Some(fm),
+        file_name:   name(),
         text,
     }
 
@@ -157,16 +178,17 @@ fn parse_md_file(file: &DirEntry) -> MdFile {
 
 fn get_frontmatter_text(file: &DirEntry) -> (Option<String>, String) {
 
+    // (?ms) set flags
     // m     multi-line mode: ^ and $ match begin/end of line
     // s     allow . to match \n
-    regex!(RE = r"(?ms)^---\s*(.+?)^---\s*$(.*)");
+    regex!(RE = r"^(?ms)---\s*(.+?)^---\s*$(.*)");
 
     let text = fs::read_to_string(file.path()).unwrap();
-    
+
     let Some(captures) = RE.captures(&text) else {
         return (None, text);
     };
-    
+
     (
         Some(captures[1].to_owned()),
         captures[2].to_owned()
