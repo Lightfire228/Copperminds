@@ -1,30 +1,59 @@
 mod vault;
 
-use vault::Index;
-use walkdir::DirEntry;
-use std::sync::LazyLock;
-use regex::Regex;
+use std::{fmt::Display, iter};
 
-use crate::vault::MdFile;
-use crate::vault::regex;
+use vault::Index;
 
 
 
 fn main() {
 
-    let mut index = Index::build();
+    let index = Index::build();
 
-    let mut rest: Vec<_> = index.needs_inbox().collect();
+    let rest = index.needs_inbox();
 
-    rest.sort_by_key(|f| &f.file_name);
 
-    for file in rest.iter() {
-        println!("needs inbox: {}", file.file_name);
+    let filenames = rest
+        .map(|f| &f.file_name)
+    ;
+
+    display_list_sorted("needs inbox", filenames, |f| *f);
+
+    let inboxes = index.list_all_inboxes();
+
+    println!("");
+    display_list_sorted("Inboxes", inboxes.iter(), |i| *i);
+
+    // index.bulk_assign_inbox_by_name("other", |f| {
+    //     true
+    // });
+}
+
+
+fn display_list<T>(msg: &str, iter: impl Iterator<Item = T>)
+    where T: Display
+{
+    let mut count = 0;
+
+    println!("{msg}:");
+
+    for x in iter {
+        println!(" - {x}");
+        count += 1;
     }
 
-    println!("count: {}", rest.len());
+    println!("/{msg}");
+    println!("count: {count}");
+}
 
-    index.bulk_assign_inbox_by_name("other", |f| {
-        true
-    });
+fn display_list_sorted<F, T, K>(msg: &str, iter: impl Iterator<Item = T>, sort_by: F)
+    where T: Display,
+          K: Ord,
+          F: Fn(&T) -> K,
+{
+    let mut list: Vec<_> = iter.collect();
+
+    list.sort_by_key(sort_by);
+
+    display_list(msg, list.into_iter());
 }
