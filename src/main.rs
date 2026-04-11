@@ -16,7 +16,7 @@ fn main() {
     print_unnamed_files(&index);
     print_empty_files  (&index);
 
-    // index.delete_empty_files();
+    index.delete_empty_files();
     
     // index.bulk_assign_inbox_by_name("other", |f| {
     //     true
@@ -48,7 +48,7 @@ fn print_inboxes(index: &Index) {
 fn print_empty_files(index: &Index) {
     display_list_sorted_by_name(
         "Empty files",
-        index.list_empty_files(),
+        index.list_empty_unnamed_files(),
     );
 }
 

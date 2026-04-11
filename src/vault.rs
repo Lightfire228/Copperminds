@@ -1,6 +1,7 @@
-use std::{collections::{HashMap}, env, fs, path::PathBuf, sync::LazyLock};
+use std::{collections::HashMap, env, fs, mem, ops::Deref, path::PathBuf, sync::LazyLock};
 
 use regex::Regex;
+use serde::de;
 use walkdir::{DirEntry, WalkDir};
 use yaml_serde::{Mapping, Value};
 use trash;
@@ -16,7 +17,7 @@ pub(crate) use regex;
 
 
 pub struct Index {
-    pub md_files: Vec<MdFile>,
+    pub md_files: Vec<Box<MdFile>>,
     
 }
 
@@ -48,12 +49,14 @@ impl Index {
         self.md_files
             .iter   ()
             .filter (|f| f.inbox.is_none())
+            .map    (|f| f.as_ref())
     }
     
     pub fn needs_inbox_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
         self.md_files
             .iter_mut()
             .filter  (|f| f.inbox.is_none())
+            .map     (|f| f.as_mut())
     }
 
     pub fn bulk_assign_inbox_by_name<F>(&mut self, inbox: &str, filter: F)
@@ -98,11 +101,11 @@ impl Index {
         map
     }
 
-    pub fn list_empty_files(&self) -> impl Iterator<Item = &MdFile> {
+    pub fn list_empty_unnamed_files(&self) -> impl Iterator<Item = &MdFile> {
         regex!(RE = r"^\s*$");
 
         self.list_unnamed_files()
-            .filter(|f| RE.is_match(&f.md_text))
+            .filter(|f| RE.is_match(&f.md_text)) // TODO: use raw_text instead?
     }
 
     pub fn list_unnamed_files(&self) -> impl Iterator<Item = &MdFile> {
@@ -111,15 +114,31 @@ impl Index {
 
         self.md_files
             .iter  ()
-            .filter(|f| 
+            .filter(|f|
                 RE.is_match(&f.file_name)
             )
+            .map(|f| f.as_ref())
     }
 
     pub fn delete_empty_files(&mut self) {
-        for file in self.list_empty_files() {
+        let files: Vec<_> = self.list_empty_unnamed_files().collect();
+
+        for file in files.iter() {
             trash::delete(file.entry.path()).unwrap();
         }
+
+        let deleted: Vec<_> = files
+            .iter   ()
+            .map    (|f| *f as *const MdFile)
+            .collect()
+        ;
+
+        // TODO: maybe store the files as a hashmap?
+        self.md_files
+            .retain(|f| !deleted.contains(
+                &(f.deref() as *const MdFile)
+            ))
+        ;
     }
     
 
@@ -151,8 +170,15 @@ impl MdFile {
 
         fs::write(self.entry.path(), &text).unwrap();
     }
-
 }
+
+impl PartialEq for MdFile {
+    fn eq(&self, other: &Self) -> bool {
+        self.entry.path() == other.entry.path()
+    }
+}
+
+impl Eq for MdFile {}
 
 
 fn vault_folder() -> PathBuf {
@@ -185,20 +211,20 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
 }
 
 
-fn parse_md_file(file: &DirEntry) -> MdFile {
+fn parse_md_file(file: &DirEntry) -> Box<MdFile> {
 
     let name = || file.file_name().to_str().unwrap().to_owned();
     
     
     let blank = |text: String| {
-        MdFile {
+        Box::new(MdFile {
             entry:       file.clone(),
             frontmatter: None,
             inbox:       None,
             file_name:   name(),
             md_text:     text.clone(),
             raw_text:    text,
-        }
+        })
     };
 
     let parsed = get_frontmatter_text(&file);
@@ -212,7 +238,7 @@ fn parse_md_file(file: &DirEntry) -> MdFile {
         return blank(parsed.raw_text);
     };
 
-    MdFile {
+    Box::new(MdFile {
         entry:       file.clone(),
         inbox:       fm
             .get     ("inbox")
@@ -223,7 +249,7 @@ fn parse_md_file(file: &DirEntry) -> MdFile {
         file_name:   name(),
         md_text:     parsed.body,
         raw_text:    parsed.raw_text,
-    }
+    })
 
 }
 
