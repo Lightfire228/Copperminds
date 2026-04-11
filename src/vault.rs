@@ -1,4 +1,4 @@
-use std::{collections::HashSet, env, fs, ops::Deref, path::PathBuf, sync::LazyLock};
+use std::{collections::{HashMap}, env, fs, path::PathBuf, sync::LazyLock};
 
 use regex::Regex;
 use walkdir::{DirEntry, WalkDir};
@@ -74,12 +74,26 @@ impl Index {
         println!("assigned: {}", count);
     }
 
-    pub fn list_all_inboxes(&self) -> HashSet<&str> {
-        self.md_files
+    pub fn list_all_inboxes(&self) -> HashMap<&str, Vec<&MdFile>> {
+        let files = self.md_files
             .iter      ()
-            .filter_map(|f| f.inbox.as_ref())
-            .map       (|i| i.as_str())
-            .collect   ()
+            .filter_map(|f| f.inbox
+                .as_ref()
+                .map   (|i| (i.as_str(), f))
+            )
+        ;
+
+        let mut map: HashMap<&str, Vec<&MdFile>> = HashMap::new();
+
+        for (inbox, file) in files {
+            map
+                .entry     (inbox)
+                .and_modify(|list| list.push(file))
+                .or_insert (vec![file])
+            ;
+        }
+        
+        map
     }
     
 
