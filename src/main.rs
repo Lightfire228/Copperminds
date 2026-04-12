@@ -4,23 +4,32 @@ use std::{fmt::Display};
 
 use vault::Index;
 
-use crate::vault::MdFile;
+use crate::vault::{BulkAssign, MdFile};
 
 
 fn main() {
 
     let mut index = Index::build();
 
+    print_inbox_status(&index);
+
+    print_all_by_inbox(&index, "todo");
+
+    // index.delete_empty_files();
+
+    // let files = vec![
+    // ];
+
+    // index.bulk_assign_inbox("projects", BulkAssign::All, |f| {
+    //     files.contains(&f.file_name.as_str())
+    // });
+}
+
+fn print_inbox_status(index: &Index) {
     print_needs_inbox  (&index);
     print_inboxes      (&index);
     print_unnamed_files(&index);
     print_empty_files  (&index);
-
-    index.delete_empty_files();
-    
-    // index.bulk_assign_inbox_by_name("other", |f| {
-    //     true
-    // });
 }
 
 
@@ -59,17 +68,30 @@ fn print_unnamed_files(index: &Index) {
     );
 }
 
+fn print_all_by_inbox(index: &Index, name: &str) {
+
+    let inbox       = index.list_all_inboxes();
+    let Some(files) = inbox.get(name) else {
+        println!("Inbox '{name}' not found");
+        return;
+    };
+
+    let files = to_obsidian_list(files.iter().map(|f| *f).collect());
+
+    println!("files:\n{}", files);
+}
 
 
 
 fn display_list<T>(msg: &str, iter: impl Iterator<Item = T>)
-where 
+where
     T: Display
 {
     let list: Vec<_> = iter.collect();
 
     if list.is_empty() {
         println!("{msg}: []");
+        return;
     }
 
     let count = list.len();
@@ -86,7 +108,7 @@ where
 }
 
 fn display_list_sorted<F, T, K>(msg: &str, iter: impl Iterator<Item = T>, sort_by: F)
-where 
+where
     T: Display,
     K: Ord,
     F: Fn(&T) -> K,
@@ -101,7 +123,7 @@ where
 fn display_list_sorted_by_name<'a>(msg: &str, iter: impl Iterator<Item = &'a MdFile>) {
 
     let list = iter.map(|f| f.file_name.as_str());
-    
+
     display_list_sorted(msg, list, |f| *f);
 }
 
@@ -114,4 +136,19 @@ impl<'a> Display for InboxMap<'a> {
 
         write!(f, "{},{} {}", self.0, spaces, self.1)
     }
+}
+
+
+fn to_obsidian_list(mut files: Vec<&MdFile>) -> String {
+
+    files.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+
+    let mut result = String::new();
+    for file in files {
+
+        let line = format!("- [ ] [[{}]]\n", file.file_name);
+        result.push_str(&line);
+    }
+
+    result
 }

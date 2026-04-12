@@ -30,6 +30,11 @@ pub struct MdFile {
     pub raw_text:    String,
 }
 
+pub enum BulkAssign {
+    All,
+    NeedsInboxOnly,
+}
+
 impl Index {
     pub fn build() -> Self {
         let files    = scan_vault();
@@ -58,12 +63,23 @@ impl Index {
             .filter  (|f| f.inbox.is_none())
             .map     (|f| f.as_mut())
     }
+    
+    pub fn all_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
+        self.md_files
+            .iter_mut()
+            .map     (|f| f.as_mut())
+    }
 
-    pub fn bulk_assign_inbox_by_name<F>(&mut self, inbox: &str, filter: F)
-        where F: Fn(&MdFile) -> bool
+    pub fn bulk_assign_inbox<F>(&mut self, inbox: &str, target: BulkAssign, filter: F)
+    where 
+        F: Fn(&MdFile) -> bool
     {
+        let files: Box<dyn Iterator<Item = &mut MdFile>> = match target {
+            BulkAssign::All            => Box::new(self.all_files_mut  ()),
+            BulkAssign::NeedsInboxOnly => Box::new(self.needs_inbox_mut()),
+        };
 
-        let filtered = self.needs_inbox_mut()
+        let filtered = files
             .filter(|f| filter(&f))
         ;
 
@@ -83,6 +99,7 @@ impl Index {
         let files = self.md_files
             .iter      ()
             .filter_map(|f| f.inbox
+
                 .as_ref()
                 .map   (|i| (i.as_str(), f))
             )
