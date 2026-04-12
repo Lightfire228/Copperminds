@@ -15,19 +15,27 @@ macro_rules! regex {
 
 pub(crate) use regex;
 
+use crate::backup;
+
 
 pub struct Index {
     pub md_files: Vec<Box<MdFile>>,
+    pub path:     PathBuf,
     
 }
 
 pub struct MdFile {
-    pub entry:       DirEntry,
-    pub frontmatter: Option<Mapping>,
+    pub entry:            DirEntry,
+    pub frontmatter:      Frontmatter,
+    pub file_name:        String,
+    pub md_text:          String,
+    pub raw_text:         String,
+}
+
+pub struct Frontmatter {
+    pub yaml:        Option<Mapping>,
     pub inbox:       Option<String>,
-    pub file_name:   String,
-    pub md_text:     String,
-    pub raw_text:    String,
+    pub processing:  Option<Vec<String>>,
 }
 
 pub enum BulkAssign {
@@ -47,20 +55,27 @@ impl Index {
 
         Self {
             md_files,
+            path: vault_folder(),
         }
+    }
+
+    pub fn backup(&self) {
+        println!("Backing up vault");
+
+        backup::backup(&self.path);
     }
 
     pub fn needs_inbox(&self) -> impl Iterator<Item = &MdFile> {
         self.md_files
             .iter   ()
-            .filter (|f| f.inbox.is_none())
+            .filter (|f| f.frontmatter.inbox.is_none())
             .map    (|f| f.as_ref())
     }
     
     pub fn needs_inbox_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
         self.md_files
             .iter_mut()
-            .filter  (|f| f.inbox.is_none())
+            .filter  (|f| f.frontmatter.inbox.is_none())
             .map     (|f| f.as_mut())
     }
     
@@ -98,7 +113,7 @@ impl Index {
     pub fn list_all_inboxes(&self) -> HashMap<&str, Vec<&MdFile>> {
         let files = self.md_files
             .iter      ()
-            .filter_map(|f| f.inbox
+            .filter_map(|f| f.frontmatter.inbox
 
                 .as_ref()
                 .map   (|i| (i.as_str(), f))
@@ -166,18 +181,18 @@ impl MdFile {
 
     pub fn assign_inbox(&mut self, inbox: String) {
         
-        let mut fm = self.frontmatter.take().unwrap_or_else(|| Mapping::new());
+        let mut fm = self.frontmatter.yaml.take().unwrap_or_else(|| Mapping::new());
         
         let key = Value::String("inbox".to_owned());
         let val = Value::String(inbox.clone());
         fm.insert(key, val);
 
-        self.inbox       = Some(inbox);
-        self.frontmatter = Some(fm);
+        self.frontmatter.inbox = Some(inbox);
+        self.frontmatter.yaml  = Some(fm);
     }
 
     pub fn write_file(&self) {
-        let Some(fm) = &self.frontmatter else {
+        let Some(fm) = &self.frontmatter.yaml else {
             fs::write(self.entry.path(), &self.md_text).unwrap();
             return;
         };
@@ -235,12 +250,16 @@ fn parse_md_file(file: &DirEntry) -> Box<MdFile> {
     
     let blank = |text: String| {
         Box::new(MdFile {
-            entry:       file.clone(),
-            frontmatter: None,
-            inbox:       None,
-            file_name:   name(),
-            md_text:     text.clone(),
-            raw_text:    text,
+            frontmatter: Frontmatter {
+                yaml:       None,
+                inbox:      None,
+                processing: None,
+            },
+            
+            entry:     file.clone(),
+            file_name: name(),
+            md_text:   text.clone(),
+            raw_text:  text,
         })
     };
 
@@ -256,18 +275,58 @@ fn parse_md_file(file: &DirEntry) -> Box<MdFile> {
     };
 
     Box::new(MdFile {
+        frontmatter: parse_frontmatter(fm),
         entry:       file.clone(),
-        inbox:       fm
-            .get     ("inbox")
-            .and_then(|i| i.as_str())
-            .map     (|i| i.to_owned())
-        ,
-        frontmatter: Some(fm),
         file_name:   name(),
         md_text:     parsed.body,
         raw_text:    parsed.raw_text,
     })
+}
 
+fn parse_frontmatter(fm: Mapping) -> Frontmatter {
+    let processing = get_processing_tag(&fm);
+    let inbox      = fm
+        .get     ("inbox")
+        .and_then(|i| i.as_str())
+        .map     (|i| i.to_owned())
+    ;
+
+    Frontmatter {
+        yaml: Some(fm),
+        
+        processing,
+        inbox,
+    }
+        
+}
+
+fn get_processing_tag(fm: &Mapping) -> Option<Vec<String>> {
+
+    let processing = fm.get("processing")?;
+
+    if processing.is_mapping() {
+        panic!("'processing' tag is a mapping, expected list or single value");
+    }
+
+    let values = if processing.is_sequence() {
+        processing.as_sequence().unwrap().as_slice()
+    } else {
+        &[processing.to_owned()]
+    };
+
+    let values: Vec<_> = values
+        .iter()
+        .map (|v| match v {
+            Value::Bool  (b) => b.to_string(),
+            Value::Number(n) => n.to_string(),
+            Value::String(s) => s.to_owned(),
+
+            _  => panic!("expect value to be a bool, string, or number"),
+        })
+        .collect()
+    ;
+
+    Some(values)
 }
 
 

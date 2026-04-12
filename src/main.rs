@@ -1,6 +1,10 @@
-mod vault;
+#![allow(unused_imports)]
+#![allow(dead_code)]
 
-use std::{fmt::Display};
+mod vault;
+mod backup;
+
+use std::{fmt::Display, io::{self, Stdout, Write}};
 
 use vault::Index;
 
@@ -11,21 +15,52 @@ fn main() {
 
     let mut index = Index::build();
 
-    print_inbox_status(&index);
-
-    print_all_by_inbox(&index, "todo");
-
-    // index.delete_empty_files();
-
-    // let files = vec![
-    // ];
-
-    // index.bulk_assign_inbox("projects", BulkAssign::All, |f| {
-    //     files.contains(&f.file_name.as_str())
-    // });
+    print_vault_status(&index);
+    do_query          (&index);
+    
+    if confirm_with_user("Update Files?") {
+        update_files(&mut index);
+    }
 }
 
-fn print_inbox_status(index: &Index) {
+
+fn do_query(index: &Index) {
+
+    // TODO: figure out how to subdivide inbox
+    print_all_by_inbox(&index, "todo");
+
+    let files = index.md_files
+        .iter  ()
+        .filter(|f| f.frontmatter.processing.is_some())
+        .map   (|f| f.as_ref())
+    ;
+
+    display_list_sorted_by_name("Processing", files);
+
+}
+
+
+fn update_files(index: &mut Index) {
+
+    index.backup();
+
+    println!("updating files");
+
+    index.delete_empty_files();
+
+    let files = vec![
+
+    ];
+
+    index.bulk_assign_inbox("projects", BulkAssign::All, |f| {
+        files.contains(&f.file_name.as_str())
+    });
+
+}
+
+// ---- print status
+
+fn print_vault_status(index: &Index) {
     print_needs_inbox  (&index);
     print_inboxes      (&index);
     print_unnamed_files(&index);
@@ -82,6 +117,7 @@ fn print_all_by_inbox(index: &Index, name: &str) {
 }
 
 
+// -- utils
 
 fn display_list<T>(msg: &str, iter: impl Iterator<Item = T>)
 where
@@ -151,4 +187,26 @@ fn to_obsidian_list(mut files: Vec<&MdFile>) -> String {
     }
 
     result
+}
+
+fn get_usr_in(prompt: &str) -> String {
+    let mut buffer = String::new();
+    let     stdin  = io    ::stdin ();
+    let mut stdout = io    ::stdout();
+
+    print!("{prompt}\n> ");
+    stdout.flush().unwrap();
+
+    stdin.read_line(&mut buffer).unwrap();
+
+    buffer.trim().to_owned()
+
+}
+
+fn confirm_with_user(prompt: &str) -> bool {
+    let prompt = format!("{prompt} (y/N)");
+
+    let usr_in = get_usr_in(&prompt);
+
+    usr_in.to_lowercase().starts_with("y")
 }
