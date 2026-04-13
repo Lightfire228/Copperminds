@@ -14,16 +14,14 @@ use crate::vault::{BulkAssign, MdFile};
 fn main() {
 
     let mut index = Index::build();
-    
+
     index.delete_empty_unnamed_files();
 
     print_vault_status(&index);
     do_query          (&index);
 
     
-    // if confirm_with_user("Update Files?") {
-    //     update_files(&mut index);
-    // }
+    update_files(&mut index);
 }
 
 
@@ -45,6 +43,11 @@ fn do_query(index: &Index) {
 
 fn update_files(index: &mut Index) {
 
+    if !confirm_with_user("Update Files?") {
+        return;
+    }
+
+
     index.backup();
 
     println!("updating files");
@@ -53,7 +56,11 @@ fn update_files(index: &mut Index) {
 
     ];
 
-    index.bulk_assign_inbox("projects", BulkAssign::All, |f| {
+    // index.bulk_assign_inbox("projects", BulkAssign::All, |f| {
+    //     files.contains(&f.file_name.as_str())
+    // });
+    
+    index.bulk_assign_processing_tag("needs_status", BulkAssign::All, |f| {
         files.contains(&f.file_name.as_str())
     });
 

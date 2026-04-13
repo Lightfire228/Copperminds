@@ -3,7 +3,7 @@ use std::{collections::HashMap, env, fs, mem, ops::Deref, path::PathBuf, sync::L
 use regex::Regex;
 use serde::de;
 use walkdir::{DirEntry, WalkDir};
-use yaml_serde::{Mapping, Value};
+use yaml_serde::{Mapping, Sequence, Value};
 use trash;
 
 macro_rules! regex {
@@ -113,6 +113,26 @@ impl Index {
 
         println!("assigned: {}", count);
     }
+    
+    pub fn bulk_assign_processing_tag<F>(&mut self, tag: &str, filter: F)
+    where 
+        F: Fn(&MdFile) -> bool
+    {
+        let files = self.iter_files_mut()
+            .filter(|f| filter(&f))
+        ;
+
+        let mut count = 0;
+
+        for file in files {
+            count += 1;
+
+            file.assign_processing_tag(tag.to_owned());
+            file.write_file();
+        }
+
+        println!("assigned: {}", count);
+    }
 
     pub fn list_all_inboxes(&self) -> HashMap<&str, Vec<&MdFile>> {
 
@@ -188,6 +208,26 @@ impl MdFile {
 
         self.frontmatter.inbox = Some(inbox);
         self.frontmatter.yaml  = Some(fm);
+    }
+
+    pub fn assign_processing_tag(&mut self, tag: String) {
+        
+        
+        let mut fm   = self.frontmatter.yaml      .take().unwrap_or_else(|| Mapping::new());
+        let mut tags = self.frontmatter.processing.take().unwrap_or_else(|| Vec    ::new());
+
+        tags.push(tag.clone());
+        
+        let key = Value::String("processing".to_owned());
+        let val = Value::Sequence(Sequence::from_iter(tags
+            .iter()
+            .map (|t| Value::String(t.to_owned()))
+        ));
+        
+        fm.insert(key, val);
+
+        self.frontmatter.processing = Some(tags);
+        self.frontmatter.yaml       = Some(fm);
     }
 
     pub fn write_file(&self) {
