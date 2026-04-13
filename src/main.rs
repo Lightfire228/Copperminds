@@ -21,7 +21,7 @@ fn main() {
     do_query          (&index);
 
     
-    update_files(&mut index);
+    // update_files(&mut index);
 }
 
 
@@ -52,17 +52,17 @@ fn update_files(index: &mut Index) {
 
     println!("updating files");
 
-    let files = vec![
+    // let files = vec![
 
-    ];
+    // ];
 
     // index.bulk_assign_inbox("projects", BulkAssign::All, |f| {
     //     files.contains(&f.file_name.as_str())
     // });
     
-    index.bulk_assign_processing_tag("needs_status", BulkAssign::All, |f| {
-        files.contains(&f.file_name.as_str())
-    });
+    // index.bulk_assign_processing_tag("needs_status", BulkAssign::All, |f| {
+    //     files.contains(&f.file_name.as_str())
+    // });
 
 }
 
