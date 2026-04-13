@@ -65,32 +65,36 @@ impl Index {
         backup::backup(&self.path);
     }
 
-    pub fn needs_inbox(&self) -> impl Iterator<Item = &MdFile> {
+    fn iter_files(&self) -> impl Iterator<Item = &MdFile> {
         self.md_files
-            .iter   ()
-            .filter (|f| f.frontmatter.inbox.is_none())
-            .map    (|f| f.as_ref())
+            .iter()
+            .map (|f| f.as_ref())
+    }
+
+    fn iter_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
+        self.md_files
+            .iter_mut()
+            .map (|f| f.as_mut())
+    }
+
+    pub fn needs_inbox(&self) -> impl Iterator<Item = &MdFile> {
+
+        self.iter_files()
+            .filter    (|f| f.frontmatter.inbox.is_none())
     }
     
     pub fn needs_inbox_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
-        self.md_files
-            .iter_mut()
+
+        self.iter_files_mut()
             .filter  (|f| f.frontmatter.inbox.is_none())
-            .map     (|f| f.as_mut())
     }
     
-    pub fn all_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
-        self.md_files
-            .iter_mut()
-            .map     (|f| f.as_mut())
-    }
-
     pub fn bulk_assign_inbox<F>(&mut self, inbox: &str, target: BulkAssign, filter: F)
     where 
         F: Fn(&MdFile) -> bool
     {
         let files: Box<dyn Iterator<Item = &mut MdFile>> = match target {
-            BulkAssign::All            => Box::new(self.all_files_mut  ()),
+            BulkAssign::All            => Box::new(self.iter_files_mut ()),
             BulkAssign::NeedsInboxOnly => Box::new(self.needs_inbox_mut()),
         };
 
@@ -111,10 +115,10 @@ impl Index {
     }
 
     pub fn list_all_inboxes(&self) -> HashMap<&str, Vec<&MdFile>> {
-        let files = self.md_files
-            .iter      ()
-            .filter_map(|f| f.frontmatter.inbox
 
+        let files = self
+            .iter_files()
+            .filter_map(|f| f.frontmatter.inbox
                 .as_ref()
                 .map   (|i| (i.as_str(), f))
             )
@@ -133,26 +137,21 @@ impl Index {
         map
     }
 
+
     pub fn list_empty_unnamed_files(&self) -> impl Iterator<Item = &MdFile> {
-        regex!(RE = r"^\s*$");
 
         self.list_unnamed_files()
-            .filter(|f| RE.is_match(&f.md_text)) // TODO: use raw_text instead?
+            .filter(|f| is_empty(f))
     }
 
     pub fn list_unnamed_files(&self) -> impl Iterator<Item = &MdFile> {
 
-        regex!(RE = r"^([\d \-_]*|Untitled.*?)\.md$");
-
-        self.md_files
-            .iter  ()
-            .filter(|f|
-                RE.is_match(&f.file_name)
-            )
-            .map(|f| f.as_ref())
+        self.iter_files()
+            .filter(|f| is_unnamed(f))
     }
 
-    pub fn delete_empty_files(&mut self) {
+    pub fn delete_empty_unnamed_files(&mut self) {
+        
         let files: Vec<_> = self.list_empty_unnamed_files().collect();
 
         for file in files.iter() {
@@ -363,4 +362,24 @@ struct ParsedFm {
     pub raw_text: String,
     pub fm:       String,
     pub body:     String,
+}
+
+const RE_EMPTY: &str = r"^\s*$";
+
+fn is_empty(file: &MdFile) -> bool {
+    regex!(RE = RE_EMPTY);
+
+    RE.is_match(&file.raw_text)
+}
+
+fn is_md_empty(file: &MdFile) -> bool {
+    regex!(RE = RE_EMPTY);
+
+    RE.is_match(&file.md_text)
+}
+
+fn is_unnamed(file: &MdFile) -> bool {
+    regex!(RE = r"^([\d \-_]*|Untitled.*?)\.md$");
+
+    RE.is_match(&file.file_name)
 }

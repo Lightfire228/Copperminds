@@ -14,13 +14,16 @@ use crate::vault::{BulkAssign, MdFile};
 fn main() {
 
     let mut index = Index::build();
+    
+    index.delete_empty_unnamed_files();
 
     print_vault_status(&index);
     do_query          (&index);
+
     
-    if confirm_with_user("Update Files?") {
-        update_files(&mut index);
-    }
+    // if confirm_with_user("Update Files?") {
+    //     update_files(&mut index);
+    // }
 }
 
 
@@ -46,8 +49,6 @@ fn update_files(index: &mut Index) {
 
     println!("updating files");
 
-    index.delete_empty_files();
-
     let files = vec![
 
     ];
@@ -64,7 +65,6 @@ fn print_vault_status(index: &Index) {
     print_needs_inbox  (&index);
     print_inboxes      (&index);
     print_unnamed_files(&index);
-    print_empty_files  (&index);
 }
 
 
