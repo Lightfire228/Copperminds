@@ -19,45 +19,25 @@ pub struct MdFile {
 pub struct Frontmatter {
     pub yaml:        Option<Mapping>,
     pub inbox:       Option<String>,
+    pub status:      Option<String>,
     pub processing:  Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FmProperty {
+    Inbox,
+    Status,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FmPropertyList {
+    Processing,
 }
 
 impl MdFile {
 
     pub fn new(file: &DirEntry) -> Self {
         parse_md_file(file)
-    }
-
-    pub fn assign_inbox(&mut self, inbox: String) {
-        
-        let mut fm = self.frontmatter.yaml.take().unwrap_or_else(|| Mapping::new());
-        
-        let key = Value::String("inbox".to_owned());
-        let val = Value::String(inbox.clone());
-        fm.insert(key, val);
-
-        self.frontmatter.inbox = Some(inbox);
-        self.frontmatter.yaml  = Some(fm);
-    }
-
-    pub fn assign_processing_tag(&mut self, tag: String) {
-        
-        
-        let mut fm   = self.frontmatter.yaml      .take().unwrap_or_else(|| Mapping::new());
-        let mut tags = self.frontmatter.processing.take().unwrap_or_else(|| Vec    ::new());
-
-        tags.push(tag.clone());
-        
-        let key = Value::String("processing".to_owned());
-        let val = Value::Sequence(Sequence::from_iter(tags
-            .iter()
-            .map (|t| Value::String(t.to_owned()))
-        ));
-        
-        fm.insert(key, val);
-
-        self.frontmatter.processing = Some(tags);
-        self.frontmatter.yaml       = Some(fm);
     }
 
     pub fn write_file(&self) {
@@ -90,6 +70,59 @@ impl MdFile {
 
         RE.is_match(&self.file_name)
     }
+
+    pub fn has_property_val(&self, property: FmProperty, value: &str) -> bool {
+        self.frontmatter.get_property(property) == Some(value)
+    }
+
+    pub fn has_property_val_any(&self, property: FmProperty, values: &[&str]) -> bool {
+        let Some(prop) = self.frontmatter.get_property(property) else {
+            return false;
+        };
+
+
+        values.contains(&prop)
+    }
+
+
+    pub fn assign_inbox(&mut self, inbox: String) {
+        self.assign_property(FmProperty::Inbox, inbox);
+    }
+    
+    pub fn assign_processing_tag(&mut self, tag: String) {
+        self.push_property_list(FmPropertyList::Processing, tag);
+    }
+
+    pub fn assign_property(&mut self, property: FmProperty, value: String) {
+        
+        let mut fm = self.frontmatter.yaml.take().unwrap_or_else(|| Mapping::new());
+        
+        let key = Value::String(property.get_key());
+        let val = Value::String(value   .clone());
+        fm.insert(key, val);
+
+        self.frontmatter.yaml = Some(fm);
+        self.frontmatter.set_property(property, value);
+    }
+
+    pub fn push_property_list(&mut self, list: FmPropertyList, tag: String) {
+        
+        let mut fm   = self.frontmatter.yaml.take().unwrap_or_else(|| Mapping::new());
+        let mut tags = self.frontmatter.take_property_list_mut(list);
+
+        tags.push(tag.clone());
+        
+        let key = Value::String  (list.get_key());
+        let val = Value::Sequence(Sequence::from_iter(tags
+            .iter()
+            .map (|t| Value::String(t.to_owned()))
+        ));
+        
+        fm.insert(key, val);
+
+        self.frontmatter.yaml = Some(fm);
+        self.frontmatter.set_property_list(list, tags);
+    }
 }
 
 impl PartialEq for MdFile {
@@ -104,6 +137,52 @@ impl Frontmatter {
     pub fn new(fm: Mapping) -> Self {
         parse_frontmatter(fm)
     }
+
+    fn get_property(&self, property: FmProperty) -> Option<&str> {
+
+        match property {
+            FmProperty::Inbox  => self.inbox .as_ref().map(|p| p.as_str()),
+            FmProperty::Status => self.status.as_ref().map(|p| p.as_str()),
+        }
+    }
+
+    fn set_property(&mut self, property: FmProperty, value: String) {
+
+        match property {
+            FmProperty::Inbox  => self.inbox  = Some(value),
+            FmProperty::Status => self.status = Some(value),
+        }
+    }
+
+    fn set_property_list(&mut self, list: FmPropertyList, value: Vec<String>) {
+        match list {
+            FmPropertyList::Processing => self.processing = Some(value)
+        }
+    }
+
+    fn take_property_list_mut(&mut self, list: FmPropertyList) -> Vec<String> {
+        match list {
+            FmPropertyList::Processing => self.processing.take().unwrap_or_else(|| Vec::new())
+        }
+    }
+
+}
+
+impl FmProperty {
+    pub fn get_key(&self) -> String {
+        match &self {
+            FmProperty::Inbox  => "inbox" .to_owned(),
+            FmProperty::Status => "status".to_owned()
+        }
+    }
+}
+
+impl FmPropertyList {
+    pub fn get_key(&self) -> String {
+        match &self {
+            FmPropertyList::Processing => "processing".to_owned(),
+        }
+    }
 }
 
 
@@ -117,6 +196,7 @@ fn parse_md_file(file: &DirEntry) -> MdFile {
             frontmatter: Frontmatter {
                 yaml:       None,
                 inbox:      None,
+                status:     None,
                 processing: None,
             },
             
@@ -155,11 +235,18 @@ fn parse_frontmatter(fm: Mapping) -> Frontmatter {
         .map     (|i| i.to_owned())
     ;
 
+    let status     = fm
+        .get     ("status")
+        .and_then(|i| i.as_str())
+        .map     (|i| i.to_owned())
+    ;
+
     Frontmatter {
         yaml: Some(fm),
         
         processing,
         inbox,
+        status,
     }
         
 }

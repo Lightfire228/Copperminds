@@ -8,7 +8,8 @@ use std::{fmt::Display, io::{self, Stdout, Write}};
 
 use vault::Index;
 
-use crate::vault::{BulkAssign, MdFile};
+use crate::vault::{BulkAssign, md_file::FmProperty};
+use crate::vault::md_file::MdFile;
 
 
 fn main() {
@@ -21,22 +22,33 @@ fn main() {
     do_query          (&index);
 
     
-    // update_files(&mut index);
+    update_files(&mut index);
 }
 
 
 fn do_query(index: &Index) {
 
-    // TODO: figure out how to subdivide inbox
-    print_all_by_inbox(&index, "todo");
+    // // TODO: figure out how to subdivide inbox
+    // print_all_by_inbox(&index, "todo");
 
-    let files = index.md_files
-        .iter  ()
-        .filter(|f| f.frontmatter.processing.is_some())
-        .map   (|f| f.as_ref())
+    let files = index
+        .iter_files()
+        .filter    (|f| {
+                f.has_property_val    (FmProperty::Inbox,  "todo")
+            && !f.has_property_val_any(FmProperty::Status, &["completed", "archived"])
+
+        })
     ;
 
-    display_list_sorted_by_name("Processing", files);
+    display_list_sorted_by_name("Incomplete TODO", files);
+
+    // let files = index.md_files
+    //     .iter  ()
+    //     .filter(|f| f.frontmatter.processing.is_some())
+    //     .map   (|f| f.as_ref())
+    // ;
+
+    // display_list_sorted_by_name("Processing", files);
 
 }
 
@@ -52,16 +64,15 @@ fn update_files(index: &mut Index) {
 
     println!("updating files");
 
-    // let files = vec![
+    let files = vec![
+    ];
 
-    // ];
-
-    // index.bulk_assign_inbox("projects", BulkAssign::All, |f| {
-    //     files.contains(&f.file_name.as_str())
-    // });
+    index.bulk_assign_property(FmProperty::Status, "archived", |f| {
+        files.contains(&f.file_name.as_str())
+    });
     
-    // index.bulk_assign_processing_tag("needs_status", BulkAssign::All, |f| {
-    //     files.contains(&f.file_name.as_str())
+    // index.bulk_assign_processing_tag("needs_review", |f| {
+    //     true
     // });
 
 }

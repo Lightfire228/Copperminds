@@ -1,4 +1,4 @@
-mod md_file;
+pub mod md_file;
 
 use std::{collections::HashMap, env, fs, mem, ops::Deref, path::PathBuf};
 
@@ -7,7 +7,7 @@ use walkdir::{DirEntry, WalkDir};
 use yaml_serde::{Mapping, Sequence, Value};
 use trash;
 
-pub use md_file::{MdFile, Frontmatter};
+use md_file::{MdFile, Frontmatter, FmProperty, FmPropertyList};
 
 macro_rules! regex {
     ($i:ident = $r:expr) => {
@@ -21,7 +21,7 @@ macro_rules! regex {
 
 pub(crate) use regex;
 
-use crate::backup;
+use crate::{backup};
 
 
 pub struct Index {
@@ -58,13 +58,13 @@ impl Index {
         backup::backup(&self.path);
     }
 
-    fn iter_files(&self) -> impl Iterator<Item = &MdFile> {
+    pub fn iter_files(&self) -> impl Iterator<Item = &MdFile> {
         self.md_files
             .iter()
             .map (|f| f.as_ref())
     }
 
-    fn iter_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
+    pub fn iter_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
         self.md_files
             .iter_mut()
             .map (|f| f.as_mut())
@@ -80,6 +80,26 @@ impl Index {
 
         self.iter_files_mut()
             .filter  (|f| f.frontmatter.inbox.is_none())
+    }
+    
+    pub fn bulk_assign_property<F>(&mut self, property: FmProperty, value: &str, filter: F)
+    where 
+        F: Fn(&MdFile) -> bool
+    {
+        let files = self.iter_files_mut()
+            .filter(|f| filter(&f))
+        ;
+
+        let mut count = 0;
+
+        for file in files {
+            count += 1;
+
+            file.assign_property(property, value.to_owned());
+            file.write_file();
+        }
+
+        println!("assigned: {}", count);
     }
     
     pub fn bulk_assign_inbox<F>(&mut self, inbox: &str, target: BulkAssign, filter: F)
