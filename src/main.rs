@@ -28,14 +28,14 @@ fn main() {
 
 fn do_query(index: &Index) {
 
-    // // TODO: figure out how to subdivide inbox
-    // print_all_by_inbox(&index, "todo");
+    // // TODO: figure out how to subdivide categories
+    // print_all_by_category(&index, "todo");
 
     let files = index
         .iter_files()
         .filter    (|f| {
-                f.has_property_val    (FmProperty::Inbox,  "todo")
-            && !f.has_property_val_any(FmProperty::Status, &["completed", "archived"])
+                f.has_property_val    (FmProperty::Category, "todo")
+            && !f.has_property_val_any(FmProperty::Status,   &["completed", "archived"])
 
         })
     ;
@@ -64,17 +64,26 @@ fn update_files(index: &mut Index) {
 
     println!("updating files");
 
-    let files = vec![
-    ];
+    // let files = vec![
+    // ];
 
-    // index.bulk_assign_property(FmProperty::Inbox, "todo", |f| {
+    // index.bulk_assign_property(FmProperty::Category, "todo", |f| {
     //     files.contains(&f.file_name.as_str())
     // });
 
 
-    index.bulk_assign_property(FmProperty::Inbox, "todo", |f| {
-        files.contains(&f.file_name.as_str())
-    });
+    // index.bulk_assign_property(FmProperty::Category, "todo", |f| {
+    //     files.contains(&f.file_name.as_str())
+    // });
+
+    // for file in index.iter_files_mut() {
+    //     if file.rename_property(FmProperty::Inbox, FmProperty::Category) {
+    //         file.write_file();
+    //     }
+
+    // }
+
+
 
     // index.bulk_assign_processing_tag("needs_review", |f| {
     //     true
@@ -85,31 +94,31 @@ fn update_files(index: &mut Index) {
 // ---- print status
 
 fn print_vault_status(index: &Index) {
-    print_needs_inbox  (&index);
-    print_inboxes      (&index);
-    print_unnamed_files(&index);
+    print_needs_category  (&index);
+    print_categories      (&index);
+    print_unnamed_files   (&index);
 }
 
 
-fn print_needs_inbox(index: &Index) {
-    let filenames = index.needs_inbox()
+fn print_needs_category(index: &Index) {
+    let filenames = index.needs_category()
         .map(|f| &f.file_name)
     ;
 
-    display_list_sorted("needs inbox", filenames, |f| *f);
+    display_list_sorted("needs category", filenames, |f| *f);
 }
 
-fn print_inboxes(index: &Index) {
+fn print_categories(index: &Index) {
 
-    let inboxes = index.list_all_inboxes();
-    let width   = inboxes.iter().map(|x| x.0.len()).max().unwrap();
+    let categories = index.list_all_categories();
+    let width      = categories.iter().map(|x| x.0.len()).max().unwrap();
 
-    let inboxes = inboxes
+    let categories = categories
         .iter()
-        .map(|x| InboxMap(x.0, x.1.len(), width))
+        .map(|x| CategoryMap(x.0, x.1.len(), width))
     ;
 
-    display_list_sorted("Inboxes", inboxes, |i| i.0);
+    display_list_sorted("Categories", categories, |i| i.0);
 }
 
 fn print_empty_files(index: &Index) {
@@ -126,11 +135,11 @@ fn print_unnamed_files(index: &Index) {
     );
 }
 
-fn print_all_by_inbox(index: &Index, name: &str) {
+fn print_all_by_category(index: &Index, name: &str) {
 
-    let inbox       = index.list_all_inboxes();
-    let Some(files) = inbox.get(name) else {
-        println!("Inbox '{name}' not found");
+    let category    = index.list_all_categories();
+    let Some(files) = category.get(name) else {
+        println!("Category '{name}' not found");
         return;
     };
 
@@ -186,9 +195,9 @@ fn display_list_sorted_by_name<'a>(msg: &str, iter: impl Iterator<Item = &'a MdF
     display_list_sorted(msg, list, |f| *f);
 }
 
-struct InboxMap<'a>(&'a str, usize, usize);
+struct CategoryMap<'a>(&'a str, usize, usize);
 
-impl<'a> Display for InboxMap<'a> {
+impl<'a> Display for CategoryMap<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 
         let spaces = " ".repeat(self.2 - self.0.len());

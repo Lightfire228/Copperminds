@@ -32,7 +32,7 @@ pub struct Index {
 
 pub enum BulkAssign {
     All,
-    NeedsInboxOnly,
+    NeedsCategoryOnly,
 }
 
 impl Index {
@@ -70,20 +70,20 @@ impl Index {
             .map (|f| f.as_mut())
     }
 }
-fn needs_inbox_filter(file: &MdFile) -> bool {
+fn needs_category_filter(file: &MdFile) -> bool {
     file
         .frontmatter
         .as_ref    ()
-        .is_none_or(|fm| fm.inbox.is_none())
+        .is_none_or(|fm| fm.category.is_none())
 }
 
 impl Index {
-    pub fn needs_inbox(&self) -> impl Iterator<Item = &MdFile> {
-        self.iter_files()    .filter(|f| needs_inbox_filter(*f))
+    pub fn needs_category(&self) -> impl Iterator<Item = &MdFile> {
+        self.iter_files()    .filter(|f| needs_category_filter(*f))
     }
 
-    pub fn needs_inbox_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
-        self.iter_files_mut().filter(|f| needs_inbox_filter(*f))
+    pub fn needs_category_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
+        self.iter_files_mut().filter(|f| needs_category_filter(*f))
     }
 
     pub fn bulk_assign_property<F>(&mut self, property: FmProperty, value: &str, filter: F)
@@ -106,13 +106,13 @@ impl Index {
         println!("assigned: {}", count);
     }
 
-    pub fn bulk_assign_inbox<F>(&mut self, inbox: &str, target: BulkAssign, filter: F)
+    pub fn bulk_assign_category<F>(&mut self, category: &str, target: BulkAssign, filter: F)
     where
         F: Fn(&MdFile) -> bool
     {
         let files: Box<dyn Iterator<Item = &mut MdFile>> = match target {
             BulkAssign::All            => Box::new(self.iter_files_mut ()),
-            BulkAssign::NeedsInboxOnly => Box::new(self.needs_inbox_mut()),
+            BulkAssign::NeedsCategoryOnly => Box::new(self.needs_category_mut()),
         };
 
         let filtered = files
@@ -124,7 +124,7 @@ impl Index {
         for file in filtered {
             count += 1;
 
-            file.assign_property(FmProperty::Inbox, inbox.to_owned());
+            file.assign_property(FmProperty::Category, category.to_owned());
             file.write_file();
         }
 
@@ -151,29 +151,28 @@ impl Index {
         println!("assigned: {}", count);
     }
 
-    pub fn list_all_inboxes(&self) -> HashMap<&str, Vec<&MdFile>> {
+    pub fn list_all_categories(&self) -> HashMap<&str, Vec<&MdFile>> {
 
         let files = self
             .iter_files()
-            .filter_map(|f| f
-                .frontmatter
-                .as_ref()
-                .map_or_else(
-                    |  | None,
-                    |fm| fm
-                        .inbox
-                        .as_ref()
-                        .map(|i| (i.as_str(), f))
+            .filter_map(|f| {
 
-                )
-            )
+                let category = &f.frontmatter.as_ref().map(|fm| &fm.category);
+
+                let Some(Some(category)) = category else {
+                    return None;
+                };
+
+                Some((category.as_str(), f))
+
+            })
         ;
 
         let mut map: HashMap<&str, Vec<&MdFile>> = HashMap::new();
 
-        for (inbox, file) in files {
+        for (category, file) in files {
             map
-                .entry     (inbox)
+                .entry     (category)
                 .and_modify(|list| list.push(file))
                 .or_insert (vec![file])
             ;

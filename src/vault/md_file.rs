@@ -100,6 +100,16 @@ impl MdFile {
         fm.set_property(property, value);
     }
 
+    pub fn remove_property(&mut self, property: FmProperty) {
+
+        let Some(fm) = &mut self.frontmatter else {
+            return;
+        };
+
+        fm.yaml.remove(property.get_key());
+        _ = fm.take_property(property);
+    }
+
     pub fn push_list_val(&mut self, list: FmPropertyList, tag: String) {
 
         let     fm   = self.frontmatter.get_or_insert_with(Frontmatter::blank);
@@ -117,22 +127,27 @@ impl MdFile {
         fm.set_property_list(list, tags);
     }
 
-    // pub fn rename_property(&mut self, old_prop: FmProperty, new_prop: FmProperty) {
-    //     let Some(_) = self.frontmatter.get_property(old_prop) else {
-    //         return;
-    //     };
+    pub fn rename_property(&mut self, old_prop: FmProperty, new_prop: FmProperty) -> bool {
 
-    //     if let Some(existing) = self.frontmatter.get_property(new_prop) {
-    //         panic!("{}: {} is already defined for file: {}", old_prop.get_key(), existing, self.file_name);
-    //     }
+        let Some(fm) = &mut self.frontmatter else {
+            return false;
+        };
 
-    //     let old_val = self.frontmatter.take_property(old_prop).unwrap();
+        if let Some(existing) = fm.get_property(new_prop) {
+            panic!("{}: {} is already defined for file: {}", new_prop.get_key(), existing, self.file_name);
+        }
 
-    //     self.frontmatter.yaml.as_mut().unwrap().remove(old_prop.get_key());
+        let Some(old_val) = fm.take_property(old_prop) else {
+            return false;
+        };
 
-    //     self.assign_property(new_prop, old_val);
+        fm.yaml.remove(old_prop.get_key());
 
-    // }
+        self.assign_property(new_prop, old_val);
+
+        true
+
+    }
 }
 
 impl PartialEq for MdFile {
@@ -151,9 +166,9 @@ impl Frontmatter {
     fn get_property(&self, property: FmProperty) -> Option<&str> {
 
         match property {
-            FmProperty::Inbox    => self.inbox .as_ref().map(|p| p.as_str()),
-            FmProperty::Category => self.inbox .as_ref().map(|p| p.as_str()),
-            FmProperty::Status   => self.status.as_ref().map(|p| p.as_str()),
+            FmProperty::Inbox    => self.inbox   .as_ref().map(|p| p.as_str()),
+            FmProperty::Category => self.category.as_ref().map(|p| p.as_str()),
+            FmProperty::Status   => self.status  .as_ref().map(|p| p.as_str()),
         }
     }
 
