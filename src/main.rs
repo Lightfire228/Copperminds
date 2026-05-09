@@ -4,7 +4,7 @@
 mod vault;
 mod backup;
 
-use std::{fmt::Display, io::{self, Stdout, Write}};
+use std::{fmt::Display, hint, io::{self, Stdout, Write}};
 
 use vault::Index;
 
@@ -21,7 +21,7 @@ fn main() {
     print_vault_status(&index);
     do_query          (&index);
 
-    
+
     update_files(&mut index);
 }
 
@@ -67,10 +67,15 @@ fn update_files(index: &mut Index) {
     let files = vec![
     ];
 
-    index.bulk_assign_property(FmProperty::Status, "archived", |f| {
+    // index.bulk_assign_property(FmProperty::Inbox, "todo", |f| {
+    //     files.contains(&f.file_name.as_str())
+    // });
+
+
+    index.bulk_assign_property(FmProperty::Inbox, "todo", |f| {
         files.contains(&f.file_name.as_str())
     });
-    
+
     // index.bulk_assign_processing_tag("needs_review", |f| {
     //     true
     // });

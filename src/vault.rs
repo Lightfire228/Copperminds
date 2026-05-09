@@ -1,6 +1,6 @@
 pub mod md_file;
 
-use std::{collections::HashMap, env, fs, mem, ops::Deref, path::PathBuf};
+use std::{collections::HashMap, env, fs, hint, iter::Filter, mem, ops::Deref, path::PathBuf};
 
 use serde::de;
 use walkdir::{DirEntry, WalkDir};
@@ -27,7 +27,7 @@ use crate::{backup};
 pub struct Index {
     pub md_files: Vec<Box<MdFile>>,
     pub path:     PathBuf,
-    
+
 }
 
 pub enum BulkAssign {
@@ -69,21 +69,25 @@ impl Index {
             .iter_mut()
             .map (|f| f.as_mut())
     }
+}
+fn needs_inbox_filter(file: &MdFile) -> bool {
+    file
+        .frontmatter
+        .as_ref    ()
+        .is_none_or(|fm| fm.inbox.is_none())
+}
 
+impl Index {
     pub fn needs_inbox(&self) -> impl Iterator<Item = &MdFile> {
-
-        self.iter_files()
-            .filter    (|f| f.frontmatter.inbox.is_none())
+        self.iter_files()    .filter(|f| needs_inbox_filter(*f))
     }
-    
+
     pub fn needs_inbox_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
-
-        self.iter_files_mut()
-            .filter  (|f| f.frontmatter.inbox.is_none())
+        self.iter_files_mut().filter(|f| needs_inbox_filter(*f))
     }
-    
+
     pub fn bulk_assign_property<F>(&mut self, property: FmProperty, value: &str, filter: F)
-    where 
+    where
         F: Fn(&MdFile) -> bool
     {
         let files = self.iter_files_mut()
@@ -101,9 +105,9 @@ impl Index {
 
         println!("assigned: {}", count);
     }
-    
+
     pub fn bulk_assign_inbox<F>(&mut self, inbox: &str, target: BulkAssign, filter: F)
-    where 
+    where
         F: Fn(&MdFile) -> bool
     {
         let files: Box<dyn Iterator<Item = &mut MdFile>> = match target {
@@ -120,15 +124,15 @@ impl Index {
         for file in filtered {
             count += 1;
 
-            file.assign_inbox(inbox.to_owned());
+            file.assign_property(FmProperty::Inbox, inbox.to_owned());
             file.write_file();
         }
 
         println!("assigned: {}", count);
     }
-    
+
     pub fn bulk_assign_processing_tag<F>(&mut self, tag: &str, filter: F)
-    where 
+    where
         F: Fn(&MdFile) -> bool
     {
         let files = self.iter_files_mut()
@@ -140,7 +144,7 @@ impl Index {
         for file in files {
             count += 1;
 
-            file.assign_processing_tag(tag.to_owned());
+            file.push_list_val(FmPropertyList::Processing, tag.to_owned());
             file.write_file();
         }
 
@@ -151,9 +155,17 @@ impl Index {
 
         let files = self
             .iter_files()
-            .filter_map(|f| f.frontmatter.inbox
+            .filter_map(|f| f
+                .frontmatter
                 .as_ref()
-                .map   (|i| (i.as_str(), f))
+                .map_or_else(
+                    |  | None,
+                    |fm| fm
+                        .inbox
+                        .as_ref()
+                        .map(|i| (i.as_str(), f))
+
+                )
             )
         ;
 
@@ -166,7 +178,7 @@ impl Index {
                 .or_insert (vec![file])
             ;
         }
-        
+
         map
     }
 
@@ -184,7 +196,7 @@ impl Index {
     }
 
     pub fn delete_empty_unnamed_files(&mut self) {
-        
+
         let files: Vec<_> = self.list_empty_unnamed_files().collect();
 
         for file in files.iter() {
@@ -199,9 +211,11 @@ impl Index {
 
         // TODO: maybe store the files as a hashmap?
         self.md_files
-            .retain(|f| !deleted.contains(
-                &(f.deref() as *const MdFile)
-            ))
+            .retain(|f| {
+                let ptr = f.deref() as *const MdFile;
+
+                !deleted.contains(&ptr)
+            })
         ;
     }
 
