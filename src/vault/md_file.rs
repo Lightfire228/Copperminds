@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, fs, mem, ops::Deref, path::PathBuf, sync::LazyLock};
+use std::{collections::HashMap, env, fs, marker::PhantomData, mem, ops::Deref, path::PathBuf, sync::LazyLock};
 
 use super::regex;
 use serde::de;
@@ -8,6 +8,7 @@ use trash;
 
 const RE_EMPTY: &str = r"^\s*$";
 
+#[derive(Debug)]
 pub struct MdFile {
     pub entry:            DirEntry,
     pub frontmatter:      Option<Frontmatter>,
@@ -16,6 +17,7 @@ pub struct MdFile {
     pub raw_text:         String,
 }
 
+#[derive(Debug)]
 pub struct Frontmatter {
     pub yaml:        Mapping,
     pub inbox:       Option<String>,
@@ -81,6 +83,8 @@ impl MdFile {
 
     }
 
+    // TODO: these should probably return a "file state" enum
+    // FileState::Modified
     pub fn has_property_val_any(&self, property: FmProperty, values: &[&str]) -> bool {
         self.frontmatter
             .as_ref     ()
@@ -110,10 +114,22 @@ impl MdFile {
         _ = fm.take_property(property);
     }
 
+    pub fn remove_property_list(&mut self, property: FmPropertyList) -> bool {
+
+        let Some(fm) = &mut self.frontmatter else {
+            return false;
+        };
+
+        fm.yaml.remove(property.get_key());
+        _ = fm.take_property_list(property);
+
+        true
+    }
+
     pub fn push_list_val(&mut self, list: FmPropertyList, tag: String) {
 
         let     fm   = self.frontmatter.get_or_insert_with(Frontmatter::blank);
-        let mut tags = fm.take_property_list_mut(list);
+        let mut tags = fm.take_property_list(list);
 
         tags.push(tag.clone());
 
@@ -194,7 +210,7 @@ impl Frontmatter {
         }
     }
 
-    fn take_property_list_mut(&mut self, list: FmPropertyList) -> Vec<String> {
+    fn take_property_list(&mut self, list: FmPropertyList) -> Vec<String> {
         match list {
             FmPropertyList::Processing => self.processing.take().unwrap_or_else(|| Vec::new())
         }

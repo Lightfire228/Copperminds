@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod md_file;
 
 use std::{collections::HashMap, env, fs, hint, iter::Filter, mem, ops::Deref, path::PathBuf};
@@ -24,6 +26,7 @@ pub(crate) use regex;
 use crate::{backup};
 
 
+#[derive(Debug)]
 pub struct Index {
     pub md_files: Vec<Box<MdFile>>,
     pub path:     PathBuf,

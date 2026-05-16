@@ -8,7 +8,7 @@ use std::{fmt::Display, hint, io::{self, Stdout, Write}};
 
 use vault::Index;
 
-use crate::vault::{BulkAssign, md_file::FmProperty};
+use crate::vault::{BulkAssign, md_file::{FmProperty, FmPropertyList}};
 use crate::vault::md_file::MdFile;
 
 
@@ -81,7 +81,11 @@ fn update_files(index: &mut Index) {
     //         file.write_file();
     //     }
 
-    // }
+    for file in index.iter_files_mut() {
+        if file.remove_property_list(FmPropertyList::Processing) {
+            file.write_file();
+        }
+    }
 
 
 
