@@ -224,7 +224,7 @@ impl Index {
 }
 
 
-fn vault_folder() -> PathBuf {
+pub fn vault_folder() -> PathBuf {
     let home = env::home_dir().unwrap();
 
     home.join("Notes")
