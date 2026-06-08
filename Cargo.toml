@@ -2,6 +2,7 @@
 name = "copperminds"
 version = "0.1.0"
 edition = "2024"
+default-run = "copperminds"
 
 [dependencies]
 anyhow = "1.0.102"
@@ -12,3 +13,5 @@ thiserror = "2.0.18"
 trash = "5.2.5"
 walkdir = "2.5.0"
 yaml_serde = "0.10.4"
+
+sync = { path = "./sync"}
