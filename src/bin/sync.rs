@@ -23,6 +23,8 @@ macro_rules! continue_on_err {
 }
 
 #[tokio::main]
+/// the purpose of this is to run a "sync" server that watches for changes on the main vault
+/// and auto creates commits, and pushes the results to the backup git repo
 async fn main() {
 
     let folder = vault::vault_folder();

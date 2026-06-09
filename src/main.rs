@@ -3,6 +3,8 @@
 
 mod vault;
 mod backup;
+mod summary;
+
 
 use std::{fmt::Display, hint, io::{self, Stdout, Write}};
 
@@ -18,15 +20,35 @@ fn main() {
 
     index.delete_empty_unnamed_files();
 
-    print_vault_status(&index);
-    do_query          (&index);
+    // put the most important at the bottom of the terminal
+    print_categories      (&index);
+    print_incomplete_todos(&index);
+    print_needs_category  (&index);
+    print_unnamed_files   (&index);
 
+    write_summary_page(&mut index);
+    // update_files(&mut index);
+}
 
-    update_files(&mut index);
+fn write_summary_page(index: &mut Index) {
+    index.backup();
+
+    let summary = summary::get_summary(&index);
+
+    let file = index
+        .md_files
+        .iter_mut()
+        .find    (|x| x.file_name == "Copperminds Summary Page.md")
+        .expect  ("Unable to find Copperminds Summary Page")
+    ;
+
+    file.md_text = summary;
+    file.write_file();
+
 }
 
 
-fn do_query(index: &Index) {
+fn print_incomplete_todos(index: &Index) {
 
     // // TODO: figure out how to subdivide categories
     // print_all_by_category(&index, "todo");
@@ -96,12 +118,6 @@ fn update_files(index: &mut Index) {
 }
 
 // ---- print status
-
-fn print_vault_status(index: &Index) {
-    print_needs_category  (&index);
-    print_categories      (&index);
-    print_unnamed_files   (&index);
-}
 
 
 fn print_needs_category(index: &Index) {

@@ -197,6 +197,15 @@ impl Index {
             .filter(|f| f.is_unnamed())
     }
 
+    pub fn list_incomplete_todos(&self) -> impl Iterator<Item = &MdFile> {
+
+        self.iter_files()
+            .filter    (|f| {
+                    f.has_property_val    (FmProperty::Category, "todo")
+                && !f.has_property_val_any(FmProperty::Status,   &["completed", "archived"])
+            })
+    }
+
     pub fn delete_empty_unnamed_files(&mut self) {
 
         let files: Vec<_> = self.list_empty_unnamed_files().collect();
