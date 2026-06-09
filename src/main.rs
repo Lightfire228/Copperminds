@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-#![allow(dead_code)]
 
 mod vault;
 mod backup;
@@ -22,9 +20,6 @@ fn main() {
 
     // put the most important at the bottom of the terminal
     print_categories      (&index);
-    print_incomplete_todos(&index);
-    print_needs_category  (&index);
-    print_unnamed_files   (&index);
 
     write_summary_page(&mut index);
     // update_files(&mut index);
@@ -46,87 +41,8 @@ fn write_summary_page(index: &mut Index) {
     file.write_file();
 
 }
-
-
-fn print_incomplete_todos(index: &Index) {
-
-    // // TODO: figure out how to subdivide categories
-    // print_all_by_category(&index, "todo");
-
-    let files = index
-        .iter_files()
-        .filter    (|f| {
-                f.has_property_val    (FmProperty::Category, "todo")
-            && !f.has_property_val_any(FmProperty::Status,   &["completed", "archived"])
-
-        })
-    ;
-
-    display_list_sorted_by_name("Incomplete TODO", files);
-
-    // let files = index.md_files
-    //     .iter  ()
-    //     .filter(|f| f.frontmatter.processing.is_some())
-    //     .map   (|f| f.as_ref())
-    // ;
-
-    // display_list_sorted_by_name("Processing", files);
-
-}
-
-
-fn update_files(index: &mut Index) {
-
-    if !confirm_with_user("Update Files?") {
-        return;
-    }
-
-
-    index.backup();
-
-    println!("updating files");
-
-    // let files = vec![
-    // ];
-
-    // index.bulk_assign_property(FmProperty::Category, "todo", |f| {
-    //     files.contains(&f.file_name.as_str())
-    // });
-
-
-    // index.bulk_assign_property(FmProperty::Category, "todo", |f| {
-    //     files.contains(&f.file_name.as_str())
-    // });
-
-    // for file in index.iter_files_mut() {
-    //     if file.rename_property(FmProperty::Inbox, FmProperty::Category) {
-    //         file.write_file();
-    //     }
-
-    for file in index.iter_files_mut() {
-        if file.remove_property_list(FmPropertyList::Processing) {
-            file.write_file();
-        }
-    }
-
-
-
-    // index.bulk_assign_processing_tag("needs_review", |f| {
-    //     true
-    // });
-
-}
-
 // ---- print status
 
-
-fn print_needs_category(index: &Index) {
-    let filenames = index.needs_category()
-        .map(|f| &f.file_name)
-    ;
-
-    display_list_sorted("needs category", filenames, |f| *f);
-}
 
 fn print_categories(index: &Index) {
 
@@ -141,21 +57,8 @@ fn print_categories(index: &Index) {
     display_list_sorted("Categories", categories, |i| i.0);
 }
 
-fn print_empty_files(index: &Index) {
-    display_list_sorted_by_name(
-        "Empty files",
-        index.list_empty_unnamed_files(),
-    );
-}
 
-fn print_unnamed_files(index: &Index) {
-    display_list_sorted_by_name(
-        "Unnamed files",
-        index.list_unnamed_files(),
-    );
-}
-
-fn print_all_by_category(index: &Index, name: &str) {
+fn _print_all_by_category(index: &Index, name: &str) {
 
     let category    = index.list_all_categories();
     let Some(files) = category.get(name) else {
@@ -163,9 +66,10 @@ fn print_all_by_category(index: &Index, name: &str) {
         return;
     };
 
-    let files = to_obsidian_list(files.iter().map(|f| *f).collect());
+    let mut files: Vec<_> = files.iter().map(|f| format!("- {}", f.file_name)).collect();
+    files.sort();
 
-    println!("files:\n{}", files);
+    println!("files:\n{}", files.join("\n"));
 }
 
 
@@ -208,13 +112,6 @@ where
     display_list(msg, list.into_iter());
 }
 
-fn display_list_sorted_by_name<'a>(msg: &str, iter: impl Iterator<Item = &'a MdFile>) {
-
-    let list = iter.map(|f| f.file_name.as_str());
-
-    display_list_sorted(msg, list, |f| *f);
-}
-
 struct CategoryMap<'a>(&'a str, usize, usize);
 
 impl<'a> Display for CategoryMap<'a> {
@@ -224,41 +121,4 @@ impl<'a> Display for CategoryMap<'a> {
 
         write!(f, "{},{} {}", self.0, spaces, self.1)
     }
-}
-
-
-fn to_obsidian_list(mut files: Vec<&MdFile>) -> String {
-
-    files.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
-
-    let mut result = String::new();
-    for file in files {
-
-        let line = format!("- [ ] [[{}]]\n", file.file_name);
-        result.push_str(&line);
-    }
-
-    result
-}
-
-fn get_usr_in(prompt: &str) -> String {
-    let mut buffer = String::new();
-    let     stdin  = io    ::stdin ();
-    let mut stdout = io    ::stdout();
-
-    print!("{prompt}\n> ");
-    stdout.flush().unwrap();
-
-    stdin.read_line(&mut buffer).unwrap();
-
-    buffer.trim().to_owned()
-
-}
-
-fn confirm_with_user(prompt: &str) -> bool {
-    let prompt = format!("{prompt} (y/N)");
-
-    let usr_in = get_usr_in(&prompt);
-
-    usr_in.to_lowercase().starts_with("y")
 }
