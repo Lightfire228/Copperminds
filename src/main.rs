@@ -4,12 +4,9 @@ mod backup;
 mod summary;
 
 
-use std::{fmt::Display, hint, io::{self, Stdout, Write}};
+use std::{fmt::Display};
 
 use vault::Index;
-
-use crate::vault::{BulkAssign, md_file::{FmProperty, FmPropertyList}};
-use crate::vault::md_file::MdFile;
 
 
 fn main() {

@@ -1,4 +1,4 @@
-use std::{env, ffi::OsStr, path::Path, process::{Command, Output, Stdio}};
+use std::{ffi::OsStr, path::Path, process::{Command, Output, Stdio}};
 
 pub fn backup(vault: &Path) {
     backup_named(vault, "backup")

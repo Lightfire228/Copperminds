@@ -2,14 +2,12 @@
 
 pub mod md_file;
 
-use std::{collections::HashMap, env, fs, hint, iter::Filter, mem, ops::Deref, path::PathBuf};
+use std::{collections::HashMap, env, ops::Deref, path::PathBuf};
 
-use serde::de;
 use walkdir::{DirEntry, WalkDir};
-use yaml_serde::{Mapping, Sequence, Value};
 use trash;
 
-use md_file::{MdFile, Frontmatter, FmProperty, FmPropertyList};
+use md_file::{MdFile, FmProperty, FmPropertyList};
 
 macro_rules! regex {
     ($i:ident = $r:expr) => {

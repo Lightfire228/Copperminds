@@ -1,10 +1,9 @@
-use std::{collections::HashMap, env, fs, marker::PhantomData, mem, ops::Deref, path::PathBuf, sync::LazyLock};
+
+use std::fs;
 
 use super::regex;
-use serde::de;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::{DirEntry};
 use yaml_serde::{Mapping, Sequence, Value};
-use trash;
 
 const RE_EMPTY: &str = r"^\s*$";
 
