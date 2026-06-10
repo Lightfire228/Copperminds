@@ -204,6 +204,23 @@ impl Index {
             })
     }
 
+    pub fn list_untypped(&self) -> impl Iterator<Item = &MdFile> {
+        self.iter_files()
+            .filter    (|f| {
+                   !f.has_property(FmProperty::Type)
+                && !f.is_in_dir("03 Data/Templates")
+            })
+    }
+
+    pub fn list_uncontextualized(&self) -> impl Iterator<Item = &MdFile> {
+        self.iter_files()
+            .filter    (|f| {
+                   !f.has_property    (FmProperty::Context)
+                &&  f.has_property_val(FmProperty::Type, "action")
+
+            })
+    }
+
     pub fn delete_empty_unnamed_files(&mut self) {
 
         let files: Vec<_> = self.list_empty_unnamed_files().collect();

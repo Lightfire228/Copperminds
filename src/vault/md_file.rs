@@ -1,5 +1,5 @@
 
-use std::fs;
+use std::{fs, path::Path};
 
 use super::regex;
 use walkdir::{DirEntry};
@@ -22,6 +22,11 @@ pub struct Frontmatter {
     pub inbox:       Option<String>,
     pub status:      Option<String>,
     pub category:    Option<String>,
+
+    // GTD
+    pub type_:       Option<String>,
+    pub context:     Option<String>,
+
     pub processing:  Option<Vec<String>>,
 }
 
@@ -30,6 +35,21 @@ pub enum FmProperty {
     Inbox,
     Category,
     Status,
+    Type,
+    Context,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FmType {
+    Info,
+    Action,
+}
+#[derive(Debug, Clone, Copy)]
+pub enum FmContext {
+    Todo,
+    WaitingFor,
+    Calendar,
+    MaybeSomeday,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -74,12 +94,31 @@ impl MdFile {
         RE.is_match(&self.file_name)
     }
 
+    pub fn is_in_dir<P>(&self, path: P) -> bool
+    where
+        P: AsRef<Path>
+    {
+        self
+            .entry
+            .path()
+            .parent()
+            .is_some_and(|f|
+                f.ends_with(path)
+            )
+    }
+
+    pub fn has_property(&self, property: FmProperty) -> bool {
+        self
+            .frontmatter
+            .as_ref()
+            .is_some_and(|f| f.get_property(property).is_some())
+    }
+
     pub fn has_property_val(&self, property: FmProperty, value: &str) -> bool {
         self
             .frontmatter
             .as_ref()
             .is_some_and(|f| f.get_property(property) == Some(value))
-
     }
 
     // TODO: these should probably return a "file state" enum
@@ -184,6 +223,8 @@ impl Frontmatter {
             FmProperty::Inbox    => self.inbox   .as_ref().map(|p| p.as_str()),
             FmProperty::Category => self.category.as_ref().map(|p| p.as_str()),
             FmProperty::Status   => self.status  .as_ref().map(|p| p.as_str()),
+            FmProperty::Type     => self.type_   .as_ref().map(|p| p.as_str()),
+            FmProperty::Context  => self.status  .as_ref().map(|p| p.as_str()),
         }
     }
 
@@ -192,6 +233,8 @@ impl Frontmatter {
             FmProperty::Inbox    => self.inbox    = Some(value),
             FmProperty::Category => self.category = Some(value),
             FmProperty::Status   => self.status   = Some(value),
+            FmProperty::Type     => self.type_    = Some(value),
+            FmProperty::Context  => self.context  = Some(value),
         }
     }
 
@@ -200,6 +243,8 @@ impl Frontmatter {
             FmProperty::Inbox    => self.inbox    .take(),
             FmProperty::Category => self.category .take(),
             FmProperty::Status   => self.status   .take(),
+            FmProperty::Type     => self.type_    .take(),
+            FmProperty::Context  => self.context  .take(),
         }
     }
 
@@ -225,6 +270,9 @@ impl Frontmatter {
             status:     None,
             category:   None,
             processing: None,
+
+            type_:      None,
+            context:    None,
         }
     }
 }
@@ -234,7 +282,9 @@ impl FmProperty {
         match &self {
             FmProperty::Inbox    => "inbox"   .to_owned(),
             FmProperty::Category => "category".to_owned(),
-            FmProperty::Status   => "status"  .to_owned()
+            FmProperty::Status   => "status"  .to_owned(),
+            FmProperty::Type     => "type"    .to_owned(),
+            FmProperty::Context  => "context" .to_owned(),
         }
     }
 }
@@ -285,24 +335,24 @@ fn parse_md_file(file: &DirEntry) -> MdFile {
 }
 
 fn parse_frontmatter(fm: Mapping) -> Frontmatter {
+
+    macro_rules! get_str {
+        ($val:literal) => {
+            fm
+                .get     ($val)
+                .and_then(|i| i.as_str())
+                .map     (|i| i.to_owned())
+
+        };
+    }
+
     let processing = get_processing_tag(&fm);
-    let inbox      = fm
-        .get     ("inbox")
-        .and_then(|i| i.as_str())
-        .map     (|i| i.to_owned())
-    ;
+    let inbox = get_str!("inbox");
 
-    let status     = fm
-        .get     ("status")
-        .and_then(|i| i.as_str())
-        .map     (|i| i.to_owned())
-    ;
-
-    let category   = fm
-        .get     ("category")
-        .and_then(|i| i.as_str())
-        .map     (|i| i.to_owned())
-    ;
+    let status   = get_str!("status");
+    let category = get_str!("category");
+    let type_    = get_str!("type");
+    let context  = get_str!("context");
 
     Frontmatter {
         yaml: fm,
@@ -311,6 +361,9 @@ fn parse_frontmatter(fm: Mapping) -> Frontmatter {
         inbox,
         status,
         category,
+
+        type_,
+        context,
     }
 
 }

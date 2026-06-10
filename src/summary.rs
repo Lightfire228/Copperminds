@@ -21,6 +21,9 @@ pub fn get_summary(index: &Index) -> String {
     // let date = vec![
     //     // Local::now().date().
     // ]
+    //
+
+    let s = |x| [String::from(x)];
 
     let date = [
         Local::now().format("%Y-%m-%d").to_string(),
@@ -28,15 +31,41 @@ pub fn get_summary(index: &Index) -> String {
         "".to_string(),
     ];
 
-    let unnamed_files     = get_section("Unnamed Files:",     index.list_unnamed_files());
-    let needs_categorized = get_section("Needs Categorized:", index.needs_category());
-    let incomplete_todos  = get_section("Incomplete Todos:",  index.list_incomplete_todos());
-
     flat_vec![
         date,
-        unnamed_files,
-        needs_categorized,
-        incomplete_todos,
+        get_section("Unnamed Files:", index.list_unnamed_files()),
+
+        s("# Getting Things Done"),
+        s(""),
+
+        s("## Reference:"),
+        s("Types:"),
+        format_list([
+            "info",
+            "action",
+        ]),
+        s("Contexts:"),
+        format_list([
+            "todo",
+            "waiting_for",
+            "calendar",
+            "someday",
+        ]),
+        s("Statuses:"),
+        format_list([
+            "completed",
+            "archived",
+        ]),
+        s(""),
+
+        get_section("Needs Type:", index.list_untypped()),
+        get_section("Needs Context:", index.list_uncontextualized()),
+
+
+        s("# Deprecated"),
+        s(""),
+        get_section("Needs Categorized:", index.needs_category       ()),
+        get_section("Incomplete Todos:",  index.list_incomplete_todos()),
     ]
         .join("\n")
 
@@ -50,7 +79,7 @@ where
 
     flat_vec![
         [title.to_owned()],
-        format_list(files),
+        format_list_wikilink(files),
         [
             String::new(),
             String::new(),
@@ -58,7 +87,8 @@ where
     ]
 }
 
-fn format_list<'a, T>(files: T) -> SummaryData
+
+fn format_list_wikilink<'a, T>(files: T) -> SummaryData
 where
     T: Iterator<Item = &'a MdFile>
 {
@@ -70,6 +100,18 @@ where
         .into_iter()
         .map(|f| {
             format!("- [ ] [[{}]]", f.file_name)
+        })
+        .collect()
+}
+
+fn format_list<'a, T>(files: T) -> SummaryData
+where
+    T: IntoIterator<Item = &'a str>
+{
+    files
+        .into_iter()
+        .map(|f| {
+            format!("- {}", f)
         })
         .collect()
 }
