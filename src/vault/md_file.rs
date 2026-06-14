@@ -1,5 +1,5 @@
 
-use std::{fs, path::Path};
+use std::{fs, mem, path::Path};
 
 use super::regex;
 use walkdir::{DirEntry};
@@ -63,6 +63,11 @@ impl MdFile {
         parse_md_file(file)
     }
 
+    pub fn refresh(&mut self) {
+        let mut new = parse_md_file(&self.entry);
+        mem::swap(&mut new, self);
+    }
+
     pub fn write_file(&self) {
         let Some(fm) = self.frontmatter.as_ref().map(|x| &x.yaml) else {
             fs::write(self.entry.path(), &self.md_text).unwrap();
@@ -94,6 +99,7 @@ impl MdFile {
         RE.is_match(&self.file_name)
     }
 
+    /// Does not check subdirectories
     pub fn is_in_dir<P>(&self, path: P) -> bool
     where
         P: AsRef<Path>
@@ -129,6 +135,32 @@ impl MdFile {
             .and_then   (|f| f.get_property(property))
             .is_some_and(|p| values.contains(&p) )
     }
+
+    pub fn is_uncategorized(&self) -> bool {
+        self
+            .frontmatter
+            .as_ref    ()
+            .is_none_or(|fm| fm.category.is_none())
+    }
+
+    /// GTD Type
+    pub fn is_untyped(&self) -> bool {
+           !self.has_property(FmProperty::Type)
+        && !self.entry
+            .path     ()
+            .ancestors()
+            .any      (|p| p.ends_with("03 Data"))
+    }
+
+    /// GTD Context
+    pub fn is_uncontextualized(&self) -> bool {
+              !self.has_property    (FmProperty::Context)
+           &&  self.has_property_val(FmProperty::Type, "action")
+
+    }
+
+
+
 
 
     pub fn assign_property(&mut self, property: FmProperty, value: String) {

@@ -527,6 +527,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "trash",
+ "urlencoding",
  "walkdir",
  "yaml_serde",
 ]

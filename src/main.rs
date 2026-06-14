@@ -1,7 +1,9 @@
 
 mod vault;
 mod backup;
+mod sort;
 mod summary;
+
 
 
 use std::{fmt::Display};
@@ -16,10 +18,12 @@ fn main() {
     index.delete_empty_unnamed_files();
 
     // put the most important at the bottom of the terminal
-    print_categories      (&index);
+    // print_categories      (&index);
 
     write_summary_page(&mut index);
     // update_files(&mut index);
+
+    sort::main(&mut index);
 }
 
 fn write_summary_page(index: &mut Index) {
@@ -41,17 +45,17 @@ fn write_summary_page(index: &mut Index) {
 // ---- print status
 
 
-fn print_categories(index: &Index) {
+fn _print_categories(index: &Index) {
 
     let categories = index.list_all_categories();
     let width      = categories.iter().map(|x| x.0.len()).max().unwrap();
 
     let categories = categories
         .iter()
-        .map(|x| CategoryMap(x.0, x.1.len(), width))
+        .map(|x| _CategoryMap(x.0, x.1.len(), width))
     ;
 
-    display_list_sorted("Categories", categories, |i| i.0);
+    _display_list_sorted("Categories", categories, |i| i.0);
 }
 
 
@@ -72,7 +76,7 @@ fn _print_all_by_category(index: &Index, name: &str) {
 
 // -- utils
 
-fn display_list<T>(msg: &str, iter: impl Iterator<Item = T>)
+fn _display_list<T>(msg: &str, iter: impl Iterator<Item = T>)
 where
     T: Display
 {
@@ -96,7 +100,7 @@ where
 
 }
 
-fn display_list_sorted<F, T, K>(msg: &str, iter: impl Iterator<Item = T>, sort_by: F)
+fn _display_list_sorted<F, T, K>(msg: &str, iter: impl Iterator<Item = T>, sort_by: F)
 where
     T: Display,
     K: Ord,
@@ -106,12 +110,12 @@ where
 
     list.sort_by_key(sort_by);
 
-    display_list(msg, list.into_iter());
+    _display_list(msg, list.into_iter());
 }
 
-struct CategoryMap<'a>(&'a str, usize, usize);
+struct _CategoryMap<'a>(&'a str, usize, usize);
 
-impl<'a> Display for CategoryMap<'a> {
+impl<'a> Display for _CategoryMap<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 
         let spaces = " ".repeat(self.2 - self.0.len());

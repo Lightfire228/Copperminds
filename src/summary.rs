@@ -18,6 +18,12 @@ macro_rules! flat_vec {
 
 pub fn get_summary(index: &Index) -> String {
 
+    macro_rules! iter {
+        (|$ident:ident| $filter:expr) => {
+            index.iter_files().filter(|$ident| $filter)
+        };
+    }
+
     // let date = vec![
     //     // Local::now().date().
     // ]
@@ -33,7 +39,7 @@ pub fn get_summary(index: &Index) -> String {
 
     flat_vec![
         date,
-        get_section("Unnamed Files:", index.list_unnamed_files()),
+        get_section("Unnamed Files:", iter!(|f| f.is_unnamed())),
 
         s("# Getting Things Done"),
         s(""),
@@ -58,14 +64,14 @@ pub fn get_summary(index: &Index) -> String {
         ]),
         s(""),
 
-        get_section("Needs Type:", index.list_untypped()),
-        get_section("Needs Context:", index.list_uncontextualized()),
+        get_section("Needs Type:",    iter!(|f| f.is_untyped())),
+        get_section("Needs Context:", iter!(|f| f.is_uncontextualized())),
 
 
         s("# Deprecated"),
         s(""),
-        get_section("Needs Categorized:", index.needs_category       ()),
-        get_section("Incomplete Todos:",  index.list_incomplete_todos()),
+        get_section("Needs Categorized:", iter!(|f| f.is_uncategorized())),
+        get_section("Incomplete Todos:",  iter!(|f| f.is_unnamed())),
     ]
         .join("\n")
 

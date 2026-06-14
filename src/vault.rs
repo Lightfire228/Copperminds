@@ -112,7 +112,7 @@ impl Index {
         F: Fn(&MdFile) -> bool
     {
         let files: Box<dyn Iterator<Item = &mut MdFile>> = match target {
-            BulkAssign::All            => Box::new(self.iter_files_mut ()),
+            BulkAssign::All               => Box::new(self.iter_files_mut    ()),
             BulkAssign::NeedsCategoryOnly => Box::new(self.needs_category_mut()),
         };
 
@@ -183,47 +183,13 @@ impl Index {
     }
 
 
-    pub fn list_empty_unnamed_files(&self) -> impl Iterator<Item = &MdFile> {
-
-        self.list_unnamed_files()
-            .filter(|f| f.is_empty())
-    }
-
-    pub fn list_unnamed_files(&self) -> impl Iterator<Item = &MdFile> {
-
-        self.iter_files()
-            .filter(|f| f.is_unnamed())
-    }
-
-    pub fn list_incomplete_todos(&self) -> impl Iterator<Item = &MdFile> {
-
-        self.iter_files()
-            .filter    (|f| {
-                    f.has_property_val    (FmProperty::Category, "todo")
-                && !f.has_property_val_any(FmProperty::Status,   &["completed", "archived"])
-            })
-    }
-
-    pub fn list_untypped(&self) -> impl Iterator<Item = &MdFile> {
-        self.iter_files()
-            .filter    (|f| {
-                   !f.has_property(FmProperty::Type)
-                && !f.is_in_dir("03 Data/Templates")
-            })
-    }
-
-    pub fn list_uncontextualized(&self) -> impl Iterator<Item = &MdFile> {
-        self.iter_files()
-            .filter    (|f| {
-                   !f.has_property    (FmProperty::Context)
-                &&  f.has_property_val(FmProperty::Type, "action")
-
-            })
-    }
-
     pub fn delete_empty_unnamed_files(&mut self) {
 
-        let files: Vec<_> = self.list_empty_unnamed_files().collect();
+        let files: Vec<_> = self
+            .iter_files()
+            .filter(|f| f.is_empty() && f.is_unnamed())
+            .collect()
+        ;
 
         for file in files.iter() {
             trash::delete(file.entry.path()).unwrap();
