@@ -24,8 +24,10 @@ pub fn main(index: &mut Index) {
 
         let type_ = get_type();
 
-        file.set_type(type_);
+        // re-load any changes made to the file while the cli was waiting for input
+        file.refresh();
 
+        file.set_type(type_);
         file.write_file();
     }
 }
