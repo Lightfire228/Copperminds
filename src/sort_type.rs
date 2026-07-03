@@ -1,12 +1,16 @@
 
-use std::{process::Command};
-
-use crate::{cli::{MenuOption, choose}, vault::{Index, md_file::{FmProperty, MdFile}}};
+use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, md_file::{FmProperty, MdFile}}};
 
 
 pub fn main(index: &mut Index) {
 
-    let action_count = index.iter_files().filter(|t| t.has_property_val(FmProperty::Type, "action")).count();
+    println!("Sorting by Type");
+
+    let action_count: usize = index
+        .iter_files()
+        .filter    (|t| t.has_property_val(FmProperty::Type, "action"))
+        .count     ()
+    ;
 
     let files: Vec<_> = index
         .iter_files_mut()
@@ -14,8 +18,8 @@ pub fn main(index: &mut Index) {
         .collect       ()
     ;
 
-    println!("remaining:     {}", files.len());
-    println!("count: action: {}", action_count);
+    println!("to be sorted: {}", files.len());
+    println!("action count: {}", action_count);
 
 
     for file in files {
@@ -73,16 +77,4 @@ impl MdFile {
             Type::Action => "action".to_owned(),
         });
     }
-}
-
-
-fn open_in_obsidian(file: &MdFile) {
-
-    let uri = format!("obsidian://open?vault=Notes&file={}", urlencoding::encode(&file.file_name));
-
-    Command::new("xdg-open")
-        .arg   (uri)
-        .output()
-        .unwrap()
-    ;
 }

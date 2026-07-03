@@ -64,8 +64,8 @@ pub fn get_summary(index: &Index) -> String {
         ]),
         s(""),
 
-        get_section("Needs Type:",    iter!(|f| f.is_untyped())),
-        get_section("Needs Context:", iter!(|f| f.is_uncontextualized())),
+        get_section("Needs Type:",   iter!(|f| f.is_untyped())),
+        get_section("Needs Action:", iter!(|f| f.is_unactioned())),
 
 
         s("# Deprecated"),

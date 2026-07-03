@@ -20,8 +20,11 @@ where
     T: Copy
 {
 
+    let width = opts.iter().map(|o| o.code.len()).max().unwrap();
+
     for o in opts {
-        println!("  {} - {}", o.code, o.name);
+        let w = " ".repeat(width - o.code.len());
+        println!("  {}{w} - {}", o.code, o.name);
     }
 
     let opts: HashMap<_, T> = opts

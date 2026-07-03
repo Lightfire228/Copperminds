@@ -25,18 +25,19 @@ pub struct Frontmatter {
 
     // GTD
     pub type_:       Option<String>,
-    pub context:     Option<String>,
+    pub action:      Option<String>,
 
     pub processing:  Option<Vec<String>>,
 }
 
+// TODO: maybe these should be defined elsewhere, away from the noise of md_file management
 #[derive(Debug, Clone, Copy)]
 pub enum FmProperty {
     Inbox,
     Category,
     Status,
     Type,
-    Context,
+    Action,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -45,11 +46,16 @@ pub enum FmType {
     Action,
 }
 #[derive(Debug, Clone, Copy)]
-pub enum FmContext {
-    Todo,
+pub enum FmAction {
     WaitingFor,
     Calendar,
+    Todo,
     MaybeSomeday,
+}
+#[derive(Debug, Clone, Copy)]
+pub enum FmStatus {
+    Completed,
+    Archived,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -152,9 +158,14 @@ impl MdFile {
             .any      (|p| p.ends_with("03 Data"))
     }
 
-    /// GTD Context
-    pub fn is_uncontextualized(&self) -> bool {
-              !self.has_property    (FmProperty::Context)
+    /// GTD Action
+    /// - waiting for
+    //  - calendar
+    /// - todo
+    /// - maybe someday
+    ///
+    pub fn is_unactioned(&self) -> bool {
+              !self.has_property    (FmProperty::Action)
            &&  self.has_property_val(FmProperty::Type, "action")
 
     }
@@ -244,11 +255,13 @@ impl PartialEq for MdFile {
 
 impl Eq for MdFile {}
 
+
 impl Frontmatter {
     pub fn new(fm: Mapping) -> Self {
         parse_frontmatter(fm)
     }
 
+    // TODO: macro this
     fn get_property(&self, property: FmProperty) -> Option<&str> {
 
         match property {
@@ -256,7 +269,7 @@ impl Frontmatter {
             FmProperty::Category => self.category.as_ref().map(|p| p.as_str()),
             FmProperty::Status   => self.status  .as_ref().map(|p| p.as_str()),
             FmProperty::Type     => self.type_   .as_ref().map(|p| p.as_str()),
-            FmProperty::Context  => self.status  .as_ref().map(|p| p.as_str()),
+            FmProperty::Action   => self.action  .as_ref().map(|p| p.as_str()),
         }
     }
 
@@ -266,7 +279,7 @@ impl Frontmatter {
             FmProperty::Category => self.category = Some(value),
             FmProperty::Status   => self.status   = Some(value),
             FmProperty::Type     => self.type_    = Some(value),
-            FmProperty::Context  => self.context  = Some(value),
+            FmProperty::Action   => self.action   = Some(value),
         }
     }
 
@@ -276,7 +289,7 @@ impl Frontmatter {
             FmProperty::Category => self.category .take(),
             FmProperty::Status   => self.status   .take(),
             FmProperty::Type     => self.type_    .take(),
-            FmProperty::Context  => self.context  .take(),
+            FmProperty::Action   => self.action   .take(),
         }
     }
 
@@ -304,7 +317,7 @@ impl Frontmatter {
             processing: None,
 
             type_:      None,
-            context:    None,
+            action:     None,
         }
     }
 }
@@ -316,7 +329,7 @@ impl FmProperty {
             FmProperty::Category => "category".to_owned(),
             FmProperty::Status   => "status"  .to_owned(),
             FmProperty::Type     => "type"    .to_owned(),
-            FmProperty::Context  => "context" .to_owned(),
+            FmProperty::Action   => "action"  .to_owned(),
         }
     }
 }
@@ -384,7 +397,7 @@ fn parse_frontmatter(fm: Mapping) -> Frontmatter {
     let status   = get_str!("status");
     let category = get_str!("category");
     let type_    = get_str!("type");
-    let context  = get_str!("context");
+    let action   = get_str!("action");
 
     Frontmatter {
         yaml: fm,
@@ -395,7 +408,7 @@ fn parse_frontmatter(fm: Mapping) -> Frontmatter {
         category,
 
         type_,
-        context,
+        action,
     }
 
 }
