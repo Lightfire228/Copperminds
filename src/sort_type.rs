@@ -1,7 +1,7 @@
 
-use std::{io::{self, Write}, process::Command};
+use std::{process::Command};
 
-use crate::vault::{Index, md_file::{FmProperty, MdFile}};
+use crate::{cli::{MenuOption, choose}, vault::{Index, md_file::{FmProperty, MdFile}}};
 
 
 pub fn main(index: &mut Index) {
@@ -43,23 +43,24 @@ fn display_file(file: &MdFile) {
 
 
 fn get_type() -> Type {
-    println!("  i - info");
-    println!("  a - action");
+    let opts = [
+        MenuOption {
+            code:  "i",
+            name:  "info",
+            value: Type::Info,
+        },
+        MenuOption {
+            code:  "a",
+            name:  "action",
+            value: Type::Action,
+        },
+    ];
 
-    loop {
-        let usrin = get_usr_in("Type").to_lowercase();
-
-        match usrin.chars().next() {
-            Some('i') => break Type::Info,
-            Some('a') => break Type::Action,
-            _         => println!("Unknown type"),
-        }
-    }
-
+    choose("Type", &opts)
 
 }
 
-
+#[derive(Debug, Clone, Copy)]
 enum Type {
     Info,
     Action,
@@ -74,20 +75,6 @@ impl MdFile {
     }
 }
 
-
-fn get_usr_in(prompt: &str) -> String {
-    let mut buffer = String::new();
-    let     stdin  = io::stdin ();
-    let mut stdout = io::stdout();
-
-    print!("{prompt}\n> ");
-    stdout.flush().unwrap();
-
-    stdin.read_line(&mut buffer).unwrap();
-
-    buffer.trim().to_owned()
-
-}
 
 fn open_in_obsidian(file: &MdFile) {
 
