@@ -25,6 +25,7 @@ pub fn main(index: &mut Index) {
         let type_ = get_type();
 
         // re-load any changes made to the file while the cli was waiting for input
+        // NOTE: this doesn't catch renames or deletes
         file.refresh();
 
         file.set_type(type_);
