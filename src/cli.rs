@@ -15,12 +15,14 @@ pub fn get_usr_in(prompt: &str) -> String {
 
 }
 
-pub fn choose<T>(prompt: &str, opts: &[MenuOption<T>]) -> T
+pub fn choose<T>(title: &str, opts: &[MenuOption<T>]) -> T
 where
     T: Copy
 {
 
     let width = opts.iter().map(|o| o.code.len()).max().unwrap();
+
+    println!("{title}");
 
     for o in opts {
         let w = " ".repeat(width - o.code.len());
@@ -34,7 +36,7 @@ where
     ;
 
     loop {
-        let usrin = get_usr_in(prompt).to_lowercase();
+        let usrin = get_usr_in("").to_lowercase();
 
         let Some(val) = opts.get(usrin.as_str()) else {
             println!("Unknown type");

@@ -1,5 +1,5 @@
 
-use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, md_file::{FmAction, FmProperty, MdFile}}};
+use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, md_file::{FmProperty, MdFile}}};
 
 
 pub fn main(index: &mut Index) {
@@ -21,7 +21,7 @@ pub fn main(index: &mut Index) {
 
         let action = get_action();
 
-        if matches!(action, Action::Calendar) {
+        if matches!(action, MenuAction::Calendar) {
             println!("!! Set it in Tasks or Calendar apps");
             continue;
         }
@@ -44,37 +44,47 @@ fn display_file(file: &MdFile) {
 }
 
 
-fn get_action() -> Action {
+fn get_action() -> MenuAction {
     let opts = [
         MenuOption {
             code:  "w",
             name:  "waiting for",
-            value: Action::WaitingFor,
+            value: MenuAction::WaitingFor,
         },
         MenuOption {
             code:  "c",
             name:  "calendar",
-            value: Action::Calendar,
+            value: MenuAction::Calendar,
+        },
+        MenuOption {
+            code:  "p",
+            name:  "project",
+            value: MenuAction::Project,
+        },
+        MenuOption {
+            code:  "i",
+            name:  "info",
+            value: MenuAction::Info,
         },
         MenuOption {
             code:  "t",
             name:  "todo",
-            value: Action::Todo,
+            value: MenuAction::Todo,
         },
         MenuOption {
             code:  "tc",
             name:  "todo completed",
-            value: Action::TodoCompleted,
+            value: MenuAction::TodoCompleted,
         },
         MenuOption {
             code:  "ta",
             name:  "todo archived",
-            value: Action::TodoArchived,
+            value: MenuAction::TodoArchived,
         },
         MenuOption {
             code:  "m",
             name:  "maybe someday",
-            value: Action::MaybeSomeday,
+            value: MenuAction::MaybeSomeday,
         },
     ];
 
@@ -82,9 +92,11 @@ fn get_action() -> Action {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum Action {
+enum MenuAction {
     WaitingFor,
     Calendar,
+    Project,
+    Info,
     Todo,
     TodoCompleted,
     TodoArchived,
@@ -92,26 +104,42 @@ enum Action {
 }
 
 impl MdFile {
-    fn set_action(&mut self, action: Action) {
-        self.assign_property(FmProperty::Action, match action {
-            Action::WaitingFor    => "waiting_for"  .to_owned(),
-            Action::Todo          => "todo"         .to_owned(),
-            Action::TodoCompleted => "todo"         .to_owned(),
-            Action::TodoArchived  => "todo"         .to_owned(),
-            Action::MaybeSomeday  => "maybe_someday".to_owned(),
-            Action::Calendar      => "calendar"     .to_owned(),
-        });
+    fn set_action(&mut self, menu_choice: MenuAction) {
 
-        // TODO: make this a set func on MdFile::set_status(Status::Completed)
-        let status = match action {
-            Action::TodoCompleted => Some("completed".to_owned()),
-            Action::TodoArchived  => Some("archived" .to_owned()),
+        let action = match menu_choice {
+            MenuAction::WaitingFor    => Some("waiting_for"),
+            MenuAction::Calendar      => Some("calendar"),
+            MenuAction::Project       => Some("project"),
+            MenuAction::Todo          |
+            MenuAction::TodoCompleted |
+            MenuAction::TodoArchived  => Some("todo"),
+            MenuAction::MaybeSomeday  => Some("maybe_someday"),
 
+            MenuAction::Info          => None,
+        };
+
+        let status = match menu_choice {
+            MenuAction::TodoCompleted => Some("completed"),
+            MenuAction::TodoArchived  => Some("archived"),
             _ => None,
         };
 
+        let type_ = match menu_choice {
+            MenuAction::Info => Some("info"),
+
+            _ => None
+        };
+
+        if let Some(action) = action {
+            self.assign_property(FmProperty::Action, action.to_owned());
+        }
+
         if let Some(status) = status {
-            self.assign_property(FmProperty::Status, status);
+            self.assign_property(FmProperty::Status, status.to_owned());
+        }
+
+        if let Some(type_) = type_ {
+            self.assign_property(FmProperty::Type,   type_.to_owned());
         }
     }
 
