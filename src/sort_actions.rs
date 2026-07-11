@@ -1,6 +1,5 @@
 
-use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, md_file::{FmProperty, MdFile}}};
-
+use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, md_file::{FmProperty, MdFile}, regex}};
 
 pub fn main(index: &mut Index) {
 
@@ -8,7 +7,7 @@ pub fn main(index: &mut Index) {
 
     let files: Vec<_> = index
         .iter_files_mut()
-        .filter        (|f| f.is_unactioned())
+        .filter        (filter)
         .collect       ()
     ;
 
@@ -26,6 +25,10 @@ pub fn main(index: &mut Index) {
             continue;
         }
 
+        if matches!(action, MenuAction::Next) {
+            continue;
+        }
+
         // re-load any changes made to the file while the cli was waiting for input
         // NOTE: this doesn't catch renames or deletes
         file.refresh();
@@ -33,6 +36,13 @@ pub fn main(index: &mut Index) {
         file.set_action(action);
         file.write_file();
     }
+}
+
+fn filter(f: &&mut MdFile) -> bool {
+    // regex!(RE = r"^\d{4}-\d{2}-\d{2}");
+
+    // f.is_unactioned() && !RE.is_match(&f.file_name)
+    f.is_unactioned()
 }
 
 fn display_file(file: &MdFile) {
@@ -86,6 +96,11 @@ fn get_action() -> MenuAction {
             name:  "maybe someday",
             value: MenuAction::MaybeSomeday,
         },
+        MenuOption {
+            code:  "n",
+            name:  "next",
+            value: MenuAction::Next,
+        },
     ];
 
     choose("Type", &opts)
@@ -101,6 +116,7 @@ enum MenuAction {
     TodoCompleted,
     TodoArchived,
     MaybeSomeday,
+    Next,
 }
 
 impl MdFile {
@@ -116,6 +132,7 @@ impl MdFile {
             MenuAction::MaybeSomeday  => Some("maybe_someday"),
 
             MenuAction::Info          => None,
+            MenuAction::Next          => None,
         };
 
         let status = match menu_choice {

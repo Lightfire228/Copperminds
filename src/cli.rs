@@ -19,6 +19,13 @@ pub fn choose<T>(title: &str, opts: &[MenuOption<T>]) -> T
 where
     T: Copy
 {
+    choose_with(title, opts, None)
+}
+
+pub fn choose_with<T>(title: &str, opts: &[MenuOption<T>], default: Option<T>) -> T
+where
+    T: Copy
+{
 
     let width = opts.iter().map(|o| o.code.len()).max().unwrap();
 
@@ -37,6 +44,10 @@ where
 
     loop {
         let usrin = get_usr_in("").to_lowercase();
+
+        if let (true, Some(default)) = (usrin.is_empty(), default) {
+            return default
+        }
 
         let Some(val) = opts.get(usrin.as_str()) else {
             println!("Unknown type");
