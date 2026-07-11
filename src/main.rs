@@ -1,4 +1,5 @@
 
+mod actionables;
 mod backup;
 mod cli;
 mod obsidian;
@@ -21,34 +22,41 @@ fn main() {
 
     println!("\n\n---\n");
 
+
+
     match menu() {
-        Sort::ByType   => sort_type   ::main(&mut index),
-        Sort::ByAction => sort_actions::main(&mut index),
+        Menu::SortByType       => sort_type   ::main(&mut index),
+        Menu::SortByAction     => sort_actions::main(&mut index),
+        Menu::ActionablesInbox => actionables ::main(&mut index),
     }
 }
 
 
-fn menu() -> Sort {
+fn menu() -> Menu {
     let opts = [
         MenuOption {
             code:  "t",
             name:  "sort by Type",
-            value: Sort::ByType,
+            value: Menu::SortByType,
         },
         MenuOption {
             code:  "a",
             name:  "sort by Action",
-            value: Sort::ByAction,
+            value: Menu::SortByAction,
+        },
+        MenuOption {
+            code:  "ai",
+            name:  "actionables inbox",
+            value: Menu::ActionablesInbox,
         }
     ];
 
     choose("Sorting method", &opts)
-
 }
 
 #[derive(Debug, Clone, Copy)]
-enum Sort {
-    ByType,
-    ByAction,
-
+enum Menu {
+    SortByType,
+    SortByAction,
+    ActionablesInbox,
 }

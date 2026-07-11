@@ -1,5 +1,5 @@
 
-use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, md_file::{FmProperty, MdFile}, regex}};
+use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, md_file::{FmProperty, MdFile}}};
 
 pub fn main(index: &mut Index) {
 

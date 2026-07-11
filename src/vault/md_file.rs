@@ -165,11 +165,25 @@ impl MdFile {
     /// - maybe someday
     ///
     pub fn is_unactioned(&self) -> bool {
-              !self.has_property    (FmProperty::Action)
-           &&  self.has_property_val(FmProperty::Type, "action")
-
+            self.is_actionable()
+        && !self.has_property (FmProperty::Action)
     }
 
+    pub fn is_actionable(&self) -> bool {
+        self.has_property_val(FmProperty::Type, "action")
+    }
+
+    pub fn is_archived(&self) -> bool {
+        self.has_property_val_any(FmProperty::Status, &["archive",  "archived"])
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.has_property_val_any(FmProperty::Status, &["complete", "completed"])
+    }
+
+    pub fn is_complete_or_archived(&self) -> bool {
+        self.is_complete() || self.is_archived()
+    }
 
 
 
