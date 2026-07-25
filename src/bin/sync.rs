@@ -40,21 +40,7 @@ async fn main() {
     while let Some(event) = next_write(&mut rx).await {
         println!("received write: {event:?}");
 
-
-        // wait for a break in writes
-        loop {
-            let sleep = time::sleep(Duration::from_secs(10));
-            tokio::pin!(sleep);
-
-            select! {
-                _ = &mut sleep => {
-                    break;
-                }
-                e = next_write(&mut rx) => {
-                    println!("> new write: {e:?}")
-                }
-            }
-        }
+        wait_for_write_timeout(&mut rx, Duration::from_secs(10)).await;
 
         println!("making backup");
         backup::backup_named(&folder, "Automatic backup");
@@ -90,7 +76,8 @@ async fn next_write(rx: &mut Receiver<notify::Result<Event>>) -> Option<Event> {
             .any(|p| p
                 .ancestors()
                 .any(|p| p.is_dir() && p.ends_with(".git"))
-            );
+            )
+        ;
 
         if is_git {
             continue;
@@ -109,4 +96,21 @@ async fn next_write(rx: &mut Receiver<notify::Result<Event>>) -> Option<Event> {
 
     None
 
+}
+
+async fn wait_for_write_timeout(rx: &mut Receiver<notify::Result<Event>>, timeout: Duration) {
+
+    loop {
+        let sleep = time::sleep(timeout);
+        tokio::pin!(sleep);
+
+        select! {
+            _ = &mut sleep => {
+                break;
+            }
+            e = next_write(rx) => {
+                println!("> new write: {e:?}")
+            }
+        }
+    }
 }

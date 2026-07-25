@@ -9,13 +9,30 @@ pub fn main(index: &mut Index) {
         .collect()
     ;
 
-    let unsorted      = get(&files, |f| f.is_unactioned() && !f.is_complete_or_archived());
-    let complete      = get(&files, |f| f.is_complete());
-    let archived      = get(&files, |f| f.is_archived());
-    let todo          = get(&files, |f| f.has_property_val(FmProperty::Action, "todo")          && !f.is_complete_or_archived());
-    let waiting_for   = get(&files, |f| f.has_property_val(FmProperty::Action, "waiting_for")   && !f.is_complete_or_archived());
-    let maybe_someday = get(&files, |f| f.has_property_val(FmProperty::Action, "maybe_someday") && !f.is_complete_or_archived());
-    let project       = get(&files, |f| f.has_property_val(FmProperty::Action, "project")       && !f.is_complete_or_archived());
+    let mut unsorted      = vec![];
+    let mut complete      = vec![];
+    let mut archived      = vec![];
+    let mut todo          = vec![];
+    let mut waiting_for   = vec![];
+    let mut maybe_someday = vec![];
+    let mut project       = vec![];
+    let mut unknown       = vec![];
+
+    for file in files {
+
+        let bucket = match () {
+            _ if file.is_complete  ()                                       => &mut complete,
+            _ if file.is_archived  ()                                       => &mut archived,
+            _ if file.is_unactioned()                                       => &mut unsorted,
+            _ if file.has_property_val(FmProperty::Action, "todo")          => &mut todo,
+            _ if file.has_property_val(FmProperty::Action, "waiting_for")   => &mut waiting_for,
+            _ if file.has_property_val(FmProperty::Action, "maybe_someday") => &mut maybe_someday,
+            _ if file.has_property_val(FmProperty::Action, "project")       => &mut project,
+            _ => &mut unknown,
+        };
+
+        bucket.push(file);
+    }
 
     println!("unsorted      {}", unsorted     .iter().count());
     println!("complete      {}", complete     .iter().count());
@@ -24,16 +41,4 @@ pub fn main(index: &mut Index) {
     println!("waiting_for   {}", waiting_for  .iter().count());
     println!("maybe_someday {}", maybe_someday.iter().count());
     println!("project       {}", project      .iter().count());
-}
-
-fn get<'a, F>(files: &[&'a MdFile], f: F) -> Vec<&'a MdFile>
-where
-    F: Fn(&&&'a MdFile) -> bool
-{
-    files
-        .iter   ()
-        .filter (f)
-        .map    (|f| *f)
-        .collect()
-
 }
