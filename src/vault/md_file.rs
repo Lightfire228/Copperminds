@@ -11,6 +11,7 @@ const RE_EMPTY: &str = r"^\s*$";
 pub struct MdFile {
     pub entry:            DirEntry,
     pub frontmatter:      Option<Frontmatter>,
+    /// Includes file extension
     pub file_name:        String,
     pub md_text:          String,
     pub raw_text:         String,

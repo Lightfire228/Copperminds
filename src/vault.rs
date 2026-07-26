@@ -2,12 +2,17 @@
 
 pub mod md_file;
 
+mod file_utilities;
+
+
+use crate::{backup};
 use std::{collections::HashMap, env, ops::Deref, path::PathBuf};
 
 use walkdir::{DirEntry, WalkDir};
 use trash;
 
 use md_file::{MdFile, FmProperty, FmPropertyList};
+
 
 macro_rules! regex {
     ($i:ident = $r:expr) => {
@@ -21,7 +26,6 @@ macro_rules! regex {
 
 pub(crate) use regex;
 
-use crate::{backup};
 
 
 #[derive(Debug)]

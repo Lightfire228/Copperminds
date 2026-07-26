@@ -1,4 +1,4 @@
-use crate::vault::{Index, md_file::{FmProperty, MdFile}};
+use crate::vault::{Index, md_file::{FmProperty}};
 
 pub fn main(index: &mut Index) {
     let files: Vec<_> = index

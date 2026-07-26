@@ -1,0 +1,11 @@
+type: action
+action: todo
+thingy:
+  nested_prop: hi
+  a: 1
+  b: null
+  double nested:
+    a: b
+list:
+  - hi
+  - there
