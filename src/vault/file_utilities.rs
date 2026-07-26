@@ -74,25 +74,8 @@ impl RawFile {
         let val = Value::String(value);
 
         fm.insert(key, val);
+        self.fm_text = fm_to_text(fm);
     }
-
-    // pub fn push_property_list(&mut self, list: String, value: String) {
-
-    //     let     fm   = self.frontmatter.get_or_insert_with(Mapping::new);
-    //     let mut tags = fm.take_property_list(list);
-
-    //     tags.push(value.clone());
-
-    //     let key = Value::String  (list.get_key());
-    //     let val = Value::Sequence(Sequence::from_iter(tags
-    //         .iter()
-    //         .map (|t| Value::String(t.to_owned()))
-    //     ));
-
-    //     fm.yaml.insert(key, val);
-    //     fm.set_property_list(list, tags);
-    // }
-
 
     pub fn remove_property(&mut self, property: String) {
 
@@ -102,27 +85,6 @@ impl RawFile {
 
         fm.remove(Value::String(property));
     }
-
-    // pub fn rename_property(&mut self, old_prop: FmProperty, new_prop: FmProperty) -> bool {
-
-    //     let Some(fm) = &mut self.frontmatter else {
-    //         return false;
-    //     };
-
-    //     if let Some(existing) = fm.get_property(new_prop) {
-    //         panic!("{}: {} is already defined for file: {}", new_prop.get_key(), existing, self.file_name);
-    //     }
-
-    //     let Some(old_val) = fm.take_property(old_prop) else {
-    //         return false;
-    //     };
-
-    //     fm.yaml.remove(old_prop.get_key());
-
-    //     self.assign_property(new_prop, old_val);
-
-    //     true
-    // }
 
     // ----- /CRUD ----
 
@@ -250,7 +212,7 @@ mod tests {
     use super::*;
 
     fn load_file(name: &str) -> String {
-        let dir  = format!("{}/test_files/parsing/{name}", env!("CARGO_MANIFEST_DIR"));
+        let dir  = format!("{}/test_files/{name}", env!("CARGO_MANIFEST_DIR"));
         let path = Path::new(&dir);
 
         fs::read_to_string(path).unwrap()
@@ -258,8 +220,8 @@ mod tests {
 
     fn load_test_bodies() -> Vec<String> {
         vec![
-            load_file("test_body_01.md"),
-            load_file("test_body_02.md"),
+            load_file("parsing/test_body_01.md"),
+            load_file("parsing/test_body_02.md"),
         ]
     }
 
@@ -269,10 +231,10 @@ mod tests {
         let bodies = load_test_bodies();
 
         let invalid_fm = vec![
-            load_file("invalid_fm_01.yaml"),
-            load_file("invalid_fm_02.yaml"),
-            load_file("invalid_fm_03.yaml"),
-            load_file("invalid_fm_04.yaml"),
+            load_file("parsing/invalid_fm_01.yaml"),
+            load_file("parsing/invalid_fm_02.yaml"),
+            load_file("parsing/invalid_fm_03.yaml"),
+            load_file("parsing/invalid_fm_04.yaml"),
         ];
 
         let mut tests = Vec::new();
@@ -303,8 +265,8 @@ mod tests {
         let bodies = load_test_bodies();
 
         let fms = vec![
-            load_file("valid_fm_01.yaml"),
-            load_file("valid_fm_01.yaml"),
+            load_file("parsing/valid_fm_01.yaml"),
+            load_file("parsing/valid_fm_01.yaml"),
 
             // test empty front matter
             "".to_string(),
@@ -325,18 +287,77 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_empty() {
+
+        let empty        = " \n\n\n\t\t\t\t    \t\t \n\n \t   ".to_owned();
+        let not_empty_01 = format!("{}.{}", empty, empty);
+        let not_empty_02 = format!("{}-{}", empty, empty);
+        let not_empty_03 = format!("{}a{}", empty, empty);
+
+        let tests = vec![
+            (empty,        true),
+            (not_empty_01, false),
+            (not_empty_02, false),
+            (not_empty_03, false),
+        ];
+
+        for (text, val) in tests {
+            let parsed = parse_md_file(text);
+            assert_eq!(parsed.is_empty(), val);
+        }
+    }
 
     #[test]
-    fn base() {
-        // - is empty file
-        // - properties
-        //   - add
-        //   - remove
-        //   - overwrite
-        //
-        // make sure to check for data loss
-        //
+    fn test_property_writes() {
+        macro_rules! value {
+            ($x:literal) => {
+                Value::String($x.to_owned())
+            };
+        }
 
+        let bodies = load_test_bodies();
+
+        for text in bodies {
+            let mut body = parse_md_file(text.clone());
+            let mut fm   = Mapping::new();
+
+            macro_rules! assert {
+                () => {
+                    assert_eq!(body.frontmatter.as_ref(), Some(&fm));
+                    assert_eq!(body.md_text,              text);
+                };
+            }
+
+            macro_rules! add {
+                ($key:literal, $val:literal) => {
+                    body.set_property($key.to_owned(), $val.to_owned());
+                    fm.insert(value!($key), value!($val));
+
+                    assert!();
+                };
+            }
+
+            add!("test prop 01", "test val 01");
+            add!("test prop 02", "test val 02");
+            add!("test prop 03", "test val 03");
+
+
+            // test modify
+            body.set_property("test prop 02".to_owned(), "changed".to_owned());
+
+            let x = fm.get_mut(value!("test prop 02")).unwrap();
+            *x = value!("changed");
+
+            assert!();
+
+
+            // test delete
+            body.remove_property("test prop 02".to_owned());
+            fm.remove(value!("test prop 02"));
+
+            assert!();
+        }
     }
 
 }
