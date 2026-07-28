@@ -21,13 +21,13 @@ pub fn main(index: &mut Index) {
     for file in files {
 
         let bucket = match () {
-            _ if file.is_complete  ()                                       => &mut complete,
-            _ if file.is_archived  ()                                       => &mut archived,
-            _ if file.is_unactioned()                                       => &mut unsorted,
-            _ if file.has_property_val(FmProperty::Action, "todo")          => &mut todo,
-            _ if file.has_property_val(FmProperty::Action, "waiting_for")   => &mut waiting_for,
-            _ if file.has_property_val(FmProperty::Action, "maybe_someday") => &mut maybe_someday,
-            _ if file.has_property_val(FmProperty::Action, "project")       => &mut project,
+            _ if file.is_complete  ()                                  => &mut complete,
+            _ if file.is_archived  ()                                  => &mut archived,
+            _ if file.is_unactioned()                                  => &mut unsorted,
+            _ if file.is_property(FmProperty::Action, "todo")          => &mut todo,
+            _ if file.is_property(FmProperty::Action, "waiting_for")   => &mut waiting_for,
+            _ if file.is_property(FmProperty::Action, "maybe_someday") => &mut maybe_someday,
+            _ if file.is_property(FmProperty::Action, "project")       => &mut project,
             _ => &mut unknown,
         };
 

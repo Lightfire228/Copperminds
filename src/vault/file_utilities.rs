@@ -8,6 +8,7 @@ const RE_EMPTY: &str = r"^\s*$";
 
 /// This is only concerned with manipulating the raw text and files, and front matter dictionaries.
 /// It does not provide any structured information about frontmatter properites, their state, or their validity
+#[derive(Debug)]
 pub struct RawFile {
     pub frontmatter:      Option<Mapping>,
 

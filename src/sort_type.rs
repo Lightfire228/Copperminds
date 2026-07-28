@@ -8,7 +8,7 @@ pub fn main(index: &mut Index) {
 
     let action_count: usize = index
         .iter_files()
-        .filter    (|t| t.has_property_val(FmProperty::Type, "action"))
+        .filter    (|t| t.is_property(FmProperty::Type, "action"))
         .count     ()
     ;
 
@@ -72,7 +72,7 @@ enum Type {
 
 impl MdFile {
     fn set_type(&mut self, type_: Type) {
-        self.assign_property(FmProperty::Type, match type_ {
+        self.set_property(FmProperty::Type, match type_ {
             Type::Info   => "info"  .to_owned(),
             Type::Action => "action".to_owned(),
         });

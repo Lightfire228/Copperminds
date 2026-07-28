@@ -148,15 +148,15 @@ impl MdFile {
         };
 
         if let Some(action) = action {
-            self.assign_property(FmProperty::Action, action.to_owned());
+            self.set_property(FmProperty::Action, action.to_owned());
         }
 
         if let Some(status) = status {
-            self.assign_property(FmProperty::Status, status.to_owned());
+            self.set_property(FmProperty::Status, status.to_owned());
         }
 
         if let Some(type_) = type_ {
-            self.assign_property(FmProperty::Type,   type_.to_owned());
+            self.set_property(FmProperty::Type,   type_.to_owned());
         }
     }
 
