@@ -1,16 +1,16 @@
 
-use std::{fs, path::Path};
+use std::{fs, path::{Path, PathBuf}};
 
-use crate::vault::file_utilities::RawFile;
+use crate::vault::{file_utilities::RawFile};
 
 use super::regex;
-use walkdir::{DirEntry};
 
 const RE_EMPTY: &str = r"^\s*$";
 
 #[derive(Debug)]
 pub struct MdFile {
-    pub entry:            DirEntry,
+    pub id:               usize,
+    pub path:             PathBuf,
     pub raw_file:         RawFile,
 
     /// Includes file extension
@@ -52,12 +52,13 @@ pub enum FmPropertyList {
 
 impl MdFile {
 
-    pub fn new(file: DirEntry) -> Self {
-        let text = fs::read_to_string(file.path()).unwrap();
+    pub fn new(id: usize, file: PathBuf) -> Self {
+        let text = fs::read_to_string(&file).unwrap();
 
         Self {
-            file_name: file.file_name().to_str().unwrap().to_owned(),
-            entry:     file,
+            id,
+            file_name: file.file_name().unwrap().to_str().unwrap().to_owned(),
+            path:     file,
             raw_file:  RawFile::new(text),
         }
     }
@@ -84,8 +85,7 @@ impl MdFile {
         P: AsRef<Path>
     {
         self
-            .entry
-            .path()
+            .path
             .parent()
             .is_some_and(|f|
                 f.ends_with(path)
@@ -99,8 +99,7 @@ impl MdFile {
     /// GTD Type
     pub fn is_untyped(&self) -> bool {
         self.get_property(FmProperty::Type).is_none()
-        && !self.entry
-            .path     ()
+        && !self.path
             .ancestors()
             .any      (|p| p.ends_with("03 Data"))
     }
@@ -157,11 +156,11 @@ impl MdFile {
 
 
     pub fn refresh(&mut self) {
-        *self = Self::new(self.entry.clone());
+        *self = Self::new(self.id, self.path.clone());
     }
 
     pub fn write_file(&self) {
-        self.raw_file.write(self.entry.path());
+        self.raw_file.write(&self.path);
     }
 
 
@@ -177,7 +176,9 @@ impl MdFile {
 
 impl PartialEq for MdFile {
     fn eq(&self, other: &Self) -> bool {
-        self.entry.path() == other.entry.path()
+        // TODO: should probably check if file inodes are the same instead
+        // or otherwise ask the OS to check the paths for me
+        self.path == other.path
     }
 }
 

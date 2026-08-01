@@ -11,7 +11,7 @@ use std::{collections::HashMap, env, ops::Deref, path::PathBuf};
 use walkdir::{DirEntry, WalkDir};
 use trash;
 
-use md_file::{MdFile, FmProperty, FmPropertyList};
+use md_file::{MdFile, FmProperty};
 
 
 macro_rules! regex {
@@ -32,7 +32,6 @@ pub(crate) use regex;
 pub struct Index {
     pub md_files: Vec<Box<MdFile>>,
     pub path:     PathBuf,
-
 }
 
 pub enum BulkAssign {
@@ -44,11 +43,17 @@ impl Index {
     pub fn build() -> Self {
         let files    = scan_vault();
 
+        let mut id = 0;
+
         let md_files = files
             .filter   (|f| ends_with(f, ".md"))
-            .map      (|f| MdFile::new(f))
-            .map      (|f| Box   ::new(f))
-            .collect  ()
+            .map      (|f| {
+                let path = f.path().to_path_buf();
+                id += 1;
+
+                Box::new(MdFile::new(id -1, path))
+            })
+            .collect()
         ;
 
         Self {
@@ -190,7 +195,7 @@ impl Index {
         ;
 
         for file in files.iter() {
-            trash::delete(file.entry.path()).unwrap();
+            trash::delete(&file.path).unwrap();
         }
 
         let deleted: Vec<_> = files
@@ -208,7 +213,6 @@ impl Index {
             })
         ;
     }
-
 }
 
 
@@ -242,6 +246,10 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
 }
 
 
+pub struct IndexIter {
+    list: Vec<usize>,
+}
+
 #[cfg(test)]
 mod tests {
     use std::{path::Path};
@@ -251,11 +259,9 @@ mod tests {
 
     fn load_file(name: &str) -> MdFile {
         let dir  = format!("{}/test_files/{name}", env!("CARGO_MANIFEST_DIR"));
-        let path = Path::new(&dir);
+        let path = Path::new(&dir).to_path_buf();
 
-        let entry = walkdir::WalkDir::new(path).into_iter().next().unwrap().unwrap();
-
-        MdFile::new(entry)
+        MdFile::new(0, path)
     }
 
 

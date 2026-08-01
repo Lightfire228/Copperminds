@@ -55,52 +55,27 @@ fn display_file(file: &MdFile) {
 
 
 fn get_action() -> MenuAction {
+
+    macro_rules! opt {
+        ($code:expr, $name:expr, $action:expr) => {
+            MenuOption {
+                code:  $code,
+                name:  $name,
+                value: $action,
+            }
+        };
+    }
+
     let opts = [
-        MenuOption {
-            code:  "w",
-            name:  "waiting for",
-            value: MenuAction::WaitingFor,
-        },
-        MenuOption {
-            code:  "c",
-            name:  "calendar",
-            value: MenuAction::Calendar,
-        },
-        MenuOption {
-            code:  "p",
-            name:  "project",
-            value: MenuAction::Project,
-        },
-        MenuOption {
-            code:  "i",
-            name:  "info",
-            value: MenuAction::Info,
-        },
-        MenuOption {
-            code:  "t",
-            name:  "todo",
-            value: MenuAction::Todo,
-        },
-        MenuOption {
-            code:  "tc",
-            name:  "todo completed",
-            value: MenuAction::TodoCompleted,
-        },
-        MenuOption {
-            code:  "ta",
-            name:  "todo archived",
-            value: MenuAction::TodoArchived,
-        },
-        MenuOption {
-            code:  "m",
-            name:  "maybe someday",
-            value: MenuAction::MaybeSomeday,
-        },
-        MenuOption {
-            code:  "n",
-            name:  "next",
-            value: MenuAction::Next,
-        },
+        opt!("w",  "waiting",  MenuAction::WaitingFor),
+        opt!("c",  "calendar", MenuAction::Calendar),
+        opt!("p",  "project",  MenuAction::Project),
+        opt!("i",  "info",     MenuAction::Info),
+        opt!("t",  "todo",     MenuAction::Todo),
+        opt!("tc", "todo",     MenuAction::TodoCompleted),
+        opt!("ta", "todo",     MenuAction::TodoArchived),
+        opt!("m",  "maybe",    MenuAction::MaybeSomeday),
+        opt!("n",  "next",     MenuAction::Next),
     ];
 
     choose("Type", &opts)
