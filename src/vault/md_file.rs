@@ -7,9 +7,11 @@ use super::regex;
 
 const RE_EMPTY: &str = r"^\s*$";
 
+pub type FileId = usize;
+
 #[derive(Debug)]
 pub struct MdFile {
-    pub id:               usize,
+    pub id:               FileId,
     pub path:             PathBuf,
     pub raw_file:         RawFile,
 
@@ -52,13 +54,13 @@ pub enum FmPropertyList {
 
 impl MdFile {
 
-    pub fn new(id: usize, file: PathBuf) -> Self {
-        let text = fs::read_to_string(&file).unwrap();
+    pub fn new(id: FileId, path: PathBuf) -> Self {
+        let text = fs::read_to_string(&path).unwrap();
 
         Self {
             id,
-            file_name: file.file_name().unwrap().to_str().unwrap().to_owned(),
-            path:     file,
+            file_name: path.file_name().unwrap().to_str().unwrap().to_owned(),
+            path,
             raw_file:  RawFile::new(text),
         }
     }

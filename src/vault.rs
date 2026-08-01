@@ -5,7 +5,7 @@ pub mod md_file;
 mod file_utilities;
 
 
-use crate::{backup};
+use crate::{backup, vault::md_file::FileId};
 use std::{collections::HashMap, env, ops::Deref, path::PathBuf};
 
 use walkdir::{DirEntry, WalkDir};
@@ -27,10 +27,9 @@ macro_rules! regex {
 pub(crate) use regex;
 
 
-
 #[derive(Debug)]
 pub struct Index {
-    pub md_files: Vec<Box<MdFile>>,
+    pub md_files: HashMap<FileId, Box<MdFile>>,
     pub path:     PathBuf,
 }
 
@@ -43,15 +42,16 @@ impl Index {
     pub fn build() -> Self {
         let files    = scan_vault();
 
-        let mut id = 0;
+        let mut next = 0;
 
         let md_files = files
             .filter   (|f| ends_with(f, ".md"))
             .map      (|f| {
                 let path = f.path().to_path_buf();
-                id += 1;
+                let id = next;
+                next += 1;
 
-                Box::new(MdFile::new(id -1, path))
+                (id, Box::new(MdFile::new(id, path)))
             })
             .collect()
         ;
@@ -68,98 +68,16 @@ impl Index {
         backup::backup(&self.path);
     }
 
-    pub fn iter_files(&self) -> impl Iterator<Item = &MdFile> {
-        self.md_files
-            .iter()
-            .map (|f| f.as_ref())
+    pub fn needs_category(&self) -> impl Iterator<Item = FileId> {
+        self
+            .iter_files()
+            .filter_map(|f| f
+                .is_uncategorized()
+                .then_some(f.id)
+            )
     }
 
-    pub fn iter_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
-        self.md_files
-            .iter_mut()
-            .map (|f| f.as_mut())
-    }
-}
-
-fn needs_category_filter(file: &MdFile) -> bool {
-    file.is_uncategorized()
-}
-
-impl Index {
-    pub fn needs_category(&self) -> impl Iterator<Item = &MdFile> {
-        self.iter_files()    .filter(|f| needs_category_filter(*f))
-    }
-
-    pub fn needs_category_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
-        self.iter_files_mut().filter(|f| needs_category_filter(*f))
-    }
-
-    pub fn bulk_assign_property<F>(&mut self, property: FmProperty, value: &str, filter: F)
-    where
-        F: Fn(&MdFile) -> bool
-    {
-        let files = self.iter_files_mut()
-            .filter(|f| filter(&f))
-        ;
-
-        let mut count = 0;
-
-        for file in files {
-            count += 1;
-
-            file.set_property(property, value.to_owned());
-            file.write_file();
-        }
-
-        println!("assigned: {}", count);
-    }
-
-    pub fn bulk_assign_category<F>(&mut self, category: &str, target: BulkAssign, filter: F)
-    where
-        F: Fn(&MdFile) -> bool
-    {
-        let files: Box<dyn Iterator<Item = &mut MdFile>> = match target {
-            BulkAssign::All               => Box::new(self.iter_files_mut    ()),
-            BulkAssign::NeedsCategoryOnly => Box::new(self.needs_category_mut()),
-        };
-
-        let filtered = files
-            .filter(|f| filter(&f))
-        ;
-
-        let mut count = 0;
-
-        for file in filtered {
-            count += 1;
-
-            file.set_property(FmProperty::Category, category.to_owned());
-            file.write_file();
-        }
-
-        println!("assigned: {}", count);
-    }
-
-    // pub fn bulk_assign_processing_tag<F>(&mut self, tag: &str, filter: F)
-    // where
-    //     F: Fn(&MdFile) -> bool
-    // {
-    //     let files = self.iter_files_mut()
-    //         .filter(|f| filter(&f))
-    //     ;
-
-    //     let mut count = 0;
-
-    //     for file in files {
-    //         count += 1;
-
-    //         file.push_list_val(FmPropertyList::Processing, tag.to_owned());
-    //         file.write_file();
-    //     }
-
-    //     println!("assigned: {}", count);
-    // }
-
-    pub fn list_all_categories(&self) -> HashMap<String, Vec<&MdFile>> {
+    pub fn list_all_categories(&self) -> HashMap<String, Vec<FileId>> {
 
         let files = self
             .iter_files()
@@ -172,13 +90,13 @@ impl Index {
             })
         ;
 
-        let mut map: HashMap<String, Vec<&MdFile>> = HashMap::new();
+        let mut map: HashMap<String, Vec<FileId>> = HashMap::new();
 
         for (category, file) in files {
             map
                 .entry     (category)
-                .and_modify(|list| list.push(file))
-                .or_insert (vec![file])
+                .and_modify(|list| list.push(file.id))
+                .or_insert (vec![file.id])
             ;
         }
 
@@ -191,27 +109,42 @@ impl Index {
         let files: Vec<_> = self
             .iter_files()
             .filter(|f| f.is_empty() && f.is_unnamed())
+            .map   (|f| f.id)
             .collect()
         ;
 
-        for file in files.iter() {
-            trash::delete(&file.path).unwrap();
+        for id in files.iter() {
+            let path = &self.md_files[id].path;
+
+            trash::delete(path).unwrap();
+            self.md_files.remove(id);
         }
+    }
 
-        let deleted: Vec<_> = files
-            .iter   ()
-            .map    (|f| *f as *const MdFile)
-            .collect()
-        ;
+    fn iter_files(&self) -> impl Iterator<Item = &MdFile> {
+        self
+            .md_files
+            .iter()
+            .map (|f| f.1.deref())
+    }
 
-        // TODO: maybe store the files as a hashmap?
-        self.md_files
-            .retain(|f| {
-                let ptr = f.deref() as *const MdFile;
+    pub fn filter_files<P>(&self, mut predicate: P) -> impl Iterator<Item = FileId>
+    where
+        P: FnMut(&MdFile) -> bool,
+    {
+        self
+            .md_files
+            .iter()
+            .filter(move |f| predicate(f.1.deref()))
+            .map (|f| *f.0)
+    }
 
-                !deleted.contains(&ptr)
-            })
-        ;
+    pub fn get_file(&self, id: FileId) -> &MdFile {
+        &self.md_files[&id]
+    }
+
+    pub fn get_file_mut(&mut self, id: FileId) -> &mut MdFile {
+        self.md_files.get_mut(&id).unwrap()
     }
 }
 
@@ -248,7 +181,21 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
 
 pub struct IndexIter {
     list: Vec<usize>,
+
+    index: usize
 }
+
+impl Iterator for IndexIter {
+    type Item = FileId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let i = self.index;
+        self.index += 1;
+
+        self.list.get(i).copied()
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
