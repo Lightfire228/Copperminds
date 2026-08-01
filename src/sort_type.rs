@@ -20,9 +20,9 @@ pub fn main(index: &mut Index) {
     println!("action count: {}", action_count);
 
 
-    for file in files {
+    for id in files {
 
-        let file = index.get_file_mut(file);
+        let file = index.get_file_mut(id);
 
         display_file(file);
 

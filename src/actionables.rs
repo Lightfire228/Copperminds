@@ -2,8 +2,7 @@ use crate::vault::{Index, md_file::{FmProperty}};
 
 pub fn main(index: &mut Index) {
     let files: Vec<_> = index
-        .iter_files()
-        .filter(|f|
+        .filter_files(|f|
             f.is_actionable()
         )
         .collect()
@@ -18,7 +17,9 @@ pub fn main(index: &mut Index) {
     let mut project       = vec![];
     let mut unknown       = vec![];
 
-    for file in files {
+    for id in files {
+
+        let file = index.get_file_mut(id);
 
         let bucket = match () {
             _ if file.is_complete  ()                                  => &mut complete,
@@ -31,7 +32,7 @@ pub fn main(index: &mut Index) {
             _ => &mut unknown,
         };
 
-        bucket.push(file);
+        bucket.push(id);
     }
 
     println!("unsorted      {}", unsorted     .iter().count());

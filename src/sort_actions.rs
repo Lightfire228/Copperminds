@@ -6,15 +6,18 @@ pub fn main(index: &mut Index) {
     println!("Sorting by Action");
 
     let files: Vec<_> = index
-        .iter_files_mut()
-        .filter        (filter)
-        .collect       ()
+        .filter_files(|f| {
+            f.is_unactioned()
+        })
+        .collect()
     ;
 
     println!("to be sorted: {}", files.len());
 
 
-    for file in files {
+    for id in files {
+
+        let file = index.get_file_mut(id);
 
         display_file(file);
 
@@ -38,12 +41,6 @@ pub fn main(index: &mut Index) {
     }
 }
 
-fn filter(f: &&mut MdFile) -> bool {
-    // regex!(RE = r"^\d{4}-\d{2}-\d{2}");
-
-    // f.is_unactioned() && !RE.is_match(&f.file_name)
-    f.is_unactioned()
-}
 
 fn display_file(file: &MdFile) {
     println!("\n\n");
