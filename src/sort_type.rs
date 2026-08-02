@@ -1,5 +1,5 @@
 
-use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, md_file::{FmProperty, MdFile}}};
+use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, fm::{FmProperty, FmType}, md_file::MdFile}};
 
 
 pub fn main(index: &mut Index) {
@@ -7,12 +7,12 @@ pub fn main(index: &mut Index) {
     println!("Sorting by Type");
 
     let action_count: usize = index
-        .iter_files_with(|t| t.is_property(FmProperty::Type, "action"))
+        .iter_files_with(|t| t.is_property(FmProperty::Type, FmType::Action))
         .count          ()
     ;
 
     let files: Vec<_> = index
-        .iter_files_with(|f| f.is_untyped())
+        .iter_files_with(|f| f.needs_type())
         .collect        ()
     ;
 

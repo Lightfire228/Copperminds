@@ -1,5 +1,5 @@
 
-use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, md_file::{FmProperty, MdFile}}};
+use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, fm::FmProperty, md_file::MdFile}};
 
 pub fn main(index: &mut Index) {
 
@@ -7,7 +7,7 @@ pub fn main(index: &mut Index) {
 
     let files: Vec<_> = index
         .iter_files_with(|f| {
-            f.is_unactioned()
+            f.needs_action_type()
         })
         .collect()
     ;

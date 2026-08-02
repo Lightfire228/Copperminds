@@ -11,6 +11,7 @@ use iced::Task;
 use tokio::runtime::Runtime;
 
 use crate::vault::Index;
+use crate::vault::md_file::{FileId, MdFile};
 
 
 pub fn main() {
@@ -26,37 +27,46 @@ pub fn main() {
 
 
 struct App {
-    index: Index
+    index: Index,
+    files: IterFiles,
 }
 
 enum Interaction {
-
+    NextFile,
 }
 
-impl App {
-    fn new() -> (Self, Task<Interaction>) {(
-        Self {
-            index: Index::build(),
-        },
-        Task::none() // on startup
 
-    )}
+
+impl App {
+    fn new() -> (Self, Task<Interaction>) {
+        let index = Index::build();
+
+        (
+            Self {
+                files: load_files(&index, QueueType::NeedsAction),
+                index,
+            },
+            Task::none() // on startup
+
+        )
+    }
 
     fn update(&mut self, message: Interaction) -> Task<Interaction> {
         match message {
-
+            Interaction::NextFile => {
+                self.files.next();
+            },
         }
 
-        // Task::none()
+        Task::none()
     }
 
     fn view(&self) -> Element<'_, Interaction> {
 
-        let files = self
-            .index
-            .iter_files_with(|f| f.is_untyped())
-            .map            (|f| {
-                let name = &self.index._get_file(f).file_name;
+        let files = self.files.files
+            .iter()
+            .map (|f| {
+                let name = &self.index._get_file(*f).file_name;
 
                 text!("{}", name).into()
             })
@@ -65,5 +75,44 @@ impl App {
         column(files).into()
     }
 
+}
 
+
+struct IterFiles {
+    files: Vec<FileId>,
+    queue: QueueType,
+    index: usize,
+}
+
+impl Iterator for IterFiles {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+
+        self.index += 1;
+
+        self.files.get(self.index -1).copied()
+    }
+}
+
+
+enum QueueType {
+    NeedsType,
+    NeedsAction,
+}
+
+fn load_files(index: &Index, queue: QueueType) -> IterFiles {
+
+    let files: Vec<_> = index.iter_files_with(|f| match queue {
+        QueueType::NeedsType   => f.needs_type(),
+        QueueType::NeedsAction => f.needs_action_type()
+    })
+        .collect()
+    ;
+
+    IterFiles {
+        files,
+        queue,
+        index: 0,
+    }
 }

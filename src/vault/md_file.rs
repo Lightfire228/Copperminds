@@ -1,7 +1,7 @@
 
 use std::{fs, path::{Path, PathBuf}};
 
-use crate::vault::{file_utilities::RawFile};
+use crate::vault::{file_utilities::RawFile, fm::{FmProperty, GetKey}};
 
 use super::regex;
 
@@ -15,34 +15,6 @@ pub struct MdFile {
 
     /// Includes file extension
     pub file_name:        String,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-pub enum FmProperty {
-    Inbox,
-    Category,
-    Status,
-    Type,
-    Action,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum _FmType {
-    Info,
-    Action,
-}
-#[derive(Debug, Clone, Copy)]
-pub enum _FmAction {
-    WaitingFor,
-    Calendar,
-    Todo,
-    MaybeSomeday,
-}
-#[derive(Debug, Clone, Copy)]
-pub enum _FmStatus {
-    Completed,
-    Archived,
 }
 
 impl MdFile {
@@ -88,7 +60,7 @@ impl MdFile {
     }
 
     /// GTD Type
-    pub fn is_untyped(&self) -> bool {
+    pub fn needs_type(&self) -> bool {
         self.get_property(FmProperty::Type).is_none()
         && !self.path
             .ancestors()
@@ -100,9 +72,9 @@ impl MdFile {
     /// - todo
     /// - maybe someday
     ///
-    pub fn is_unactioned(&self) -> bool {
+    pub fn needs_action_type(&self) -> bool {
         self.is_actionable()
-        && !self.get_property(FmProperty::Action).is_some()
+        && self.get_property(FmProperty::Action).is_none()
     }
 
     pub fn is_actionable(&self) -> bool {
@@ -126,8 +98,8 @@ impl MdFile {
             .ok()
     }
 
-    pub fn is_property(&self, property: FmProperty, value: &str) -> bool {
-        self.get_property(property).is_some_and(|p| p == value)
+    pub fn is_property(&self, property: FmProperty, val: impl GetKey) -> bool {
+        self.get_property(property).is_some_and(|p| p == val.get_key())
     }
 
     pub fn is_property_any_of(&self, property: FmProperty, vals: &[&str]) -> bool {
@@ -171,14 +143,75 @@ impl PartialEq for MdFile {
 
 impl Eq for MdFile {}
 
-impl FmProperty {
-    pub fn get_key(&self) -> String {
-        match &self {
-            FmProperty::Inbox    => "inbox"   .to_owned(),
-            FmProperty::Category => "category".to_owned(),
-            FmProperty::Status   => "status"  .to_owned(),
-            FmProperty::Type     => "type"    .to_owned(),
-            FmProperty::Action   => "action"  .to_owned(),
+#[cfg(test)]
+impl MdFile {
+    pub fn parse(id: FileId, text: String) -> Self {
+        Self {
+            id,
+            file_name: String ::new(),
+            path:      PathBuf::new(),
+            raw_file:  RawFile::new(text),
         }
     }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::{path::Path};
+
+
+    use crate::vault::fm::FmType;
+
+    use super::*;
+
+
+    fn load_file(name: &str) -> MdFile {
+        let dir  = format!("{}/test_files/{name}", env!("CARGO_MANIFEST_DIR"));
+        let path = Path::new(&dir).to_path_buf();
+
+        MdFile::new(0, path)
+    }
+
+
+    #[test]
+    fn test_type_sorting() {
+        let untyped = load_file("sorting/type_none.md");
+        let info    = load_file("sorting/type_info.md");
+        let action  = load_file("sorting/type_action.md");
+
+        assert_eq!(untyped.needs_type(), true);
+        assert_eq!(info   .needs_type(), false);
+        assert_eq!(action .needs_type(), false);
+
+        assert_eq!(untyped.needs_action_type(), false);
+        assert_eq!(info   .needs_action_type(), false);
+        assert_eq!(action .needs_action_type(), true);
+
+        assert_eq!(untyped.is_actionable(), false);
+        assert_eq!(info   .is_actionable(), false);
+        assert_eq!(action .is_actionable(), true);
+
+        assert!(info  .is_property(FmProperty::Type, FmType::Info));
+        assert!(action.is_property(FmProperty::Type, FmType::Action));
+    }
+
+    #[test]
+    fn test_status_sorting() {
+        let archive   = load_file("sorting/status_archive.md");
+        let archived  = load_file("sorting/status_archived.md");
+        let complete  = load_file("sorting/status_complete.md");
+        let completed = load_file("sorting/status_completed.md");
+
+        assert_eq!(archive  .is_archived(), true);
+        assert_eq!(archived .is_archived(), true);
+        assert_eq!(complete .is_archived(), false);
+        assert_eq!(completed.is_archived(), false);
+
+        assert_eq!(archive  .is_complete(), false);
+        assert_eq!(archived .is_complete(), false);
+        assert_eq!(complete .is_complete(), true);
+        assert_eq!(completed.is_complete(), true);
+    }
+
 }

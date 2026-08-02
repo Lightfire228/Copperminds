@@ -1,5 +1,6 @@
 
 pub mod md_file;
+pub mod fm;
 
 mod file_utilities;
 
@@ -28,8 +29,8 @@ pub(crate) use regex;
 
 #[derive(Debug)]
 pub struct Index {
-    pub md_files: HashMap<FileId, Box<MdFile>>,
-    pub _path:    PathBuf,
+    md_files: HashMap<FileId, Box<MdFile>>,
+    _path:    PathBuf,
 }
 
 impl Index {
@@ -136,60 +137,4 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
         .to_str   ()
         .map      (|f| f.ends_with(ext))
         .unwrap_or(false)
-}
-
-
-#[cfg(test)]
-mod tests {
-    use std::{path::Path};
-
-    use crate::vault::md_file::FmProperty;
-
-    use super::*;
-
-
-    fn load_file(name: &str) -> MdFile {
-        let dir  = format!("{}/test_files/{name}", env!("CARGO_MANIFEST_DIR"));
-        let path = Path::new(&dir).to_path_buf();
-
-        MdFile::new(0, path)
-    }
-
-
-    #[test]
-    fn test_type_sorting() {
-        let untyped = load_file("sorting/type_none.md");
-        let info    = load_file("sorting/type_info.md");
-        let action  = load_file("sorting/type_action.md");
-
-        assert_eq!(untyped.is_untyped(), true);
-        assert_eq!(info   .is_untyped(), false);
-        assert_eq!(action .is_untyped(), false);
-
-        assert_eq!(untyped.is_actionable(), false);
-        assert_eq!(info   .is_actionable(), false);
-        assert_eq!(action .is_actionable(), true);
-
-        assert!(info  .is_property(FmProperty::Type, "info"));
-        assert!(action.is_property(FmProperty::Type, "action"));
-    }
-
-    #[test]
-    fn test_status_sorting() {
-        let archive   = load_file("sorting/status_archive.md");
-        let archived  = load_file("sorting/status_archived.md");
-        let complete  = load_file("sorting/status_complete.md");
-        let completed = load_file("sorting/status_completed.md");
-
-        assert_eq!(archive  .is_archived(), true);
-        assert_eq!(archived .is_archived(), true);
-        assert_eq!(complete .is_archived(), false);
-        assert_eq!(completed.is_archived(), false);
-
-        assert_eq!(archive  .is_complete(), false);
-        assert_eq!(archived .is_complete(), false);
-        assert_eq!(complete .is_complete(), true);
-        assert_eq!(completed.is_complete(), true);
-    }
-
 }

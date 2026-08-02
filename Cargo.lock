@@ -528,6 +528,7 @@ dependencies = [
  "anyhow",
  "async-stdin",
  "chrono",
+ "enum_ext",
  "futures",
  "iced",
  "inotify",
@@ -733,6 +734,17 @@ name = "endi"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
+
+[[package]]
+name = "enum_ext"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de7434819475dbd5c5732085d7938b5f76833055372728e4159d80a8859e3158"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "enumflags2"

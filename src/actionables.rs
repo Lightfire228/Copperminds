@@ -1,4 +1,5 @@
-use crate::vault::{Index, md_file::{FmProperty}};
+use crate::vault::{Index, fm::{FmAction, FmProperty}};
+
 
 pub fn main(index: &mut Index) {
     let files: Vec<_> = index
@@ -22,13 +23,13 @@ pub fn main(index: &mut Index) {
         let file = index.get_file_mut(id);
 
         let bucket = match () {
-            _ if file.is_complete  ()                                  => &mut complete,
-            _ if file.is_archived  ()                                  => &mut archived,
-            _ if file.is_unactioned()                                  => &mut unsorted,
-            _ if file.is_property(FmProperty::Action, "todo")          => &mut todo,
-            _ if file.is_property(FmProperty::Action, "waiting_for")   => &mut waiting_for,
-            _ if file.is_property(FmProperty::Action, "maybe_someday") => &mut maybe_someday,
-            _ if file.is_property(FmProperty::Action, "project")       => &mut project,
+            _ if file.is_complete      ()                                     => &mut complete,
+            _ if file.is_archived      ()                                     => &mut archived,
+            _ if file.needs_action_type()                                     => &mut unsorted,
+            _ if file.is_property(FmProperty::Action, FmAction::Todo)         => &mut todo,
+            _ if file.is_property(FmProperty::Action, FmAction::WaitingFor)   => &mut waiting_for,
+            _ if file.is_property(FmProperty::Action, FmAction::MaybeSomeday) => &mut maybe_someday,
+            _ if file.is_property(FmProperty::Action, FmAction::Project)      => &mut project,
             _ => &mut unknown,
         };
 
