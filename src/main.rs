@@ -6,6 +6,7 @@ mod obsidian;
 mod sort_actions;
 mod sort_type;
 mod vault;
+mod ui;
 
 
 
@@ -28,6 +29,7 @@ fn main() {
         Menu::SortByType       => sort_type   ::main(&mut index),
         Menu::SortByAction     => sort_actions::main(&mut index),
         Menu::ActionablesInbox => actionables ::main(&mut index),
+        Menu::IcedUI           => ui          ::main(),
     }
 }
 
@@ -48,6 +50,11 @@ fn menu() -> Menu {
             code:  "ai",
             name:  "actionables inbox",
             value: Menu::ActionablesInbox,
+        },
+        MenuOption {
+            code:  "u",
+            name:  "iced ui",
+            value: Menu::IcedUI,
         }
     ];
 
@@ -59,4 +66,5 @@ enum Menu {
     SortByType,
     SortByAction,
     ActionablesInbox,
+    IcedUI,
 }
