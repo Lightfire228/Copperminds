@@ -61,6 +61,7 @@ impl RawFile {
         get_val_by_name(fm, property)
     }
 
+    #[allow(unused)]
     pub fn get_property_as_list(&self, property: &str) -> Result<Vec<String>, PropertyListError> {
         let fm = self.frontmatter.as_ref().ok_or(PropertyListError::PropertyNotFound)?;
 

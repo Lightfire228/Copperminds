@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 
 pub mod md_file;
 
@@ -11,7 +10,7 @@ use std::{collections::HashMap, env, ops::Deref, path::PathBuf};
 use walkdir::{DirEntry, WalkDir};
 use trash;
 
-use md_file::{MdFile, FmProperty};
+use md_file::{MdFile};
 
 
 macro_rules! regex {
@@ -30,12 +29,7 @@ pub(crate) use regex;
 #[derive(Debug)]
 pub struct Index {
     pub md_files: HashMap<FileId, Box<MdFile>>,
-    pub path:     PathBuf,
-}
-
-pub enum BulkAssign {
-    All,
-    NeedsCategoryOnly,
+    pub _path:    PathBuf,
 }
 
 impl Index {
@@ -58,49 +52,15 @@ impl Index {
 
         Self {
             md_files,
-            path: vault_folder(),
+            _path: vault_folder(),
         }
     }
 
+    #[allow(unused)]
     pub fn backup(&self) {
         println!("Backing up vault");
 
-        backup::backup(&self.path);
-    }
-
-    pub fn needs_category(&self) -> impl Iterator<Item = FileId> {
-        self
-            .iter_files()
-            .filter_map(|f| f
-                .is_uncategorized()
-                .then_some(f.id)
-            )
-    }
-
-    pub fn list_all_categories(&self) -> HashMap<String, Vec<FileId>> {
-
-        let files = self
-            .iter_files()
-            .filter_map(|f| {
-                Some((
-                    f.get_property(FmProperty::Category)?,
-                    f
-                ))
-
-            })
-        ;
-
-        let mut map: HashMap<String, Vec<FileId>> = HashMap::new();
-
-        for (category, file) in files {
-            map
-                .entry     (category)
-                .and_modify(|list| list.push(file.id))
-                .or_insert (vec![file.id])
-            ;
-        }
-
-        map
+        backup::backup(&self._path);
     }
 
 
@@ -128,7 +88,7 @@ impl Index {
             .map (|f| f.1.deref())
     }
 
-    pub fn filter_files<P>(&self, mut predicate: P) -> impl Iterator<Item = FileId>
+    pub fn iter_files_with<P>(&self, mut predicate: P) -> impl Iterator<Item = FileId>
     where
         P: FnMut(&MdFile) -> bool,
     {
@@ -139,7 +99,7 @@ impl Index {
             .map (|f| *f.0)
     }
 
-    pub fn get_file(&self, id: FileId) -> &MdFile {
+    pub fn _get_file(&self, id: FileId) -> &MdFile {
         &self.md_files[&id]
     }
 
@@ -179,27 +139,11 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
 }
 
 
-pub struct IndexIter {
-    list: Vec<usize>,
-
-    index: usize
-}
-
-impl Iterator for IndexIter {
-    type Item = FileId;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let i = self.index;
-        self.index += 1;
-
-        self.list.get(i).copied()
-    }
-}
-
-
 #[cfg(test)]
 mod tests {
     use std::{path::Path};
+
+    use crate::vault::md_file::FmProperty;
 
     use super::*;
 

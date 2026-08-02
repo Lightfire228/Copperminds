@@ -5,8 +5,6 @@ use crate::vault::{file_utilities::RawFile};
 
 use super::regex;
 
-const RE_EMPTY: &str = r"^\s*$";
-
 pub type FileId = usize;
 
 #[derive(Debug)]
@@ -19,8 +17,8 @@ pub struct MdFile {
     pub file_name:        String,
 }
 
-// TODO: maybe these should be defined elsewhere, away from the noise of md_file management
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum FmProperty {
     Inbox,
     Category,
@@ -30,26 +28,21 @@ pub enum FmProperty {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum FmType {
+pub enum _FmType {
     Info,
     Action,
 }
 #[derive(Debug, Clone, Copy)]
-pub enum FmAction {
+pub enum _FmAction {
     WaitingFor,
     Calendar,
     Todo,
     MaybeSomeday,
 }
 #[derive(Debug, Clone, Copy)]
-pub enum FmStatus {
+pub enum _FmStatus {
     Completed,
     Archived,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum FmPropertyList {
-    Processing,
 }
 
 impl MdFile {
@@ -71,7 +64,7 @@ impl MdFile {
         self.raw_file.is_empty()
     }
 
-    pub fn is_md_empty(&self) -> bool {
+    pub fn _is_md_empty(&self) -> bool {
         self.raw_file.is_md_empty()
     }
 
@@ -82,7 +75,7 @@ impl MdFile {
     }
 
     /// Does not check subdirectories
-    pub fn is_in_dir<P>(&self, path: P) -> bool
+    pub fn _is_in_dir<P>(&self, path: P) -> bool
     where
         P: AsRef<Path>
     {
@@ -92,10 +85,6 @@ impl MdFile {
             .is_some_and(|f|
                 f.ends_with(path)
             )
-    }
-
-    pub fn is_uncategorized(&self) -> bool {
-        self.get_property(FmProperty::Category).is_none()
     }
 
     /// GTD Type
@@ -108,7 +97,6 @@ impl MdFile {
 
     /// GTD Action
     /// - waiting for
-    //  - calendar
     /// - todo
     /// - maybe someday
     ///
@@ -129,10 +117,6 @@ impl MdFile {
 
     pub fn is_complete(&self) -> bool {
         self.is_property_any_of(FmProperty::Status, &["complete", "completed"])
-    }
-
-    pub fn is_complete_or_archived(&self) -> bool {
-        self.is_complete() || self.is_archived()
     }
 
     pub fn get_property(&self, property: FmProperty) -> Option<String> {
@@ -170,6 +154,7 @@ impl MdFile {
         self.raw_file.set_property(property.get_key(), value);
     }
 
+    #[allow(unused)]
     pub fn remove_property(&mut self, property: FmProperty) {
         self.raw_file.remove_property(property.get_key());
     }
@@ -194,14 +179,6 @@ impl FmProperty {
             FmProperty::Status   => "status"  .to_owned(),
             FmProperty::Type     => "type"    .to_owned(),
             FmProperty::Action   => "action"  .to_owned(),
-        }
-    }
-}
-
-impl FmPropertyList {
-    pub fn get_key(&self) -> String {
-        match &self {
-            FmPropertyList::Processing => "processing".to_owned(),
         }
     }
 }

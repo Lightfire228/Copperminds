@@ -2,7 +2,7 @@ use crate::vault::{Index, md_file::{FmProperty}};
 
 pub fn main(index: &mut Index) {
     let files: Vec<_> = index
-        .filter_files(|f|
+        .iter_files_with(|f|
             f.is_actionable()
         )
         .collect()

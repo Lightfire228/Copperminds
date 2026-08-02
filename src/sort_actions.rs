@@ -6,7 +6,7 @@ pub fn main(index: &mut Index) {
     println!("Sorting by Action");
 
     let files: Vec<_> = index
-        .filter_files(|f| {
+        .iter_files_with(|f| {
             f.is_unactioned()
         })
         .collect()

@@ -7,13 +7,13 @@ pub fn main(index: &mut Index) {
     println!("Sorting by Type");
 
     let action_count: usize = index
-        .filter_files(|t| t.is_property(FmProperty::Type, "action"))
-        .count        ()
+        .iter_files_with(|t| t.is_property(FmProperty::Type, "action"))
+        .count          ()
     ;
 
     let files: Vec<_> = index
-        .filter_files(|f| f.is_untyped())
-        .collect     ()
+        .iter_files_with(|f| f.is_untyped())
+        .collect        ()
     ;
 
     println!("to be sorted: {}", files.len());
