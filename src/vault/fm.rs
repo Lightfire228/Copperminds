@@ -1,6 +1,7 @@
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum FmProperty {
     Inbox,
     Category,
@@ -9,12 +10,14 @@ pub enum FmProperty {
     Action,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum FmType {
     Info,
     Action,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum FmAction {
     WaitingFor,
     Calendar,
@@ -22,7 +25,8 @@ pub enum FmAction {
     MaybeSomeday,
     Project,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum FmStatus {
     Completed,
     Complete,
@@ -31,7 +35,7 @@ pub enum FmStatus {
 }
 
 impl FmStatus {
-    pub fn is_completed(&self) -> bool {
+    pub fn _is_completed(&self) -> bool {
         match self {
             FmStatus::Completed => true,
             FmStatus::Complete  => true,
@@ -39,7 +43,7 @@ impl FmStatus {
         }
     }
 
-    pub fn is_archived(&self) -> bool {
+    pub fn _is_archived(&self) -> bool {
         match self {
             FmStatus::Archived => true,
             FmStatus::Archive  => true,
@@ -66,7 +70,8 @@ macro_rules! impl_get_key {
     };
 }
 
-
+// TODO: would probably be better to use a HashMap<>,
+// since then you get "iter all values" for free
 impl_get_key!(FmProperty,
     Inbox    => "inbox",
     Category => "category",

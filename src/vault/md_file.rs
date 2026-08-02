@@ -1,7 +1,7 @@
 
 use std::{fs, path::{Path, PathBuf}};
 
-use crate::vault::{file_utilities::RawFile, fm::{FmProperty, GetKey}};
+use crate::vault::{file_utilities::RawFile, fm::{FmAction, FmProperty, FmType, GetKey}};
 
 use super::regex;
 
@@ -67,20 +67,16 @@ impl MdFile {
             .any      (|p| p.ends_with("03 Data"))
     }
 
-    /// GTD Action
-    /// - waiting for
-    /// - todo
-    /// - maybe someday
-    ///
+    /// returns true if the file has type of action, and doesn't have an action assigned
     pub fn needs_action_type(&self) -> bool {
-        self.is_actionable()
+           self.is_property (FmProperty::Type, FmType::Action)
         && self.get_property(FmProperty::Action).is_none()
     }
 
+    /// returns true if the file has type of action, and has an action assigned
     pub fn is_actionable(&self) -> bool {
-        self
-            .get_property(FmProperty::Type)
-            .is_some_and(|p| p == "action")
+           self.is_property (FmProperty::Type, FmType::Action)
+        && self.get_property(FmProperty::Action).is_some()
     }
 
     pub fn is_archived(&self) -> bool {
@@ -102,11 +98,17 @@ impl MdFile {
         self.get_property(property).is_some_and(|p| p == val.get_key())
     }
 
-    pub fn is_property_any_of(&self, property: FmProperty, vals: &[&str]) -> bool {
+    pub fn is_property_any_of(&self, property: FmProperty, vals: &[impl GetKey + Eq]) -> bool {
+        let vals: Vec<_> = vals
+            .iter   ()
+            .map    (|p| p.get_key())
+            .collect()
+        ;
+
         self
             .get_property(property)
-            .is_some_and(|p|
-                vals.contains(&p.as_str())
+            .is_some_and (|p|
+                vals.contains(&p)
             )
     }
 
@@ -135,7 +137,7 @@ impl MdFile {
 
 impl PartialEq for MdFile {
     fn eq(&self, other: &Self) -> bool {
-        // TODO: should probably check if file inodes are the same instead
+        // MAYBE: should probably check if file inodes are the same instead
         // or otherwise ask the OS to check the paths for me
         self.path == other.path
     }
@@ -158,50 +160,81 @@ impl MdFile {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::Path};
 
+    use yaml_serde::{Mapping, Value};
 
-    use crate::vault::fm::FmType;
+    use crate::vault::{file_utilities::PropertyError, fm::{FmStatus, FmType}};
 
     use super::*;
 
 
-    fn load_file(name: &str) -> MdFile {
-        let dir  = format!("{}/test_files/{name}", env!("CARGO_MANIFEST_DIR"));
-        let path = Path::new(&dir).to_path_buf();
-
-        MdFile::new(0, path)
+    fn mapping_to_str(fm: Mapping) -> String {
+        format!("---\n{}---\n", yaml_serde::to_string(&fm).unwrap())
     }
 
+    macro_rules! fm {
+        ( $($key:expr => $value:expr),*$(,)? ) => {{
+            #[allow(unused_mut)]
+            let mut fm = Mapping::new();
+
+            $(
+                fm.insert(Value::String($key.get_key()), Value::String($value.get_key()));
+            )*
+
+            MdFile::parse(0, mapping_to_str(fm))
+        }};
+    }
+
+    fn from_yaml(text: &str) -> MdFile {
+        let yaml: Mapping = yaml_serde::from_str(text).unwrap();
+
+        let text = mapping_to_str(yaml);
+        MdFile::parse(0, text)
+    }
 
     #[test]
     fn test_type_sorting() {
-        let untyped = load_file("sorting/type_none.md");
-        let info    = load_file("sorting/type_info.md");
-        let action  = load_file("sorting/type_action.md");
+
+        let untyped = fm!();
+        let info    = fm!(FmProperty::Type => FmType::Info);
+        let action  = fm!(FmProperty::Type => FmType::Action);
 
         assert_eq!(untyped.needs_type(), true);
         assert_eq!(info   .needs_type(), false);
         assert_eq!(action .needs_type(), false);
-
-        assert_eq!(untyped.needs_action_type(), false);
-        assert_eq!(info   .needs_action_type(), false);
-        assert_eq!(action .needs_action_type(), true);
-
-        assert_eq!(untyped.is_actionable(), false);
-        assert_eq!(info   .is_actionable(), false);
-        assert_eq!(action .is_actionable(), true);
 
         assert!(info  .is_property(FmProperty::Type, FmType::Info));
         assert!(action.is_property(FmProperty::Type, FmType::Action));
     }
 
     #[test]
+    fn test_action_sorting() {
+
+        let no_action_info     = fm!(FmProperty::Type => FmType::Info);
+        let no_action          = fm!(                                    FmProperty::Action => FmAction::Todo);
+        let needs_action       = fm!(FmProperty::Type => FmType::Action);
+        let action_todo        = fm!(FmProperty::Type => FmType::Action, FmProperty::Action => FmAction::Todo);
+        let action_waiting_for = fm!(FmProperty::Type => FmType::Action, FmProperty::Action => FmAction::WaitingFor);
+
+        assert_eq!(no_action_info    .needs_action_type(), false);
+        assert_eq!(no_action         .needs_action_type(), false);
+        assert_eq!(needs_action      .needs_action_type(), true);
+        assert_eq!(action_todo       .needs_action_type(), false);
+        assert_eq!(action_waiting_for.needs_action_type(), false);
+
+        assert_eq!(no_action_info    .is_actionable(),     false);
+        assert_eq!(no_action         .is_actionable(),     false);
+        assert_eq!(needs_action      .is_actionable(),     false);
+        assert_eq!(action_todo       .is_actionable(),     true);
+        assert_eq!(action_waiting_for.is_actionable(),     true);
+    }
+
+    #[test]
     fn test_status_sorting() {
-        let archive   = load_file("sorting/status_archive.md");
-        let archived  = load_file("sorting/status_archived.md");
-        let complete  = load_file("sorting/status_complete.md");
-        let completed = load_file("sorting/status_completed.md");
+        let archive   = fm!(FmProperty::Status => FmStatus::Archive);
+        let archived  = fm!(FmProperty::Status => FmStatus::Archived);
+        let complete  = fm!(FmProperty::Status => FmStatus::Complete);
+        let completed = fm!(FmProperty::Status => FmStatus::Completed);
 
         assert_eq!(archive  .is_archived(), true);
         assert_eq!(archived .is_archived(), true);
@@ -212,6 +245,34 @@ mod tests {
         assert_eq!(archived .is_complete(), false);
         assert_eq!(complete .is_complete(), true);
         assert_eq!(completed.is_complete(), true);
+    }
+
+    #[test]
+    fn test_property_coercion() {
+        let test = from_yaml(r#"
+            bool:   true
+            number: 42
+            single:
+                - thingy
+
+            empty: []
+            many:
+                - thingy 1
+                - thingy 2
+
+            map:
+                a: b
+                b: c
+        "#);
+
+
+        assert_eq!(test.raw_file.get_property("bool")  .unwrap(), "true");
+        assert_eq!(test.raw_file.get_property("number").unwrap(), "42");
+        assert_eq!(test.raw_file.get_property("single").unwrap(), "thingy");
+
+        assert_eq!(test.raw_file.get_property("empty").unwrap_err(), PropertyError::ValueNotFound);
+        assert_eq!(test.raw_file.get_property("many") .unwrap_err(), PropertyError::PropertyIsList);
+        assert_eq!(test.raw_file.get_property("map")  .unwrap_err(), PropertyError::PropertyIsMapping);
     }
 
 }

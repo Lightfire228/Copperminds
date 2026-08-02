@@ -160,13 +160,33 @@ struct ParsedFm {
 }
 
 fn get_val_by_name(fm: &Mapping, name: &str) -> Result<String, PropertyError> {
-    // TODO: as_str doesn't coerce bools, numbers, or single element lists into strings
-
     let prop = fm.get(name) .ok_or(PropertyError::PropertyNotFound)?;
-    let val  = prop.as_str().ok_or(PropertyError::ValueNotFound)?;
 
-    Ok(val.to_owned())
+    Ok(val_to_str(prop)?)
 }
+
+fn val_to_str(value: &Value) -> Result<String, PropertyError> {
+
+    Ok(match value {
+        Value::Bool    (x) => x.to_string(),
+        Value::Number  (x) => x.to_string(),
+        Value::String  (x) => x.to_owned (),
+        Value::Sequence(x) => {
+
+            match x.len() {
+                1 => val_to_str(&x[0])?,
+
+                0 => Err(PropertyError::ValueNotFound)?,
+                _ => Err(PropertyError::PropertyIsList)?,
+            }
+        }
+
+        Value::Mapping(_) => Err(PropertyError::PropertyIsMapping)?,
+        Value::Tagged (_) => Err(PropertyError::PropertyIsTagged)?,
+        Value::Null       => Err(PropertyError::ValueNotFound)?,
+    })
+}
+
 
 fn get_val_list_by_name(fm: &Mapping, name: &str) -> Result<Vec<String>, PropertyListError> {
 
@@ -193,9 +213,13 @@ fn get_val_list_by_name(fm: &Mapping, name: &str) -> Result<Vec<String>, Propert
 }
 
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropertyError {
     PropertyNotFound,
     ValueNotFound,
+    PropertyIsList,
+    PropertyIsMapping,
+    PropertyIsTagged,
 }
 
 pub enum PropertyListError {
