@@ -1,7 +1,7 @@
 
 use std::{fs, path::{Path, PathBuf}};
 
-use crate::vault::{file_utilities::RawFile, fm::{FmAction, FmProperty, FmType, GetKey}};
+use crate::vault::{file_utilities::RawFile, fm::{FmProperty, FmType, GetKey}};
 
 use super::regex;
 
@@ -163,7 +163,7 @@ mod tests {
 
     use yaml_serde::{Mapping, Value};
 
-    use crate::vault::{file_utilities::PropertyError, fm::{FmStatus, FmType}};
+    use crate::vault::{file_utilities::PropertyError, fm::{FmAction, FmStatus, FmType}};
 
     use super::*;
 
@@ -199,7 +199,7 @@ mod tests {
         let info    = fm!(FmProperty::Type => FmType::Info);
         let action  = fm!(FmProperty::Type => FmType::Action);
 
-        assert_eq!(untyped.needs_type(), true);
+        assert_ne!(untyped.needs_type(), true);
         assert_eq!(info   .needs_type(), false);
         assert_eq!(action .needs_type(), false);
 

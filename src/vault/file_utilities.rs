@@ -231,6 +231,8 @@ fn fm_to_text(fm: &Mapping) -> String {
     yaml_serde::to_string(fm).unwrap()
 }
 
+/// The main concern here is avoiding data loss.
+/// Nothing should change the file in any way other than the intended effect
 #[cfg(test)]
 mod tests {
     use std::{env, vec};
