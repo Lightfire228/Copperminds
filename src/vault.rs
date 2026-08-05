@@ -100,7 +100,7 @@ impl Index {
             .map (|f| *f.0)
     }
 
-    pub fn _get_file(&self, id: FileId) -> &MdFile {
+    pub fn get_file(&self, id: FileId) -> &MdFile {
         &self.md_files[&id]
     }
 

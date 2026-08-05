@@ -17,6 +17,7 @@ use crate::vault::Index;
 use crate::vault::md_file::{FileId, MdFile};
 
 
+
 pub fn main() {
     println!("iced ui");
 
@@ -32,8 +33,8 @@ pub fn main() {
 
 struct App {
     index:      Index,
-    file_queue: Vec<FileId>,
-    queue_type: QueueType,
+    file_queue: Vec<FileView>,
+    ui_mode:    UIMode,
 }
 
 #[derive(Debug, Clone)]
@@ -48,28 +49,34 @@ enum QueueType {
 }
 
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UIMode {
+    SelectQueue,
+    SortQueue(QueueType),
+}
+
 
 impl App {
-    fn new() -> (Self, Task<Interaction>) {
-        let index = Index::build();
+    fn new() -> (Self, Task<Interaction>) {(
 
-        let queue_type = QueueType::NeedsType;
-        (
-            Self {
-                file_queue: load_files(&index, queue_type),
-                index,
-                queue_type,
-            },
-            Task::none() // on startup
+        Self {
+            index:      Index ::build(),
+            file_queue: Vec   ::new(),
+            ui_mode:    UIMode::SelectQueue,
+        },
+        Self::on_startup(),
 
-        )
+    )}
+
+    fn on_startup() -> Task<Interaction> {
+        Task::none()
     }
 
     fn update(&mut self, message: Interaction) -> Task<Interaction> {
         match message {
             Interaction::LoadQueue(queue) => {
                 self.file_queue = load_files(&self.index, queue);
-                self.queue_type = queue;
+                self.ui_mode    = UIMode::SortQueue(queue)
             },
         }
 
@@ -81,9 +88,7 @@ impl App {
         let files = self.file_queue
             .iter()
             .map (|f| {
-                let name = &self.index._get_file(*f).file_name;
-
-                text!("{}", name).into()
+                text!("{}", f.name).into()
             })
         ;
 
@@ -122,12 +127,18 @@ impl App {
     }
 
     fn queue_picker(&self) -> Element<'_, Interaction> {
+
+        let selected = match &self.ui_mode {
+            UIMode::SelectQueue           => None,
+            UIMode::SortQueue(queue_type) => Some(queue_type),
+        };
+
         pick_list(
             [
                 QueueType::NeedsType,
                 QueueType::NeedsAction,
             ],
-            Some(&self.queue_type),
+            selected,
             Interaction::LoadQueue
         )
             .into()
@@ -137,12 +148,17 @@ impl App {
 }
 
 
-fn load_files(index: &Index, queue: QueueType) -> Vec<FileId> {
+fn load_files(index: &Index, queue: QueueType) -> Vec<FileView> {
 
-    index.iter_files_with(|f| match queue {
-        QueueType::NeedsType   => f.needs_type(),
-        QueueType::NeedsAction => f.needs_action_type()
-    })
+    index
+        .iter_files_with(|f| match queue {
+            QueueType::NeedsType   => f.needs_type(),
+            QueueType::NeedsAction => f.needs_action_type()
+        })
+        .map(|id| FileView {
+            id,
+            name: index.get_file(id).file_name.clone(),
+        })
         .collect()
 }
 
@@ -154,4 +170,9 @@ impl Display for QueueType {
             QueueType::NeedsAction => write!(f, "Needs Action"),
         }
     }
+}
+
+struct FileView {
+    pub id:   FileId,
+    pub name: String,
 }
