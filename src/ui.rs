@@ -3,7 +3,7 @@
 use std::fmt::Display;
 
 use iced::Length::Fill;
-use iced::keyboard::Event;
+use iced::keyboard::{Event, Key};
 use iced::wgpu::naga::proc::index;
 use iced::wgpu::wgt::error;
 use iced::widget::text_editor::Content;
@@ -12,10 +12,10 @@ use iced::{Element, Font, Length, Subscription, Theme, application, event, keybo
 use iced::widget::{Button, Column, button, column, pick_list, text, tooltip};
 use iced::Task;
 use tokio::runtime::Runtime;
+use smol_str::SmolStr;
 
 use crate::vault::Index;
 use crate::vault::md_file::{FileId, MdFile};
-
 
 
 pub fn main() {
@@ -24,7 +24,7 @@ pub fn main() {
     application(App::new, App::update, App::view)
         .theme       (Theme::Dark)
         .title       ("Copperminds")
-        .subscription(App::subscription)
+        .subscription(|_| iced::event::listen().map(Interaction::Event))
         .run         ()
         .unwrap      ()
     ;
@@ -33,12 +33,12 @@ pub fn main() {
 
 struct App {
     index:      Index,
-    file_queue: Vec<FileView>,
     ui_mode:    UIMode,
 }
 
 #[derive(Debug, Clone)]
 enum Interaction {
+    Event    (iced::Event),
     LoadQueue(QueueType),
 }
 
@@ -49,10 +49,10 @@ enum QueueType {
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum UIMode {
     SelectQueue,
-    SortQueue(QueueType),
+    SortQueue(SortFileState),
 }
 
 
@@ -60,9 +60,8 @@ impl App {
     fn new() -> (Self, Task<Interaction>) {(
 
         Self {
-            index:      Index ::build(),
-            file_queue: Vec   ::new(),
-            ui_mode:    UIMode::SelectQueue,
+            index:   Index ::build(),
+            ui_mode: UIMode::SelectQueue,
         },
         Self::on_startup(),
 
@@ -74,77 +73,69 @@ impl App {
 
     fn update(&mut self, message: Interaction) -> Task<Interaction> {
         match message {
+            Interaction::Event(iced::Event::Keyboard(event)) => {
+                self.handle_key_event(event)
+            }
             Interaction::LoadQueue(queue) => {
-                self.file_queue = load_files(&self.index, queue);
-                self.ui_mode    = UIMode::SortQueue(queue)
-            },
-        }
+                self.ui_mode = UIMode::SortQueue(SortFileState {
+                    queue_type: queue,
+                    files:      load_files(&self.index, queue),
+                });
 
-        Task::none()
+                Task::none()
+            },
+
+            _ => Task::none(),
+        }
+    }
+
+    fn handle_key_event(&mut self, event: Event) -> Task<Interaction> {
+
+        let Event::KeyPressed { key, .. } = event else {
+            return Task::none();
+        };
+
+        let Key::Character(key) = key else {
+            return Task::none();
+        };
+
+        match key.as_str() {
+            "t" => self.update(Interaction::LoadQueue(QueueType::NeedsType)),
+            "a" => self.update(Interaction::LoadQueue(QueueType::NeedsAction)),
+            _   => Task::none()
+        }
     }
 
     fn view(&self) -> Element<'_, Interaction> {
 
-        let files = self.file_queue
-            .iter()
-            .map (|f| {
-                text!("{}", f.name).into()
-            })
-        ;
-
-        container(
-            column![
-                self.queue_picker(),
-                column(files),
-            ]
-        )
-            .into()
-    }
-
-    fn subscription(&self) -> iced::Subscription<Interaction> {
-
-        event::listen_with(|event, status, _| match (event, status) {
-            (iced::Event::Keyboard(event), event::Status::Ignored) => {
-
-                Self::handle_key_event(event)
-
+        let element = match &self.ui_mode {
+            UIMode::SelectQueue => {
+                container(
+                    column![
+                        text!("Select queue type"),
+                        text!("T - type"),
+                        text!("A - action"),
+                    ],
+                )
             },
-            _ => None
-        })
-    }
-
-    fn handle_key_event(event: iced::keyboard::Event) -> Option<Interaction> {
-        match event {
-            Event::KeyPressed  { key, .. } => {
-                match key {
-                    keyboard::Key::Character(t) if t.as_str() == "t" => Some(Interaction::LoadQueue(QueueType::NeedsType)),
-                    keyboard::Key::Character(t) if t.as_str() == "a" => Some(Interaction::LoadQueue(QueueType::NeedsAction)),
-                    _ => None
-                }
+            UIMode::SortQueue(sort_queue) => {
+                container(
+                    column![
+                        text!("{}", sort_queue.queue_type),
+                        text!("==="),
+                        column(
+                            sort_queue.files.iter().map(|f|
+                                text!("{}", &f.name).into()
+                            )
+                        ),
+                    ]
+                )
             },
-            _ => None
-        }
-    }
-
-    fn queue_picker(&self) -> Element<'_, Interaction> {
-
-        let selected = match &self.ui_mode {
-            UIMode::SelectQueue           => None,
-            UIMode::SortQueue(queue_type) => Some(queue_type),
         };
 
-        pick_list(
-            [
-                QueueType::NeedsType,
-                QueueType::NeedsAction,
-            ],
-            selected,
-            Interaction::LoadQueue
-        )
-            .into()
+        element.into()
 
     }
-
 }
 
 
@@ -172,7 +163,21 @@ impl Display for QueueType {
     }
 }
 
+#[derive(Debug, Clone, Eq)]
 struct FileView {
     pub id:   FileId,
     pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SortFileState {
+    pub queue_type: QueueType,
+    pub files:      Vec<FileView>,
+}
+
+
+impl PartialEq for FileView {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }

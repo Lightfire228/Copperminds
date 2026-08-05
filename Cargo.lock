@@ -535,6 +535,7 @@ dependencies = [
  "notify",
  "regex",
  "serde",
+ "smol_str",
  "thiserror 2.0.18",
  "tokio",
  "trash",
