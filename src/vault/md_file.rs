@@ -17,6 +17,13 @@ pub struct MdFile {
     pub file_name:        String,
 }
 
+#[derive(Debug, Clone, Eq)]
+pub struct FileView {
+    pub id:   FileId,
+    pub name: String,
+}
+
+
 impl MdFile {
 
     pub fn new(id: FileId, path: PathBuf) -> Self {
@@ -144,6 +151,23 @@ impl PartialEq for MdFile {
 }
 
 impl Eq for MdFile {}
+
+
+impl PartialEq for FileView {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl From<&MdFile> for FileView {
+    fn from(value: &MdFile) -> Self {
+        FileView {
+            id:   value.id,
+            name: value.file_name.clone(),
+        }
+    }
+}
+
 
 #[cfg(test)]
 impl MdFile {

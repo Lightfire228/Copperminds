@@ -2,7 +2,9 @@
 use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, fm::{FmProperty, FmType}, md_file::MdFile}};
 
 
-pub fn main(index: &mut Index) {
+pub fn main() {
+
+    let mut index = Index::build();
 
     println!("Sorting by Type");
 

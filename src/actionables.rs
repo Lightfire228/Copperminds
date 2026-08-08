@@ -1,7 +1,10 @@
 use crate::vault::{Index, fm::{FmAction, FmProperty}};
 
 
-pub fn main(index: &mut Index) {
+pub fn main() {
+
+    let mut index = Index::build();
+
     let files: Vec<_> = index
         .iter_files_with(|f|
             f.is_actionable()

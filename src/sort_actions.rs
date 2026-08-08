@@ -1,7 +1,9 @@
 
 use crate::{cli::{MenuOption, choose}, obsidian::open_in_obsidian, vault::{Index, fm::FmProperty, md_file::MdFile}};
 
-pub fn main(index: &mut Index) {
+pub fn main() {
+
+    let mut index = Index::build();
 
     println!("Sorting by Action");
 

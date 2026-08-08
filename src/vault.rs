@@ -1,13 +1,15 @@
 
 pub mod md_file;
 pub mod fm;
+pub mod command;
 
 mod file_utilities;
 
 
-use crate::{backup, vault::md_file::FileId};
-use std::{collections::HashMap, env, ops::Deref, path::PathBuf};
+use crate::{backup, vault::{command::VaultCommand, md_file::{FileId, FileView}}};
+use std::{collections::HashMap, env, path::PathBuf};
 
+use tokio::sync::mpsc::{self, Sender};
 use walkdir::{DirEntry, WalkDir};
 use trash;
 
@@ -29,7 +31,7 @@ pub(crate) use regex;
 
 #[derive(Debug)]
 pub struct Index {
-    md_files: HashMap<FileId, Box<MdFile>>,
+    md_files: HashMap<FileId, MdFile>,
     _path:    PathBuf,
 }
 
@@ -43,10 +45,10 @@ impl Index {
             .filter   (|f| ends_with(f, ".md"))
             .map      (|f| {
                 let path = f.path().to_path_buf();
-                let id = next;
+                let id   = next;
                 next += 1;
 
-                (id, Box::new(MdFile::new(id, path)))
+                (id, MdFile::new(id, path))
             })
             .collect()
         ;
@@ -86,7 +88,7 @@ impl Index {
         self
             .md_files
             .iter()
-            .map (|f| f.1.deref())
+            .map (|f| f.1)
     }
 
     pub fn iter_files_with<P>(&self, mut predicate: P) -> impl Iterator<Item = FileId>
@@ -94,10 +96,20 @@ impl Index {
         P: FnMut(&MdFile) -> bool,
     {
         self
-            .md_files
-            .iter()
-            .filter(move |f| predicate(f.1.deref()))
-            .map (|f| *f.0)
+            .iter_files()
+            .filter    (move |f| predicate(f))
+            .map       (|f| f.id)
+    }
+
+    fn iter_files_with_cmd<P>(&self, mut predicate: P) -> Vec<FileView>
+    where
+        P: FnMut(&MdFile) -> bool,
+    {
+        self
+            .iter_files()
+            .filter    (|f| predicate(f))
+            .map       (FileView::from)
+            .collect()
     }
 
     pub fn get_file(&self, id: FileId) -> &MdFile {
@@ -106,6 +118,20 @@ impl Index {
 
     pub fn get_file_mut(&mut self, id: FileId) -> &mut MdFile {
         self.md_files.get_mut(&id).unwrap()
+    }
+
+    pub fn handle_command(&mut self, command: VaultCommand) {
+        match command {
+            VaultCommand::IterFilesWith { filter, resp } => {
+                resp.send(self.iter_files_with_cmd(filter)).unwrap()
+            },
+            VaultCommand::SetProperty { id, prop, value, resp } => {
+                let file = self.get_file_mut(id);
+                file.set_property(prop, value);
+
+                resp.send(()).unwrap()
+            },
+        }
     }
 }
 
@@ -137,4 +163,22 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
         .to_str   ()
         .map      (|f| f.ends_with(ext))
         .unwrap_or(false)
+}
+
+
+pub fn serve() -> Sender<VaultCommand> {
+
+    let (tx, mut rx) = mpsc::channel::<VaultCommand>(1000);
+
+    tokio::spawn(async move {
+        let mut index = Index::build();
+
+        index.delete_empty_unnamed_files();
+
+        while let Some(command) = rx.recv().await {
+            index.handle_command(command);
+        }
+    });
+
+    tx
 }

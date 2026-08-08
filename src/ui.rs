@@ -3,6 +3,7 @@
 use std::fmt::Display;
 
 use iced::Length::Fill;
+use iced::application::BootFn;
 use iced::keyboard::{Event, Key};
 use iced::wgpu::naga::proc::index;
 use iced::wgpu::wgt::error;
@@ -13,33 +14,40 @@ use iced::widget::{Button, Column, button, column, pick_list, text, tooltip};
 use iced::Task;
 use tokio::runtime::Runtime;
 use smol_str::SmolStr;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
 
 use crate::vault::Index;
-use crate::vault::md_file::{FileId, MdFile};
+use crate::vault::command::VaultCommand;
+use crate::vault::md_file::{FileId, FileView, MdFile};
 
 
-pub fn main() {
+pub fn main(tx: Sender<VaultCommand>) {
     println!("iced ui");
 
-    application(App::new, App::update, App::view)
+    let starter = AppStarter {
+        tx,
+    };
+
+    application(starter, App::update, App::view)
         .theme       (Theme::Dark)
         .title       ("Copperminds")
-        .subscription(|_| iced::event::listen().map(Interaction::Event))
+        .subscription(|_| iced::event::listen().map(Message::Event))
         .run         ()
         .unwrap      ()
     ;
 }
 
-
 struct App {
-    index:      Index,
+    index:      Sender<VaultCommand>,
     ui_mode:    UIMode,
 }
 
 #[derive(Debug, Clone)]
-enum Interaction {
-    Event    (iced::Event),
-    LoadQueue(QueueType),
+enum Message {
+    Event        (iced::Event),
+    QueueSelected(QueueType),
+    QueueLoaded  (QueueType, Vec<FileView>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,39 +65,42 @@ enum UIMode {
 
 
 impl App {
-    fn new() -> (Self, Task<Interaction>) {(
+    fn new(tx: Sender<VaultCommand>) -> (Self, Task<Message>) {(
 
         Self {
-            index:   Index ::build(),
+            index:   tx,
             ui_mode: UIMode::SelectQueue,
         },
         Self::on_startup(),
 
     )}
 
-    fn on_startup() -> Task<Interaction> {
+    fn on_startup() -> Task<Message> {
         Task::none()
     }
 
-    fn update(&mut self, message: Interaction) -> Task<Interaction> {
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Interaction::Event(iced::Event::Keyboard(event)) => {
+            Message::Event(iced::Event::Keyboard(event)) => {
                 self.handle_key_event(event)
             }
-            Interaction::LoadQueue(queue) => {
+            Message::QueueSelected(queue) => {
+                Task::perform(load_files(self.index.clone(), queue), move |files| Message::QueueLoaded(queue, files))
+            },
+            Message::QueueLoaded(queue_type, files) => {
                 self.ui_mode = UIMode::SortQueue(SortFileState {
-                    queue_type: queue,
-                    files:      load_files(&self.index, queue),
+                    queue_type,
+                    files,
                 });
 
                 Task::none()
-            },
+            }
 
             _ => Task::none(),
         }
     }
 
-    fn handle_key_event(&mut self, event: Event) -> Task<Interaction> {
+    fn handle_key_event(&mut self, event: Event) -> Task<Message> {
 
         let Event::KeyPressed { key, .. } = event else {
             return Task::none();
@@ -99,14 +110,20 @@ impl App {
             return Task::none();
         };
 
-        match key.as_str() {
-            "t" => self.update(Interaction::LoadQueue(QueueType::NeedsType)),
-            "a" => self.update(Interaction::LoadQueue(QueueType::NeedsAction)),
-            _   => Task::none()
-        }
+        let queue = match key.as_str() {
+            "t" => QueueType::NeedsType,
+            "a" => QueueType::NeedsAction,
+            _   => {
+                return Task::none();
+            }
+        };
+
+        Task::future(async move {
+            Message::QueueSelected(queue)
+        })
     }
 
-    fn view(&self) -> Element<'_, Interaction> {
+    fn view(&self) -> Element<'_, Message> {
 
         let element = match &self.ui_mode {
             UIMode::SelectQueue => {
@@ -139,18 +156,26 @@ impl App {
 }
 
 
-fn load_files(index: &Index, queue: QueueType) -> Vec<FileView> {
+async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Vec<FileView> {
 
-    index
-        .iter_files_with(|f| match queue {
-            QueueType::NeedsType   => f.needs_type(),
-            QueueType::NeedsAction => f.needs_action_type()
+    let (tx, rx) = oneshot::channel();
+
+    let cmd = match queue {
+        QueueType::NeedsType   => |f: &MdFile| f.needs_type(),
+        QueueType::NeedsAction => |f: &MdFile| f.needs_action_type(),
+    };
+
+    vault
+        .send(VaultCommand::IterFilesWith {
+            filter: cmd,
+            resp:   tx
         })
-        .map(|id| FileView {
-            id,
-            name: index.get_file(id).file_name.clone(),
-        })
-        .collect()
+        .await
+        .unwrap()
+    ;
+
+    rx.await.unwrap()
+
 }
 
 
@@ -163,11 +188,6 @@ impl Display for QueueType {
     }
 }
 
-#[derive(Debug, Clone, Eq)]
-struct FileView {
-    pub id:   FileId,
-    pub name: String,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SortFileState {
@@ -176,8 +196,13 @@ struct SortFileState {
 }
 
 
-impl PartialEq for FileView {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+
+struct AppStarter {
+    tx: Sender<VaultCommand>,
+}
+
+impl BootFn<App, Message> for AppStarter {
+    fn boot(&self) -> (App, iced::Task<Message>) {
+        App::new(self.tx.clone())
     }
 }

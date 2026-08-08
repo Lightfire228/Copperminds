@@ -12,24 +12,22 @@ mod ui;
 
 use vault::Index;
 
-use crate::cli::{MenuOption, choose};
+use crate::{cli::{MenuOption, choose}};
 
+#[tokio::main]
+async fn main() {
 
-fn main() {
-
-    let mut index = Index::build();
-
-    index.delete_empty_unnamed_files();
+    let tx = vault::serve();
 
     println!("\n\n---\n");
 
 
 
     match menu() {
-        Menu::SortByType       => sort_type   ::main(&mut index),
-        Menu::SortByAction     => sort_actions::main(&mut index),
-        Menu::ActionablesInbox => actionables ::main(&mut index),
-        Menu::IcedUI           => ui          ::main(),
+        Menu::SortByType       => sort_type   ::main(),
+        Menu::SortByAction     => sort_actions::main(),
+        Menu::ActionablesInbox => actionables ::main(),
+        Menu::IcedUI           => ui          ::main(tx),
     }
 }
 
