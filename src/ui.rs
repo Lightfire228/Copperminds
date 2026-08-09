@@ -1,5 +1,8 @@
 #![allow(unused_imports)]
 
+mod components;
+
+
 use std::fmt::Display;
 
 use iced::Length::Fill;
@@ -17,9 +20,13 @@ use smol_str::SmolStr;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
+use crate::ui::components::sort_queue::SortQueue;
 use crate::vault::Index;
 use crate::vault::command::{Cmd, IterFilesWith, VaultCommand};
 use crate::vault::md_file::{FileId, FileView, MdFile};
+
+use components::select_queue::{SelectQueue};
+
 
 
 pub fn main(tx: Sender<VaultCommand>) {
@@ -48,6 +55,8 @@ enum Message {
     Event        (iced::Event),
     QueueSelected(QueueType),
     QueueLoaded  (QueueType, Vec<FileView>),
+
+    #[allow(dead_code)] // Debug and Clone generate dead code for empty variants
     NavigateBack,
 }
 
@@ -58,10 +67,10 @@ enum QueueType {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 enum UIMode {
-    SelectQueue,
-    SortQueue(SortFileState),
+    SelectQueue(SelectQueue),
+    SortQueue(SortQueue),
 }
 
 
@@ -70,7 +79,7 @@ impl App {
 
         Self {
             index:   tx,
-            ui_mode: UIMode::SelectQueue,
+            ui_mode: SelectQueue::new().into(),
         },
         Self::on_startup(),
 
@@ -81,41 +90,48 @@ impl App {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
+
         match message {
             Message::Event(iced::Event::Keyboard(event)) => {
-                self.handle_key_event(event)
+                return self.handle_key_event(event);
             }
 
             Message::QueueSelected(queue) => {
                 let tx = self.index.clone();
 
-                Task::future(async move {
+                return Task::future(async move {
                     Message::QueueLoaded(
                         queue,
                         load_files(tx, queue).await
                     )
-                })
+                });
             },
             Message::QueueLoaded(queue_type, files) => {
-                self.ui_mode = UIMode::SortQueue(SortFileState {
+                self.ui_mode = SortQueue {
                     queue_type,
                     files,
-                });
+                }
+                    .into()
+                ;
 
-                Task::none()
+                return Task::none()
             }
             Message::NavigateBack => {
-                self.ui_mode = UIMode::SelectQueue;
+                self.ui_mode = SelectQueue::new().into();
 
-                Task::none()
+                return Task::none()
             }
-
-            Message::Event(_) => Task::none(),
-
+            _ => {()},
         }
+
+        match &mut self.ui_mode {
+            UIMode::SelectQueue(x) => x.update(message),
+            UIMode::SortQueue  (x) => x.update(message),
+        }
+
     }
 
-    fn handle_key_event(&mut self, event: Event) -> Task<Message> {
+    fn handle_key_event(&self, event: Event) -> Task<Message> {
 
         let Event::KeyPressed { key, .. } = event else {
             return Task::none();
@@ -123,72 +139,17 @@ impl App {
 
 
         match &self.ui_mode {
-            UIMode::SelectQueue => {
-
-                let Key::Character(key) = key else {
-                    return Task::none();
-                };
-
-                let queue = match key.as_str() {
-                    "t" => QueueType::NeedsType,
-                    "a" => QueueType::NeedsAction,
-                    _   => {
-                        return Task::none();
-                    }
-                };
-
-                Task::future(async move {
-                    Message::QueueSelected(queue)
-                })
-
-            },
-            UIMode::SortQueue(_) => {
-                let Key::Named(key) = key else {
-                    return Task::none();
-                };
-
-                match key {
-                    keyboard::key::Named::Escape => {
-                        Task::future(async {
-                            Message::NavigateBack
-                        })
-                    },
-
-                    _ => Task::none()
-                }
-            },
+            UIMode::SelectQueue(x) => x.handle_key_event(key),
+            UIMode::SortQueue  (x) => x.handle_key_event(key),
         }
-
     }
 
     fn view(&self) -> Element<'_, Message> {
 
-        let element = match &self.ui_mode {
-            UIMode::SelectQueue => {
-                container(
-                    column![
-                        text!("Select queue type"),
-                        text!("T - type"),
-                        text!("A - action"),
-                    ],
-                )
-            },
-            UIMode::SortQueue(sort_queue) => {
-                container(
-                    column![
-                        text!("{}", sort_queue.queue_type),
-                        text!("==="),
-                        column(
-                            sort_queue.files.iter().map(|f|
-                                text!("{}", &f.name).into()
-                            )
-                        ),
-                    ]
-                )
-            },
-        };
-
-        element.into()
+        match &self.ui_mode {
+            UIMode::SelectQueue(x) => x.view(),
+            UIMode::SortQueue  (x) => x.view(),
+        }
 
     }
 }
@@ -232,13 +193,6 @@ impl Display for QueueType {
             QueueType::NeedsAction => write!(f, "Needs Action"),
         }
     }
-}
-
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct SortFileState {
-    pub queue_type: QueueType,
-    pub files:      Vec<FileView>,
 }
 
 
