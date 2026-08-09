@@ -1,20 +1,12 @@
-use tokio::sync::oneshot;
+use tokio::sync::oneshot::{self, Sender};
 
 use crate::vault::{fm::FmProperty, md_file::{FileId, FileView, MdFile}};
 
 // https://tokio.rs/tokio/tutorial/channels
 #[derive(Debug)]
 pub enum VaultCommand {
-    IterFilesWith {
-        filter: Predicate,
-        resp:   Responder<Vec<FileView>>,
-    },
-    SetProperty {
-        id:     FileId,
-        prop:   FmProperty,
-        value:  String,
-        resp:   Responder<()>,
-    },
+    IterFilesWith(IterFilesWith, Responder<Vec<FileView>>),
+    SetProperty  (SetProperty,   Responder<()>),
 }
 
 
@@ -22,3 +14,36 @@ pub type Responder<T> = oneshot::Sender<T>;
 
 // Cannot be a Box<dyn Fn> because those aren't Send
 pub type Predicate = fn(&MdFile) -> bool;
+
+
+#[derive(Debug)]
+pub struct IterFilesWith {
+    pub filter: Predicate,
+}
+
+#[derive(Debug)]
+pub struct SetProperty {
+    pub id:     FileId,
+    pub prop:   FmProperty,
+    pub value:  String,
+}
+
+
+pub trait Cmd<T> {
+    fn to_command(self, tx: Sender<T>) -> VaultCommand;
+}
+
+
+macro_rules! to_command {
+    ($name:ident, $type:ty) => {
+        impl Cmd<$type> for $name {
+            fn to_command(self, tx: Sender<$type>) -> VaultCommand {
+                VaultCommand::$name(self, tx)
+            }
+        }
+
+    };
+}
+
+to_command!(IterFilesWith, Vec<FileView>);
+to_command!(SetProperty,   ());

@@ -18,7 +18,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 use crate::vault::Index;
-use crate::vault::command::VaultCommand;
+use crate::vault::command::{Cmd, IterFilesWith, VaultCommand};
 use crate::vault::md_file::{FileId, FileView, MdFile};
 
 
@@ -48,6 +48,7 @@ enum Message {
     Event        (iced::Event),
     QueueSelected(QueueType),
     QueueLoaded  (QueueType, Vec<FileView>),
+    NavigateBack,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,8 +85,16 @@ impl App {
             Message::Event(iced::Event::Keyboard(event)) => {
                 self.handle_key_event(event)
             }
+
             Message::QueueSelected(queue) => {
-                Task::perform(load_files(self.index.clone(), queue), move |files| Message::QueueLoaded(queue, files))
+                let tx = self.index.clone();
+
+                Task::future(async move {
+                    Message::QueueLoaded(
+                        queue,
+                        load_files(tx, queue).await
+                    )
+                })
             },
             Message::QueueLoaded(queue_type, files) => {
                 self.ui_mode = UIMode::SortQueue(SortFileState {
@@ -95,8 +104,14 @@ impl App {
 
                 Task::none()
             }
+            Message::NavigateBack => {
+                self.ui_mode = UIMode::SelectQueue;
 
-            _ => Task::none(),
+                Task::none()
+            }
+
+            Message::Event(_) => Task::none(),
+
         }
     }
 
@@ -106,21 +121,44 @@ impl App {
             return Task::none();
         };
 
-        let Key::Character(key) = key else {
-            return Task::none();
-        };
 
-        let queue = match key.as_str() {
-            "t" => QueueType::NeedsType,
-            "a" => QueueType::NeedsAction,
-            _   => {
-                return Task::none();
-            }
-        };
+        match &self.ui_mode {
+            UIMode::SelectQueue => {
 
-        Task::future(async move {
-            Message::QueueSelected(queue)
-        })
+                let Key::Character(key) = key else {
+                    return Task::none();
+                };
+
+                let queue = match key.as_str() {
+                    "t" => QueueType::NeedsType,
+                    "a" => QueueType::NeedsAction,
+                    _   => {
+                        return Task::none();
+                    }
+                };
+
+                Task::future(async move {
+                    Message::QueueSelected(queue)
+                })
+
+            },
+            UIMode::SortQueue(_) => {
+                let Key::Named(key) = key else {
+                    return Task::none();
+                };
+
+                match key {
+                    keyboard::key::Named::Escape => {
+                        Task::future(async {
+                            Message::NavigateBack
+                        })
+                    },
+
+                    _ => Task::none()
+                }
+            },
+        }
+
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -158,24 +196,32 @@ impl App {
 
 async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Vec<FileView> {
 
-    let (tx, rx) = oneshot::channel();
-
     let cmd = match queue {
         QueueType::NeedsType   => |f: &MdFile| f.needs_type(),
         QueueType::NeedsAction => |f: &MdFile| f.needs_action_type(),
     };
 
-    vault
-        .send(VaultCommand::IterFilesWith {
+    send_vault_cmd(
+        vault,
+        IterFilesWith {
             filter: cmd,
-            resp:   tx
-        })
+        }
+    )
+    .await
+
+
+}
+
+async fn send_vault_cmd<T>(vault: Sender<VaultCommand>, cmd: impl Cmd<T>) -> T {
+    let (tx, rx) = oneshot::channel();
+
+    vault
+        .send(cmd.to_command(tx))
         .await
         .unwrap()
     ;
 
     rx.await.unwrap()
-
 }
 
 

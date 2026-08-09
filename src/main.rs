@@ -10,8 +10,6 @@ mod ui;
 
 
 
-use vault::Index;
-
 use crate::{cli::{MenuOption, choose}};
 
 #[tokio::main]

@@ -112,6 +112,7 @@ impl Index {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub fn get_file(&self, id: FileId) -> &MdFile {
         &self.md_files[&id]
     }
@@ -121,15 +122,21 @@ impl Index {
     }
 
     pub fn handle_command(&mut self, command: VaultCommand) {
-        match command {
-            VaultCommand::IterFilesWith { filter, resp } => {
-                resp.send(self.iter_files_with_cmd(filter)).unwrap()
-            },
-            VaultCommand::SetProperty { id, prop, value, resp } => {
-                let file = self.get_file_mut(id);
-                file.set_property(prop, value);
 
-                resp.send(()).unwrap()
+        match command {
+            VaultCommand::IterFilesWith(filter, resp) => {
+                resp.send(self
+                    .iter_files_with_cmd(filter.filter)
+                )
+                .unwrap()
+            },
+
+            VaultCommand::SetProperty(prop, resp) => {
+                resp.send(self
+                    .get_file_mut(prop.id)
+                    .set_property(prop.prop, prop.value)
+                )
+                .unwrap()
             },
         }
     }
