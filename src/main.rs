@@ -15,17 +15,13 @@ use crate::{cli::{MenuOption, choose}};
 #[tokio::main]
 async fn main() {
 
-    let tx = vault::serve();
-
     println!("\n\n---\n");
-
-
 
     match menu() {
         Menu::SortByType       => sort_type   ::main(),
         Menu::SortByAction     => sort_actions::main(),
         Menu::ActionablesInbox => actionables ::main(),
-        Menu::IcedUI           => ui          ::main(tx),
+        Menu::IcedUI           => ui          ::main(vault::serve()),
     }
 }
 

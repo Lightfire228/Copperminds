@@ -7,8 +7,7 @@ use crate::vault::command::VaultCommand;
 
 
 #[derive(Debug)]
-pub struct SelectQueue {
-}
+pub struct SelectQueue {}
 
 impl SelectQueue {
 
@@ -24,6 +23,7 @@ impl SelectQueue {
                 text!("A - action"),
             ],
         )
+            .padding(10)
             .into()
     }
 

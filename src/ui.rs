@@ -40,6 +40,7 @@ pub fn main(tx: Sender<VaultCommand>) {
         .theme       (Theme::Dark)
         .title       ("Copperminds")
         .subscription(|_| iced::event::listen().map(Message::Event))
+        .default_font(Font::MONOSPACE)
         .run         ()
         .unwrap      ()
     ;

@@ -9,25 +9,67 @@ use crate::vault::command::VaultCommand;
 use crate::vault::md_file::FileView;
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct SortQueue {
-    pub queue_type: QueueType,
-    pub files:      Vec<FileView>,
+    pub queue_type:   QueueType,
+    pub files:        Vec<FileView>,
 
 }
+
+macro_rules! table {
+    ($( ($action:ident, $key:literal, $name:literal) ),*$(,)? ) => {[
+
+        $(
+            MenuAction {
+                key:    $key,
+                name:   $name,
+                action: Action::$action
+            },
+        )*
+    ]}
+}
+
+
+static NEEDS_TYPE: &'static [MenuAction] = &table!(
+    (SetTypeInfo,           "i", "type - info"),
+    (SetTypeAction,         "a", "type - action"),
+);
+
+static NEEDS_ACTION: &'static [MenuAction] = &table!(
+    (SetActionTodo,         "t", "action - todo"),
+    (SetActionWaitingFor,   "w", "action - waiting for"),
+    // (SetActionCalendar,     "c", "action - calendar"),
+    (SetActionProject,      "p", "action - project"),
+    (SetActionMaybeSomeday, "m", "action - maybe someday"),
+    (SetTypeInfo,           "i", "type   - info"),
+    (SetStatusComplete,     "c", "status - complete"),
+    (SetStatusArchived,     "a", "status - archived"),
+);
+
 
 impl SortQueue {
 
     pub fn view(&self) -> Element<'_, Message> {
+
+        let options = match self.queue_type {
+            QueueType::NeedsType   => NEEDS_TYPE,
+            QueueType::NeedsAction => NEEDS_ACTION,
+        }
+            .iter()
+            .map (|o| text!("{}", o.name).into())
+        ;
+
         container(
             row![
                 container(
                     column![
                         text!("{}", self.queue_type),
                         text!("==="),
+                        column(options),
                     ]
                 )
-                    .width(Fill)
+                    .width  (300)
+                    .padding(10)
                 ,
                 container(
                     column(
@@ -36,7 +78,8 @@ impl SortQueue {
                         )
                     ),
                 )
-                    .width(Fill)
+                    .width  (Fill)
+                    .padding(10)
             ]
             .spacing(40)
         )
@@ -48,17 +91,20 @@ impl SortQueue {
     }
 
     pub fn handle_key_event(&self, key: Key) -> Task<Message> {
-        let Key::Named(key) = key else {
-            return Task::none();
-        };
+
+        type N = keyboard::key::Named;
 
         match key {
-            keyboard::key::Named::Escape => {
+              Key::Named(N::ArrowLeft)
+            | Key::Named(N::Escape)    => {
+
                 Task::future(async {
                     Message::NavigateBack
                 })
             },
-
+            Key::Character(_) => {
+                Task::none()
+            },
             _ => Task::none()
         }
     }
@@ -69,4 +115,23 @@ impl Into<UIMode> for SortQueue {
     fn into(self) -> UIMode {
         UIMode::SortQueue(self)
     }
+}
+
+
+struct MenuAction {
+    pub key:     &'static str,
+    pub name:    &'static str,
+    pub action:  Action,
+}
+
+enum Action {
+    SetTypeInfo,
+    SetTypeAction,
+    SetActionWaitingFor,
+    // SetActionCalendar,
+    SetActionProject,
+    SetActionTodo,
+    SetActionMaybeSomeday,
+    SetStatusComplete,
+    SetStatusArchived,
 }
