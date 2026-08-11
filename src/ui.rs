@@ -122,9 +122,8 @@ impl App {
 
             Message::OpenInObsidian(id) => {
 
-                // am i doing this wrong?
-
                 let tx = self.vault.clone();
+
                 return Task::future(async move {
                     send_vault_cmd(tx, OpenInObsidian { id, }).await;
 
@@ -139,6 +138,10 @@ impl App {
             UIMode::SelectQueue(x) => x.update(message),
             UIMode::SortQueue  (x) => x.update(message),
         }
+            .map_or_else(
+                Task::none,
+                |m| self.update(m)
+            )
 
     }
 
@@ -153,6 +156,10 @@ impl App {
             UIMode::SelectQueue(x) => x.handle_key_event(key),
             UIMode::SortQueue  (x) => x.handle_key_event(key),
         }
+            .map_or_else(
+                Task::none,
+                |m| Task::future(async { m })
+            )
     }
 
     fn view(&self) -> Element<'_, Message> {

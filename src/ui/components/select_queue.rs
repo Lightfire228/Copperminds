@@ -27,26 +27,24 @@ impl SelectQueue {
             .into()
     }
 
-    pub fn update(&mut self, _message: Message) -> Task<Message> {
-        Task::none()
+    pub fn update(&mut self, _message: Message) -> Option<Message> {
+        None
     }
 
-    pub fn handle_key_event(&self, key: Key) -> Task<Message> {
+    pub fn handle_key_event(&self, key: Key) -> Option<Message> {
         let Key::Character(key) = key else {
-            return Task::none();
+            return None;
         };
 
         let queue = match key.as_str() {
             "t" => QueueType::NeedsType,
             "a" => QueueType::NeedsAction,
             _   => {
-                return Task::none();
+                return None;
             }
         };
 
-        Task::future(async move {
-            Message::QueueSelected(queue)
-        })
+        Some(Message::QueueSelected(queue))
     }
 
 }

@@ -102,13 +102,15 @@ impl SortQueue {
         .into()
     }
 
-    pub fn update(&mut self, message: Message) -> Task<Message> {
+    // TODO: read this https://jl710.github.io/iced-guide/app_structure/composition.html
+
+    pub fn update(&mut self, message: Message) -> Option<Message> {
         let Message::SortQueueMessage(message) = message else {
-            return Task::none();
+            return None;
         };
 
         match message {
-            SortQueueMessage::VaultAction(vault_action) => todo!(),
+            SortQueueMessage::VaultAction(_vault_action) => todo!(),
 
             SortQueueMessage::MoveCursorUp   => {
                 if self.index > 0 {
@@ -125,49 +127,30 @@ impl SortQueue {
         }
     }
 
-    pub fn handle_key_event(&self, key: Key) -> Task<Message> {
+    pub fn handle_key_event(&self, key: Key) -> Option<Message> {
 
         type N = keyboard::key::Named;
 
         match key {
               Key::Named(N::ArrowLeft)
-            | Key::Named(N::Escape)    => {
+            | Key::Named(N::Escape)    => Some(Message::NavigateBack),
 
-                Task::future(async {
-                    Message::NavigateBack
-                })
+            Key::Named(N::ArrowUp)     => Some(SortQueueMessage::MoveCursorUp  .into()),
+            Key::Named(N::ArrowDown)   => Some(SortQueueMessage::MoveCursorDown.into()),
+
+            // TODO:
+            Key::Character(_key) => {
+                None
             },
-            Key::Named(N::ArrowUp) => {
-
-                Task::future(async {
-                    SortQueueMessage::MoveCursorUp.into()
-                })
-                    .chain(self.open_obsidian())
-            }
-            Key::Named(N::ArrowDown) => {
-
-                Task::future(async {
-                    SortQueueMessage::MoveCursorDown.into()
-                })
-                    .chain(self.open_obsidian())
-            }
-            Key::Character(key) => {
-                Task::none()
-            },
-            _ => Task::none()
+            _ => None
         }
     }
 
 
-    fn open_obsidian(&self) -> Task<Message> {
-        let Some(file) = self.files.get(self.index) else {
-            return Task::none();
-        };
+    fn open_obsidian(&self) -> Option<Message> {
+        let file = self.files.get(self.index)?;
 
-        let id = file.id;
-        Task::future(async move {
-            Message::OpenInObsidian(id)
-        })
+        Some(Message::OpenInObsidian(file.id))
 
     }
 
@@ -179,7 +162,7 @@ impl From<SortQueue> for UIMode {
     }
 }
 
-
+#[allow(dead_code)]
 struct MenuAction {
     pub key:     &'static str,
     pub name:    &'static str,
@@ -187,7 +170,7 @@ struct MenuAction {
 }
 
 #[derive(Debug, Clone)]
-enum VaultAction {
+pub enum VaultAction {
     SetTypeInfo,
     SetTypeAction,
     SetActionWaitingFor,
@@ -199,6 +182,7 @@ enum VaultAction {
     SetStatusArchived,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum SortQueueMessage {
     VaultAction(VaultAction),
