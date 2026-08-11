@@ -51,8 +51,8 @@ impl SelectQueue {
 
 }
 
-impl Into<UIMode> for SelectQueue {
-    fn into(self) -> UIMode {
-        UIMode::SelectQueue(self)
+impl From<SelectQueue> for UIMode {
+    fn from(val: SelectQueue) -> Self {
+        UIMode::SelectQueue(val)
     }
 }

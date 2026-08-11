@@ -6,12 +6,13 @@ pub mod command;
 mod file_utilities;
 
 
-use crate::{backup, vault::{command::VaultCommand, md_file::{FileId, FileView}}};
+use crate::{obsidian, backup, vault::{command::VaultCommand, md_file::{FileId, FileView}}};
 use std::{collections::HashMap, env, path::PathBuf};
 
 use tokio::sync::mpsc::{self, Sender};
 use walkdir::{DirEntry, WalkDir};
 use trash;
+
 
 use md_file::{MdFile};
 
@@ -138,6 +139,14 @@ impl Index {
                 )
                 .unwrap()
             },
+
+            VaultCommand::OpenInObsidian(opts, resp) => {
+                let file = &self.md_files[&opts.id];
+
+                obsidian::open_in_obsidian(file);
+
+                resp.send(()).unwrap()
+            }
         }
     }
 }

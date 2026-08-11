@@ -20,13 +20,12 @@ use smol_str::SmolStr;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-use crate::ui::components::sort_queue::SortQueue;
+use crate::ui::components::select_queue::SelectQueue;
+use crate::ui::components::sort_queue::{SortQueue, SortQueueMessage};
 use crate::vault::Index;
-use crate::vault::command::{Cmd, IterFilesWith, VaultCommand};
+use crate::vault::command::{Cmd, IterFilesWith, OpenInObsidian, VaultCommand};
 use crate::vault::md_file::{FileId, FileView, MdFile};
-
-use components::select_queue::{SelectQueue};
-
+use crate::obsidian;
 
 
 pub fn main(tx: Sender<VaultCommand>) {
@@ -47,15 +46,18 @@ pub fn main(tx: Sender<VaultCommand>) {
 }
 
 struct App {
-    index:      Sender<VaultCommand>,
+    vault:      Sender<VaultCommand>,
     ui_mode:    UIMode,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum Message {
-    Event        (iced::Event),
-    QueueSelected(QueueType),
-    QueueLoaded  (QueueType, Vec<FileView>),
+    None,
+    Event           (iced::Event),
+    QueueSelected   (QueueType),
+    QueueLoaded     (QueueType, Vec<FileView>),
+    SortQueueMessage(SortQueueMessage),
+    OpenInObsidian  (FileId),
 
     #[allow(dead_code)] // Debug and Clone generate dead code for empty variants
     NavigateBack,
@@ -79,7 +81,7 @@ impl App {
     fn new(tx: Sender<VaultCommand>) -> (Self, Task<Message>) {(
 
         Self {
-            index:   tx,
+            vault:   tx,
             ui_mode: SelectQueue::new().into(),
         },
         Self::on_startup(),
@@ -98,7 +100,7 @@ impl App {
             }
 
             Message::QueueSelected(queue) => {
-                let tx = self.index.clone();
+                let tx = self.vault.clone();
 
                 return Task::future(async move {
                     Message::QueueLoaded(
@@ -108,12 +110,7 @@ impl App {
                 });
             },
             Message::QueueLoaded(queue_type, files) => {
-                self.ui_mode = SortQueue {
-                    queue_type,
-                    files,
-                }
-                    .into()
-                ;
+                self.ui_mode = SortQueue::new(queue_type, files).into();
 
                 return Task::none()
             }
@@ -122,6 +119,19 @@ impl App {
 
                 return Task::none()
             }
+
+            Message::OpenInObsidian(id) => {
+
+                // am i doing this wrong?
+
+                let tx = self.vault.clone();
+                return Task::future(async move {
+                    send_vault_cmd(tx, OpenInObsidian { id, }).await;
+
+                    Message::None
+                });
+            }
+
             _ => {()},
         }
 

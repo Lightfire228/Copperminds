@@ -5,8 +5,9 @@ use crate::vault::{fm::FmProperty, md_file::{FileId, FileView, MdFile}};
 // https://tokio.rs/tokio/tutorial/channels
 #[derive(Debug)]
 pub enum VaultCommand {
-    IterFilesWith(IterFilesWith, Responder<Vec<FileView>>),
-    SetProperty  (SetProperty,   Responder<()>),
+    IterFilesWith (IterFilesWith,  Responder<Vec<FileView>>),
+    SetProperty   (SetProperty,    Responder<()>),
+    OpenInObsidian(OpenInObsidian, Responder<()>),
 }
 
 
@@ -28,6 +29,12 @@ pub struct SetProperty {
     pub value:  String,
 }
 
+#[derive(Debug)]
+pub struct OpenInObsidian {
+    pub id: FileId,
+}
+
+
 
 pub trait Cmd<T> {
     fn to_command(self, tx: Sender<T>) -> VaultCommand;
@@ -41,9 +48,15 @@ macro_rules! to_command {
                 VaultCommand::$name(self, tx)
             }
         }
-
     };
 }
 
-to_command!(IterFilesWith, Vec<FileView>);
-to_command!(SetProperty,   ());
+to_command!(IterFilesWith,  Vec<FileView>);
+to_command!(SetProperty,    ());
+to_command!(OpenInObsidian, ());
+
+impl<T> Cmd<T> for VaultCommand {
+    fn to_command(self, _: Sender<T>) -> VaultCommand {
+        self
+    }
+}
