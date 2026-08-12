@@ -4,13 +4,14 @@ use tokio::sync::mpsc::Sender;
 use iced::{Element, Task, keyboard::Key, widget::container};
 use iced::widget::{Button, Column, button, column, pick_list, row, text, tooltip};
 
-use crate::ui::{Message, QueueType, UIMode};
-use crate::vault::command::VaultCommand;
+use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
+use crate::vault::command::{OpenInObsidian, VaultCommand};
 use crate::vault::md_file::{FileId, FileView};
 
 
 #[derive(Debug, Clone)]
 pub struct SortQueue {
+    pub vault:        Sender<VaultCommand>,
     pub queue_type:   QueueType,
     pub files:        Vec<FileView>,
     pub index:        usize,
@@ -49,9 +50,10 @@ static NEEDS_ACTION: &'static [MenuAction] = &table!(
 
 impl SortQueue {
 
-    pub fn new(queue_type: QueueType, files: Vec<FileView>) -> Self {
+    pub fn new(queue_type: QueueType, files: Vec<FileView>, vault: Sender<VaultCommand>) -> Self {
 
         Self {
+            vault,
             queue_type,
             files,
             index: 0,
@@ -102,55 +104,68 @@ impl SortQueue {
         .into()
     }
 
-    // TODO: read this https://jl710.github.io/iced-guide/app_structure/composition.html
-
-    pub fn update(&mut self, message: Message) -> Option<Message> {
-        let Message::SortQueueMessage(message) = message else {
-            return None;
-        };
+    #[must_use]
+    pub fn update(&mut self, message: Message) -> Action {
 
         match message {
-            SortQueueMessage::VaultAction(_vault_action) => todo!(),
-
-            SortQueueMessage::MoveCursorUp   => {
+            Message::MoveCursorUp   => {
                 if self.index > 0 {
                     self.index -= 1;
                 }
 
                 self.open_obsidian()
             },
-            SortQueueMessage::MoveCursorDown => {
+            Message::MoveCursorDown => {
                 self.index += 1;
 
                 self.open_obsidian()
             },
+            Message::None         => Action::None,
+            Message::NavigateBack => Action::NavigateBack,
         }
     }
 
-    pub fn handle_key_event(&self, key: Key) -> Option<Message> {
+    pub fn handle_key_event(&self, key: Key) -> Message {
 
         type N = keyboard::key::Named;
 
         match key {
-              Key::Named(N::ArrowLeft)
-            | Key::Named(N::Escape)    => Some(Message::NavigateBack),
+            Key::Named(N::ArrowLeft)   |
+            Key::Named(N::Escape)      => Message::NavigateBack,
 
-            Key::Named(N::ArrowUp)     => Some(SortQueueMessage::MoveCursorUp  .into()),
-            Key::Named(N::ArrowDown)   => Some(SortQueueMessage::MoveCursorDown.into()),
+            Key::Named(N::ArrowUp)     => Message::MoveCursorUp,
+            Key::Named(N::ArrowDown)   => Message::MoveCursorDown,
 
             // TODO:
             Key::Character(_key) => {
-                None
+                Message::None
             },
-            _ => None
+            _ => Message::None
         }
     }
 
 
-    fn open_obsidian(&self) -> Option<Message> {
-        let file = self.files.get(self.index)?;
+    fn open_obsidian(&self) -> Action {
 
-        Some(Message::OpenInObsidian(file.id))
+        let Some(file) = self.files.get(self.index) else {
+            return Action::None;
+        };
+
+        let id = file.id;
+        let tx = self.vault.clone();
+
+        let task = Task::future(async move {
+
+            let cmd = OpenInObsidian {
+                id,
+            };
+
+            send_vault_cmd(tx, cmd).await;
+
+            Message::None
+        });
+
+        Action::Run(task)
 
     }
 
@@ -186,13 +201,27 @@ pub enum VaultAction {
 #[derive(Debug, Clone)]
 pub enum SortQueueMessage {
     VaultAction(VaultAction),
-    MoveCursorUp,
-    MoveCursorDown,
 }
 
 
-impl From<SortQueueMessage> for Message {
-    fn from(val: SortQueueMessage) -> Self {
-        Message::SortQueueMessage(val)
+#[derive(Debug)]
+pub enum Message {
+    None,
+    MoveCursorUp,
+    MoveCursorDown,
+    NavigateBack,
+}
+
+
+#[derive(Debug)]
+pub enum Action {
+    None,
+    Run(Task<Message>),
+    NavigateBack,
+}
+
+impl From<Message> for ui::Message {
+    fn from(val: Message) -> Self {
+        ui::Message::SortQueue(val)
     }
 }

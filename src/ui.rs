@@ -5,6 +5,7 @@ mod components;
 
 use std::fmt::Display;
 
+use futures::FutureExt;
 use iced::Length::Fill;
 use iced::application::BootFn;
 use iced::keyboard::{Event, Key};
@@ -12,7 +13,7 @@ use iced::wgpu::naga::proc::index;
 use iced::wgpu::wgt::error;
 use iced::widget::text_editor::Content;
 use iced::widget::{container, row, space::horizontal, text_editor};
-use iced::{Element, Font, Length, Subscription, Theme, application, event, keyboard, theme};
+use iced::{Element, Font, Length, Subscription, Theme, application, event, keyboard, message, theme};
 use iced::widget::{Button, Column, button, column, pick_list, text, tooltip};
 use iced::Task;
 use tokio::runtime::Runtime;
@@ -21,7 +22,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 use crate::ui::components::select_queue::SelectQueue;
-use crate::ui::components::sort_queue::{SortQueue, SortQueueMessage};
+use crate::ui::components::sort_queue::{self, SortQueue, SortQueueMessage};
 use crate::vault::Index;
 use crate::vault::command::{Cmd, IterFilesWith, OpenInObsidian, VaultCommand};
 use crate::vault::md_file::{FileId, FileView, MdFile};
@@ -56,7 +57,7 @@ enum Message {
     Event           (iced::Event),
     QueueSelected   (QueueType),
     QueueLoaded     (QueueType, Vec<FileView>),
-    SortQueueMessage(SortQueueMessage),
+    SortQueue       (sort_queue::Message),
     OpenInObsidian  (FileId),
 
     #[allow(dead_code)] // Debug and Clone generate dead code for empty variants
@@ -96,7 +97,9 @@ impl App {
 
         match message {
             Message::Event(iced::Event::Keyboard(event)) => {
-                return self.handle_key_event(event);
+                let message = self.handle_key_event(event);
+
+                return Task::future(async move { message })
             }
 
             Message::QueueSelected(queue) => {
@@ -110,7 +113,7 @@ impl App {
                 });
             },
             Message::QueueLoaded(queue_type, files) => {
-                self.ui_mode = SortQueue::new(queue_type, files).into();
+                self.ui_mode = SortQueue::new(queue_type, files, self.vault.clone()).into();
 
                 return Task::none()
             }
@@ -134,39 +137,47 @@ impl App {
             _ => {()},
         }
 
-        match &mut self.ui_mode {
-            UIMode::SelectQueue(x) => x.update(message),
-            UIMode::SortQueue  (x) => x.update(message),
+        match (&mut self.ui_mode, message) {
+            (UIMode::SelectQueue(x), message) => x
+                .update(message)
+                .map_or_else(
+                    Task::none,
+                    |m| self.update(m)
+                )
+            ,
+            (UIMode::SortQueue(x), Message::SortQueue(message)) => match x.update(message) {
+
+                sort_queue::Action::None         => Task::none(),
+                sort_queue::Action::Run(task)    => task.map(Message::SortQueue),
+                sort_queue::Action::NavigateBack => self.update(Message::NavigateBack),
+            }
+            _ => Task::none(),
         }
-            .map_or_else(
-                Task::none,
-                |m| self.update(m)
-            )
 
     }
 
-    fn handle_key_event(&self, event: Event) -> Task<Message> {
+    fn handle_key_event(&self, event: Event) -> Message {
 
         let Event::KeyPressed { key, .. } = event else {
-            return Task::none();
+            return Message::None;
         };
 
 
         match &self.ui_mode {
-            UIMode::SelectQueue(x) => x.handle_key_event(key),
-            UIMode::SortQueue  (x) => x.handle_key_event(key),
+            UIMode::SelectQueue(x) => x
+                .handle_key_event(key)
+                .unwrap_or(Message::None)
+            ,
+            UIMode::SortQueue  (x) => x.handle_key_event(key).into()
+
         }
-            .map_or_else(
-                Task::none,
-                |m| Task::future(async { m })
-            )
     }
 
     fn view(&self) -> Element<'_, Message> {
 
         match &self.ui_mode {
             UIMode::SelectQueue(x) => x.view(),
-            UIMode::SortQueue  (x) => x.view(),
+            UIMode::SortQueue  (x) => x.view().map(Message::SortQueue),
         }
 
     }
