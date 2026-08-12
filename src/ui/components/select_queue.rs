@@ -1,8 +1,9 @@
+use iced::message;
 use tokio::sync::mpsc::Sender;
 use iced::{Element, Task, keyboard::Key, widget::container};
 use iced::widget::{Button, Column, button, column, pick_list, text, tooltip};
 
-use crate::ui::{Message, QueueType, UIMode};
+use crate::ui::{self, QueueType, UIMode};
 use crate::vault::command::VaultCommand;
 
 
@@ -27,24 +28,27 @@ impl SelectQueue {
             .into()
     }
 
-    pub fn update(&mut self, _message: Message) -> Option<Message> {
-        None
+    pub fn update(&mut self, message: Message) -> Action {
+        match message {
+            Message::None                      => Action::None,
+            Message::QueueSelected(queue_type) => Action::QueueSelected(queue_type),
+        }
     }
 
-    pub fn handle_key_event(&self, key: Key) -> Option<Message> {
+    pub fn handle_key_event(&self, key: Key) -> Message {
         let Key::Character(key) = key else {
-            return None;
+            return Message::None;
         };
 
         let queue = match key.as_str() {
             "t" => QueueType::NeedsType,
             "a" => QueueType::NeedsAction,
             _   => {
-                return None;
+                return Message::None;
             }
         };
 
-        Some(Message::QueueSelected(queue))
+        Message::QueueSelected(queue)
     }
 
 }
@@ -52,5 +56,24 @@ impl SelectQueue {
 impl From<SelectQueue> for UIMode {
     fn from(val: SelectQueue) -> Self {
         UIMode::SelectQueue(val)
+    }
+}
+
+
+#[derive(Debug)]
+pub enum Message {
+    None,
+    QueueSelected(QueueType)
+}
+
+#[derive(Debug)]
+pub enum Action {
+    None,
+    QueueSelected(QueueType)
+}
+
+impl From<Message> for ui::Message {
+    fn from(val: Message) -> Self {
+        ui::Message::SelectQueue(val)
     }
 }

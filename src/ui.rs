@@ -21,7 +21,7 @@ use smol_str::SmolStr;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-use crate::ui::components::select_queue::SelectQueue;
+use crate::ui::components::select_queue::{self, SelectQueue};
 use crate::ui::components::sort_queue::{self, SortQueue, SortQueueMessage};
 use crate::vault::Index;
 use crate::vault::command::{Cmd, IterFilesWith, OpenInObsidian, VaultCommand};
@@ -55,10 +55,9 @@ struct App {
 enum Message {
     None,
     Event           (iced::Event),
-    QueueSelected   (QueueType),
     QueueLoaded     (QueueType, Vec<FileView>),
-    SortQueue       (sort_queue::Message),
-    OpenInObsidian  (FileId),
+    SelectQueue     (select_queue::Message),
+    SortQueue       (sort_queue  ::Message),
 
     #[allow(dead_code)] // Debug and Clone generate dead code for empty variants
     NavigateBack,
@@ -74,7 +73,7 @@ enum QueueType {
 #[derive(Debug)]
 enum UIMode {
     SelectQueue(SelectQueue),
-    SortQueue(SortQueue),
+    SortQueue  (SortQueue),
 }
 
 
@@ -95,60 +94,40 @@ impl App {
 
     fn update(&mut self, message: Message) -> Task<Message> {
 
-        match message {
-            Message::Event(iced::Event::Keyboard(event)) => {
+        match (&mut self.ui_mode, message) {
+            (_, Message::Event(iced::Event::Keyboard(event))) => {
                 let message = self.handle_key_event(event);
 
                 return Task::future(async move { message })
             }
 
-            Message::QueueSelected(queue) => {
-                let tx = self.vault.clone();
-
-                return Task::future(async move {
-                    Message::QueueLoaded(
-                        queue,
-                        load_files(tx, queue).await
-                    )
-                });
-            },
-            Message::QueueLoaded(queue_type, files) => {
+            (_, Message::QueueLoaded(queue_type, files)) => {
                 self.ui_mode = SortQueue::new(queue_type, files, self.vault.clone()).into();
 
                 return Task::none()
             }
-            Message::NavigateBack => {
+            (_, Message::NavigateBack) => {
                 self.ui_mode = SelectQueue::new().into();
 
                 return Task::none()
             }
 
-            Message::OpenInObsidian(id) => {
+            (UIMode::SelectQueue(x), Message::SelectQueue(message)) => match x.update(message) {
+                select_queue::Action::None                      => Task::none(),
+                select_queue::Action::QueueSelected(queue_type) => {
+                    let tx = self.vault.clone();
 
-                let tx = self.vault.clone();
+                    Task::future(async move {
+                        let files = load_files(tx, queue_type).await;
 
-                return Task::future(async move {
-                    send_vault_cmd(tx, OpenInObsidian { id, }).await;
-
-                    Message::None
-                });
+                        Message::QueueLoaded(queue_type, files)
+                    })
+                }
             }
-
-            _ => {()},
-        }
-
-        match (&mut self.ui_mode, message) {
-            (UIMode::SelectQueue(x), message) => x
-                .update(message)
-                .map_or_else(
-                    Task::none,
-                    |m| self.update(m)
-                )
-            ,
             (UIMode::SortQueue(x), Message::SortQueue(message)) => match x.update(message) {
 
-                sort_queue::Action::None         => Task::none(),
-                sort_queue::Action::Run(task)    => task.map(Message::SortQueue),
+                sort_queue::Action::None         => Task::none (),
+                sort_queue::Action::Run(task)    => task.map   (Message::SortQueue),
                 sort_queue::Action::NavigateBack => self.update(Message::NavigateBack),
             }
             _ => Task::none(),
@@ -164,19 +143,15 @@ impl App {
 
 
         match &self.ui_mode {
-            UIMode::SelectQueue(x) => x
-                .handle_key_event(key)
-                .unwrap_or(Message::None)
-            ,
-            UIMode::SortQueue  (x) => x.handle_key_event(key).into()
-
+            UIMode::SelectQueue(x) => x.handle_key_event(key).into(),
+            UIMode::SortQueue  (x) => x.handle_key_event(key).into(),
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
 
         match &self.ui_mode {
-            UIMode::SelectQueue(x) => x.view(),
+            UIMode::SelectQueue(x) => x.view().map(Message::SelectQueue),
             UIMode::SortQueue  (x) => x.view().map(Message::SortQueue),
         }
 
