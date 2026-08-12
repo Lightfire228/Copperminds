@@ -55,7 +55,6 @@ struct App {
 enum Message {
     None,
     Event           (iced::Event),
-    QueueLoaded     (QueueType, Vec<FileView>),
     SelectQueue     (select_queue::Message),
     SortQueue       (sort_queue  ::Message),
 
@@ -101,11 +100,6 @@ impl App {
                 return Task::future(async move { message })
             }
 
-            (_, Message::QueueLoaded(queue_type, files)) => {
-                self.ui_mode = SortQueue::new(queue_type, files, self.vault.clone()).into();
-
-                return Task::none()
-            }
             (_, Message::NavigateBack) => {
                 self.ui_mode = SelectQueue::new().into();
 
@@ -115,13 +109,12 @@ impl App {
             (UIMode::SelectQueue(x), Message::SelectQueue(message)) => match x.update(message) {
                 select_queue::Action::None                      => Task::none(),
                 select_queue::Action::QueueSelected(queue_type) => {
-                    let tx = self.vault.clone();
+                    let (state, task) = SortQueue::new(queue_type, self.vault.clone());
 
-                    Task::future(async move {
-                        let files = load_files(tx, queue_type).await;
+                    self.ui_mode = state.into();
 
-                        Message::QueueLoaded(queue_type, files)
-                    })
+                    task.map(Message::SortQueue)
+
                 }
             }
             (UIMode::SortQueue(x), Message::SortQueue(message)) => match x.update(message) {
@@ -159,23 +152,6 @@ impl App {
 }
 
 
-async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Vec<FileView> {
-
-    let cmd = match queue {
-        QueueType::NeedsType   => |f: &MdFile| f.needs_type(),
-        QueueType::NeedsAction => |f: &MdFile| f.needs_action_type(),
-    };
-
-    send_vault_cmd(
-        vault,
-        IterFilesWith {
-            filter: cmd,
-        }
-    )
-    .await
-
-
-}
 
 async fn send_vault_cmd<T>(vault: Sender<VaultCommand>, cmd: impl Cmd<T>) -> T {
     let (tx, rx) = oneshot::channel();

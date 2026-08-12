@@ -50,14 +50,21 @@ static NEEDS_ACTION: &'static [MenuAction] = &table!(
 
 impl SortQueue {
 
-    pub fn new(queue_type: QueueType, files: Vec<FileView>, vault: Sender<VaultCommand>) -> Self {
+    pub fn new(queue_type: QueueType, vault: Sender<VaultCommand>) -> (Self, Task<Message>) {
+        (
+            Self {
+                queue_type,
+                vault: vault.clone(),
+                files: Vec::new(),
+                index: 0,
+            },
+            Task::future(async move {
+                let files = load_files(vault, queue_type).await;
 
-        Self {
-            vault,
-            queue_type,
-            files,
-            index: 0,
-        }
+                Message::LoadFiles(files)
+            })
+
+        )
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -122,6 +129,12 @@ impl SortQueue {
             },
             Message::None         => Action::None,
             Message::NavigateBack => Action::NavigateBack,
+
+            Message::LoadFiles(files) => {
+                self.files = files;
+
+                Action::None
+            }
         }
     }
 
@@ -207,6 +220,7 @@ pub enum SortQueueMessage {
 #[derive(Debug)]
 pub enum Message {
     None,
+    LoadFiles(Vec<FileView>),
     MoveCursorUp,
     MoveCursorDown,
     NavigateBack,
@@ -224,4 +238,21 @@ impl From<Message> for ui::Message {
     fn from(val: Message) -> Self {
         ui::Message::SortQueue(val)
     }
+}
+
+
+async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Vec<FileView> {
+
+    let cmd = match queue {
+        QueueType::NeedsType   => |f: &MdFile| f.needs_type(),
+        QueueType::NeedsAction => |f: &MdFile| f.needs_action_type(),
+    };
+
+    send_vault_cmd(
+        vault,
+        IterFilesWith {
+            filter: cmd,
+        }
+    )
+    .await
 }
