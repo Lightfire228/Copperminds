@@ -22,7 +22,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 use crate::ui::components::select_queue::{self, SelectQueue};
-use crate::ui::components::sort_queue::{self, SortQueue, SortQueueMessage};
+use crate::ui::components::sort_queue::{self, SortQueue};
 use crate::vault::Index;
 use crate::vault::command::{Cmd, IterFilesWith, OpenInObsidian, VaultCommand};
 use crate::vault::md_file::{FileId, FileView, MdFile};
@@ -57,9 +57,6 @@ enum Message {
     Event           (iced::Event),
     SelectQueue     (select_queue::Message),
     SortQueue       (sort_queue  ::Message),
-
-    #[allow(dead_code)] // Debug and Clone generate dead code for empty variants
-    NavigateBack,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,12 +97,6 @@ impl App {
                 return Task::future(async move { message })
             }
 
-            (_, Message::NavigateBack) => {
-                self.ui_mode = SelectQueue::new().into();
-
-                return Task::none()
-            }
-
             (UIMode::SelectQueue(x), Message::SelectQueue(message)) => match x.update(message) {
                 select_queue::Action::None                      => Task::none(),
                 select_queue::Action::QueueSelected(queue_type) => {
@@ -121,7 +112,10 @@ impl App {
 
                 sort_queue::Action::None         => Task::none (),
                 sort_queue::Action::Run(task)    => task.map   (Message::SortQueue),
-                sort_queue::Action::NavigateBack => self.update(Message::NavigateBack),
+                sort_queue::Action::NavigateBack => {
+                    self.ui_mode = SelectQueue::new().into();
+                    Task::none()
+                },
             }
             _ => Task::none(),
         }

@@ -5,7 +5,8 @@ use iced::{Element, Task, keyboard::Key, widget::container};
 use iced::widget::{Button, Column, button, column, pick_list, row, text, tooltip};
 
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
-use crate::vault::command::{IterFilesWith, OpenInObsidian, VaultCommand};
+use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCommand};
+use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
 use crate::vault::md_file::{FileId, FileView, MdFile};
 
 
@@ -134,13 +135,15 @@ impl SortQueue {
                 self.files = files;
 
                 Action::None
-            }
+            },
+            Message::VaultAction(action) => Action::Run(self.handle_vault_action(action))
         }
     }
 
     pub fn handle_key_event(&self, key: Key) -> Message {
 
         type N = keyboard::key::Named;
+
 
         match key {
             Key::Named(N::ArrowLeft)   |
@@ -149,12 +152,47 @@ impl SortQueue {
             Key::Named(N::ArrowUp)     => Message::MoveCursorUp,
             Key::Named(N::ArrowDown)   => Message::MoveCursorDown,
 
-            // TODO:
-            Key::Character(_key) => {
-                Message::None
+            Key::Character(key) => {
+                let list = match self.queue_type {
+                    QueueType::NeedsType   => NEEDS_TYPE,
+                    QueueType::NeedsAction => NEEDS_ACTION,
+                };
+
+                let action = list.iter().filter(|a| a.key == key.as_str()).next();
+
+                let Some(action) = action else {
+                    return Message::None;
+                };
+
+                Message::VaultAction(action.action)
             },
             _ => Message::None
         }
+    }
+
+    fn handle_vault_action(&mut self, action: VaultAction) -> Task<Message> {
+
+        let tx = self.vault.clone();
+        let (prop, value) = action.get_value();
+
+        let id = self.files[self.index].id;
+
+
+        Task::future(async move {
+
+            // TODO: this doesn't actually write the changes to disk
+            // i wanna get the file watch in place before then
+            send_vault_cmd(tx, SetProperty {
+                id,
+                prop,
+                value,
+            })
+                .await
+            ;
+
+            Message::None
+        })
+
     }
 
 
@@ -191,13 +229,14 @@ impl From<SortQueue> for UIMode {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 struct MenuAction {
     pub key:     &'static str,
     pub name:    &'static str,
     pub action:  VaultAction,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum VaultAction {
     SetTypeInfo,
     SetTypeAction,
@@ -210,12 +249,6 @@ pub enum VaultAction {
     SetStatusArchived,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub enum SortQueueMessage {
-    VaultAction(VaultAction),
-}
-
 
 #[derive(Debug)]
 pub enum Message {
@@ -224,6 +257,7 @@ pub enum Message {
     MoveCursorUp,
     MoveCursorDown,
     NavigateBack,
+    VaultAction(VaultAction),
 }
 
 
@@ -255,4 +289,20 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Vec<FileVi
         }
     )
     .await
+}
+
+
+impl VaultAction {
+    fn get_value(&self) -> (FmProperty, String) {
+        match self {
+            VaultAction::SetTypeInfo           => (FmProperty::Type,   FmType  ::Info        .get_key()),
+            VaultAction::SetTypeAction         => (FmProperty::Type,   FmType  ::Action      .get_key()),
+            VaultAction::SetActionWaitingFor   => (FmProperty::Action, FmAction::WaitingFor  .get_key()),
+            VaultAction::SetActionProject      => (FmProperty::Action, FmAction::Project     .get_key()),
+            VaultAction::SetActionTodo         => (FmProperty::Action, FmAction::Todo        .get_key()),
+            VaultAction::SetActionMaybeSomeday => (FmProperty::Action, FmAction::MaybeSomeday.get_key()),
+            VaultAction::SetStatusComplete     => (FmProperty::Status, FmStatus::Completed   .get_key()),
+            VaultAction::SetStatusArchived     => (FmProperty::Status, FmStatus::Archived    .get_key()),
+        }
+    }
 }
