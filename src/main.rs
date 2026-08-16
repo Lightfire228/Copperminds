@@ -10,12 +10,25 @@ mod ui;
 
 
 
-use crate::{cli::{MenuOption, choose}};
+use crate::{cli::{MenuOption, choose}, vault::ENV};
 
 #[tokio::main]
 async fn main() {
 
     println!("\n\n---\n");
+
+    match ENV {
+        vault::Env::Prod => {
+            println!("######### ENV #########");
+            println!("# Prod");
+            println!("#");
+
+            println!("\n---\n");
+        },
+        _ => {}
+    }
+
+
 
     match menu() {
         Menu::SortByType       => sort_type   ::main(),

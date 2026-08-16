@@ -70,7 +70,14 @@ impl Watcher {
 
     async fn handle_event(&self, event: Event) -> Option<ModificationType> {
 
+        // TODO: unify filter logic into one place for both initial vault indexing, and events
+        //       - is '.md'
+        //       - is hidden
+        //       - is '.git'
+        //       - is '.obsidian'
 
+        // TODO: should probably exclude vault path prefix from filter checking logic
+        //       ex. moon logic (/home/user/.cache/vault/...)
         let is_git = event
             .paths
             .iter()
@@ -89,7 +96,18 @@ impl Watcher {
             )
         ;
 
-        if is_git || is_obsidian {
+        let is_hidden = event
+            .paths
+            .iter()
+            .any(|p| p.file_name().unwrap().to_str().unwrap().starts_with("."))
+        ;
+
+        let filters = [
+            is_git,
+            is_obsidian,
+        ];
+
+        if filters.iter().any(|f| *f) {
             return None;
         }
 
@@ -123,8 +141,8 @@ impl Watcher {
             Ek::Remove(Rk::File)           => ModificationType::Delete { target: take(event) },
 
             // TODO: are these relevant?
-            Ek::Modify(Mk::Name(Rm::To))   => panic!("rename mode not supported"),
-            Ek::Modify(Mk::Name(Rm::From)) => panic!("rename mode not supported"),
+            Ek::Modify(Mk::Name(Rm::To))   => panic!("rename mode not supported: To"),
+            Ek::Modify(Mk::Name(Rm::From)) => panic!("rename mode not supported: From"),
 
             _ => None?,
         })

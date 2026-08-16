@@ -18,6 +18,8 @@ use trash;
 use md_file::{MdFile};
 
 
+pub const ENV: Env = Env::Dev;
+
 macro_rules! regex {
     ($i:ident = $r:expr) => {
         use regex::Regex;
@@ -35,6 +37,7 @@ pub(crate) use regex;
 pub struct Index {
     md_files: HashMap<FileId, MdFile>,
     _path:    PathBuf,
+    next_id:  usize,
 }
 
 impl Index {
@@ -57,7 +60,8 @@ impl Index {
 
         Self {
             md_files,
-            _path: vault_folder(),
+            _path:   vault_folder(),
+            next_id: next,
         }
     }
 
@@ -156,7 +160,7 @@ impl Index {
 pub fn vault_folder() -> PathBuf {
     let home = env::home_dir().unwrap();
 
-    home.join("Notes")
+    home.join(ENV.vault())
 }
 
 fn scan_vault() -> impl Iterator<Item = DirEntry> {
@@ -211,31 +215,96 @@ async fn handle_serve(mut rx: mpsc::Receiver<VaultCommand>, mut watcher: watch::
                 }
             }
             event = watcher.next_event() => {
-                handle_watch_event(event).await;
+                index.handle_watch_event(event).await;
             }
         };
 
     }
 }
 
+impl Index {
+    async fn handle_watch_event(&mut self, event: Option<watch::ModificationType>) {
+        let Some(event) = event else {
+            return;
+        };
 
-async fn handle_watch_event(event: Option<watch::ModificationType>) {
-    let Some(event) = event else {
-        return;
-    };
+        // TODO: when i hit `ctrl + s` in obsidian, I get 2 update events
+        //       do i need to "debounce" events by a few millis?
 
-    // TODO: when i hit `ctrl + s` in obsidian, I get 2 update events
-    //       do i need to "debounce" events by a few millis?
+        type Mt = watch::ModificationType;
+        match event {
+            Mt::Create { target }   => self.handle_create_event(target),
+            Mt::Update { target }   => self.handle_update_event(target),
+            Mt::Delete { target }   => self.handle_delete_event(target),
+            Mt::Rename { from, to } => self.handle_rename_event(from, to),
+        }
+    }
 
-    // TODO:
-    match event {
-        watch::ModificationType::Create { target }   => println!("Create: {:?}", target),
-        watch::ModificationType::Update { target }   => println!("Update: {:?}", target),
-        watch::ModificationType::Delete { target }   => println!("Delete: {:?}", target),
-        watch::ModificationType::Rename { from, to } => {
-            println!("Rename");
-            println!("  - from: {:?}", from);
-            println!("  - to:   {:?}", to);
+    fn handle_create_event(&mut self, target: PathBuf) {
+        if !target.ends_with(".md") {
+            return;
+        }
+
+        println!("Adding file to index: {:?}", &target);
+
+
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let md_file = MdFile::new(id, target);
+
+        self.md_files.insert(id, md_file);
+    }
+
+    fn handle_update_event(&mut self, target: PathBuf) {
+        if !target.ends_with(".md") {
+            return;
+        }
+
+        println!("Updating file: {:?}", &target);
+
+        todo!()
+    }
+
+    fn handle_delete_event(&mut self, target: PathBuf) {
+        if !target.ends_with(".md") {
+            return;
+        }
+
+        println!("Deleting file: {:?}", &target);
+
+        todo!()
+    }
+
+    fn handle_rename_event(&mut self, from: PathBuf, to: PathBuf) {
+
+        match (from.ends_with(".md"), to.ends_with(".md")) {
+            (true, false)  => return self.handle_delete_event(from),
+            (false, true)  => return self.handle_create_event(to),
+            (false, false) => return,
+            _              => {}
+        }
+
+        println!("Rename");
+        println!("  - from: {:?}", from);
+        println!("  - to:   {:?}", to);
+
+        todo!()
+    }
+
+}
+
+
+pub enum Env {
+    Prod,
+    Dev,
+}
+
+impl Env {
+    pub fn vault(&self) -> &'static str {
+        match self {
+            Self::Prod => "Notes",
+            Self::Dev  => "Notes_dev",
         }
     }
 }
