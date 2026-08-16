@@ -4,12 +4,13 @@ pub mod fm;
 pub mod command;
 
 mod file_utilities;
+mod watch;
 
 
 use crate::{obsidian, backup, vault::{command::VaultCommand, md_file::{FileId, FileView}}};
 use std::{collections::HashMap, env, path::PathBuf};
 
-use tokio::sync::mpsc::{self, Sender};
+use tokio::{select, sync::mpsc::{self, Sender}};
 use walkdir::{DirEntry, WalkDir};
 use trash;
 
@@ -184,17 +185,57 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
 
 pub fn serve() -> Sender<VaultCommand> {
 
-    let (tx, mut rx) = mpsc::channel::<VaultCommand>(1000);
+    let (tx, rx) = mpsc::channel::<VaultCommand>(1000);
+
+    let watcher = watch::Watcher::new(vault_folder()).unwrap();
 
     tokio::spawn(async move {
-        let mut index = Index::build();
-
-        index.delete_empty_unnamed_files();
-
-        while let Some(command) = rx.recv().await {
-            index.handle_command(command);
-        }
+        handle_serve(rx, watcher).await;
     });
 
     tx
+}
+
+async fn handle_serve(mut rx: mpsc::Receiver<VaultCommand>, mut watcher: watch::Watcher) {
+
+    let mut index = Index::build();
+
+    index.delete_empty_unnamed_files();
+
+    loop {
+
+        select! {
+            command = rx.recv() => {
+                if let Some(command) = command {
+                    index.handle_command(command);
+                }
+            }
+            event = watcher.next_event() => {
+                handle_watch_event(event).await;
+            }
+        };
+
+    }
+}
+
+
+async fn handle_watch_event(event: Option<watch::ModificationType>) {
+    let Some(event) = event else {
+        return;
+    };
+
+    // TODO: when i hit `ctrl + s` in obsidian, I get 2 update events
+    //       do i need to "debounce" events by a few millis?
+
+    // TODO:
+    match event {
+        watch::ModificationType::Create { target }   => println!("Create: {:?}", target),
+        watch::ModificationType::Update { target }   => println!("Update: {:?}", target),
+        watch::ModificationType::Delete { target }   => println!("Delete: {:?}", target),
+        watch::ModificationType::Rename { from, to } => {
+            println!("Rename");
+            println!("  - from: {:?}", from);
+            println!("  - to:   {:?}", to);
+        }
+    }
 }
