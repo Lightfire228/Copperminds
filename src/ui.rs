@@ -23,9 +23,9 @@ use tokio::sync::oneshot;
 
 use crate::ui::components::select_queue::{self, SelectQueue};
 use crate::ui::components::sort_queue::{self, SortQueue};
-use crate::vault::Index;
+use crate::vault::{self, ENV, Env, Index};
 use crate::vault::command::{Cmd, IterFilesWith, OpenInObsidian, VaultCommand};
-use crate::vault::md_file::{FileId, FileView, MdFile};
+use crate::vault::md_file::{FileView, MdFile};
 use crate::obsidian;
 
 
@@ -38,7 +38,7 @@ pub fn main(tx: Sender<VaultCommand>) {
 
     application(starter, App::update, App::view)
         .theme       (Theme::Dark)
-        .title       ("Copperminds")
+        .title       (App  ::title)
         .subscription(|_| iced::event::listen().map(Message::Event))
         .default_font(Font::MONOSPACE)
         .run         ()
@@ -86,6 +86,10 @@ impl App {
 
     fn on_startup() -> Task<Message> {
         Task::none()
+    }
+
+    fn title(&self) -> String {
+        format!("Copperminds - {}", ENV.name())
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {

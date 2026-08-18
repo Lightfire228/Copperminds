@@ -1,11 +1,11 @@
 
 use std::{fs, path::{Path, PathBuf}};
 
+use file_id::FileId;
+
 use crate::vault::{file_utilities::RawFile, fm::{FmProperty, FmType, GetKey}};
 
 use super::regex;
-
-pub type FileId = usize;
 
 #[derive(Debug)]
 pub struct MdFile {
@@ -196,6 +196,14 @@ mod tests {
         format!("---\n{}---\n", yaml_serde::to_string(&fm).unwrap())
     }
 
+    fn id() -> FileId {
+        FileId::Inode {
+            device_id:    0,
+            inode_number: 0,
+        }
+    }
+
+
     macro_rules! fm {
         ( $($key:expr => $value:expr),*$(,)? ) => {{
             #[allow(unused_mut)]
@@ -205,7 +213,7 @@ mod tests {
                 fm.insert(Value::String($key.get_key()), Value::String($value.get_key()));
             )*
 
-            MdFile::parse(0, mapping_to_str(fm))
+            MdFile::parse(id(), mapping_to_str(fm))
         }};
     }
 
@@ -213,7 +221,7 @@ mod tests {
         let yaml: Mapping = yaml_serde::from_str(text).unwrap();
 
         let text = mapping_to_str(yaml);
-        MdFile::parse(0, text)
+        MdFile::parse(id(), text)
     }
 
     #[test]
@@ -223,7 +231,7 @@ mod tests {
         let info    = fm!(FmProperty::Type => FmType::Info);
         let action  = fm!(FmProperty::Type => FmType::Action);
 
-        assert_ne!(untyped.needs_type(), true);
+        assert_eq!(untyped.needs_type(), true);
         assert_eq!(info   .needs_type(), false);
         assert_eq!(action .needs_type(), false);
 

@@ -1,6 +1,7 @@
+use file_id::FileId;
 use tokio::sync::oneshot::{self, Sender};
 
-use crate::vault::{fm::FmProperty, md_file::{FileId, FileView, MdFile}};
+use crate::vault::{fm::FmProperty, md_file::{FileView, MdFile}};
 
 // https://tokio.rs/tokio/tutorial/channels
 #[derive(Debug)]

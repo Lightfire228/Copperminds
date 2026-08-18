@@ -2,10 +2,13 @@ use std::process::Command;
 
 use crate::vault::md_file::MdFile;
 
+use crate::vault::ENV;
 
 pub fn open_in_obsidian(file: &MdFile) {
 
-    let uri = format!("obsidian://open?vault=Notes&file={}", urlencoding::encode(&file.file_name));
+    let vault = ENV.vault();
+
+    let uri = format!("obsidian://open?vault={vault}&file={}", urlencoding::encode(&file.file_name));
 
     Command::new("xdg-open")
         .arg   (uri)

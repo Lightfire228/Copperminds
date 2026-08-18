@@ -65,7 +65,6 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Resul
 
 async fn next_write(rx: &mut Receiver<notify::Result<Event>>) -> Option<Event> {
 
-    type Ek = notify::EventKind;
 
     while let Some(event) = rx.next().await {
         let event = continue_on_err!(event, "Error while reading event stream");
@@ -83,10 +82,15 @@ async fn next_write(rx: &mut Receiver<notify::Result<Event>>) -> Option<Event> {
             continue;
         }
 
+        type Ek = notify::EventKind;
+        type Ak = notify::event::AccessKind;
+        type Am = notify::event::AccessMode;
+
         match event.kind {
-              Ek::Create(_)
-            | Ek::Modify(_)
-            | Ek::Remove(_) => {},
+            Ek::Access(Ak::Close(Am::Write)) |
+            Ek::Create(_) |
+            Ek::Modify(_) |
+            Ek::Remove(_) => {},
 
             _ => continue,
         }

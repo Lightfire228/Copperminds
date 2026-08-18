@@ -7,7 +7,7 @@ use iced::widget::{Button, Column, button, column, pick_list, row, text, tooltip
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCommand};
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
-use crate::vault::md_file::{FileId, FileView, MdFile};
+use crate::vault::md_file::{FileView, MdFile};
 
 
 #[derive(Debug, Clone)]

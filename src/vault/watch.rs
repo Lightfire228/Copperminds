@@ -1,12 +1,11 @@
 
-use std::{panic, path::PathBuf};
+use std::{path::PathBuf};
 
 use futures::{
     channel::mpsc::{channel, Receiver},
     SinkExt, StreamExt,
 };
-use notify::{Config, Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher as INWatcher};
-
+use notify::{Config, Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher as INWatcher, event::EventKindMask};
 
 
 #[derive(Debug)]
@@ -22,6 +21,7 @@ pub struct Watcher {
     watcher: INotifyWatcher,
 
     rx:      Receiver<notify::Result<Event>>,
+    count:   usize,
 }
 
 impl Watcher {
@@ -31,13 +31,15 @@ impl Watcher {
 
         let (mut tx, rx) = channel(1);
 
+        let config = Config::default().with_event_kinds(EventKindMask::CORE);
+
         let mut watcher = RecommendedWatcher::new(
             move |res| {
                 futures::executor::block_on(async {
                     tx.send(res).await.unwrap();
                 })
             },
-            Config::default(),
+            config,
         )?;
 
         watcher
@@ -48,12 +50,14 @@ impl Watcher {
         Ok(Watcher {
             watcher,
             rx,
+            count: 0,
         })
     }
 
     pub async fn next_event(&mut self) -> Option<ModificationType> {
 
         while let Some(event) = self.rx.next().await {
+            self.count += 1;
 
             let res = self.handle_event(event.unwrap()).await;
 
@@ -105,6 +109,7 @@ impl Watcher {
         let filters = [
             is_git,
             is_obsidian,
+            is_hidden,
         ];
 
         if filters.iter().any(|f| *f) {
@@ -115,6 +120,18 @@ impl Watcher {
             event.paths.into_iter().nth(0).unwrap()
         }
 
+        macro_rules! event {
+            ($fn:ident, $enum:ident) => {
+                fn $fn(event: Event) -> ModificationType {
+                    ModificationType::$enum { target: take(event) }
+                }
+            }
+        }
+
+        event!(create, Create);
+        event!(update, Update);
+        event!(delete, Delete);
+
         fn rename(event: Event) -> ModificationType {
             let mut iter = event.paths.into_iter().take(2);
 
@@ -124,27 +141,34 @@ impl Watcher {
             }
         }
 
+
         type Ek = notify::EventKind;
         type Ck = notify::event::CreateKind;
         type Mk = notify::event::ModifyKind;
         type Rm = notify::event::RenameMode;
         type Rk = notify::event::RemoveKind;
 
-
         Some(match event.kind {
 
-            Ek::Create(Ck::File)           => ModificationType::Create { target: take(event) },
-            Ek::Modify(Mk::Data(_))        => ModificationType::Update { target: take(event) },
+            Ek::Create(Ck::File)             => create(event),
+            Ek::Modify(Mk::Data(_))          => update(event),
 
-            Ek::Modify(Mk::Name(Rm::Both)) => rename(event),
+            // TODO: debounce from, to, and both
+            Ek::Modify(Mk::Name(Rm::Both))   => rename(event),
 
-            Ek::Remove(Rk::File)           => ModificationType::Delete { target: take(event) },
+            Ek::Modify(Mk::Name(Rm::From))   => delete(event),
+            Ek::Remove(Rk::File)             => delete(event),
 
-            // TODO: are these relevant?
-            Ek::Modify(Mk::Name(Rm::To))   => panic!("rename mode not supported: To"),
-            Ek::Modify(Mk::Name(Rm::From)) => panic!("rename mode not supported: From"),
+            Ek::Access(_) => None?,
 
-            _ => None?,
+            _ => {
+                let count = self.count;
+                let kind = event.kind;
+                let name = take(event);
+
+                println!("[{count}] ignored watch: {kind:?}, {name:?}");
+                None?
+            },
         })
     }
 }

@@ -7,8 +7,9 @@ mod file_utilities;
 mod watch;
 
 
-use crate::{obsidian, backup, vault::{command::VaultCommand, md_file::{FileId, FileView}}};
-use std::{collections::HashMap, env, path::PathBuf};
+use crate::{obsidian, backup, vault::{command::VaultCommand, md_file::{FileView}}};
+use file_id::FileId;
+use std::{collections::HashMap, env, path::{Path, PathBuf}};
 
 use tokio::{select, sync::mpsc::{self, Sender}};
 use walkdir::{DirEntry, WalkDir};
@@ -37,21 +38,18 @@ pub(crate) use regex;
 pub struct Index {
     md_files: HashMap<FileId, MdFile>,
     _path:    PathBuf,
-    next_id:  usize,
 }
 
 impl Index {
     pub fn build() -> Self {
         let files    = scan_vault();
 
-        let mut next = 0;
-
         let md_files = files
             .filter   (|f| ends_with(f, ".md"))
             .map      (|f| {
                 let path = f.path().to_path_buf();
-                let id   = next;
-                next += 1;
+                let id   = file_id::get_file_id(&path).unwrap();
+
 
                 (id, MdFile::new(id, path))
             })
@@ -61,7 +59,6 @@ impl Index {
         Self {
             md_files,
             _path:   vault_folder(),
-            next_id: next,
         }
     }
 
@@ -228,73 +225,96 @@ impl Index {
             return;
         };
 
+        println!("Handle event {event:?}");
+
         // TODO: when i hit `ctrl + s` in obsidian, I get 2 update events
         //       do i need to "debounce" events by a few millis?
 
+        // TODO: propagate events/state back to UI
         type Mt = watch::ModificationType;
         match event {
-            Mt::Create { target }   => self.handle_create_event(target),
-            Mt::Update { target }   => self.handle_update_event(target),
-            Mt::Delete { target }   => self.handle_delete_event(target),
-            Mt::Rename { from, to } => self.handle_rename_event(from, to),
+            Mt::Create { target }   => self.handle_external_create_event(target),
+            Mt::Update { target }   => self.handle_external_update_event(target),
+            Mt::Delete { target }   => self.handle_external_delete_event(target),
+            Mt::Rename { from, to } => self.handle_external_rename_event(from, to),
         }
     }
 
-    fn handle_create_event(&mut self, target: PathBuf) {
+    fn handle_external_create_event(&mut self, target: PathBuf) {
         if !target.ends_with(".md") {
             return;
         }
 
-        println!("Adding file to index: {:?}", &target);
-
-
-        let id = self.next_id;
-        self.next_id += 1;
+        let id = file_id::get_file_id(&target).unwrap();
 
         let md_file = MdFile::new(id, target);
 
         self.md_files.insert(id, md_file);
     }
 
-    fn handle_update_event(&mut self, target: PathBuf) {
+    fn handle_external_update_event(&mut self, target: PathBuf) {
         if !target.ends_with(".md") {
             return;
         }
 
-        println!("Updating file: {:?}", &target);
+        println!("Updating file: {:?}", target);
 
-        todo!()
+
+        let id = self.find_file_id_by_name(&target);
+
+        *self.get_file_mut(id) = MdFile::new(id, target);
+
+
+
     }
 
-    fn handle_delete_event(&mut self, target: PathBuf) {
+    fn handle_external_delete_event(&mut self, target: PathBuf) {
         if !target.ends_with(".md") {
             return;
         }
 
-        println!("Deleting file: {:?}", &target);
 
-        todo!()
+        let id = &self.find_file_id_by_name(&target);
+
+        self.md_files.remove(id);
     }
 
-    fn handle_rename_event(&mut self, from: PathBuf, to: PathBuf) {
+    fn handle_external_rename_event(&mut self, from: PathBuf, to: PathBuf) {
 
         match (from.ends_with(".md"), to.ends_with(".md")) {
-            (true, false)  => return self.handle_delete_event(from),
-            (false, true)  => return self.handle_create_event(to),
             (false, false) => return,
+
+            (true,  false) => return self.handle_external_delete_event(from),
+            (false, true)  => return self.handle_external_create_event(to),
+
             _              => {}
         }
 
-        println!("Rename");
-        println!("  - from: {:?}", from);
-        println!("  - to:   {:?}", to);
 
         todo!()
+    }
+
+    fn find_file_id_by_name(&self, file: &Path) -> FileId {
+        let name = file.to_str().unwrap();
+
+        let Some(id) = self.md_files
+            .iter  ()
+            .filter(|f| f.1.file_name == name)
+            .map   (|f| f.0)
+
+            .next  ()
+            .copied()
+        else {
+            panic!("file not found: {name}");
+        };
+
+        id
+
     }
 
 }
 
-
+#[allow(dead_code)]
 pub enum Env {
     Prod,
     Dev,
@@ -305,6 +325,13 @@ impl Env {
         match self {
             Self::Prod => "Notes",
             Self::Dev  => "Notes_dev",
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Prod => "Prod",
+            Self::Dev  => "Dev",
         }
     }
 }
