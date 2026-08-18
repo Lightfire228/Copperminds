@@ -1,19 +1,19 @@
 
-mod actionables;
-mod backup;
-mod cli;
-mod obsidian;
-mod sort_actions;
-mod sort_type;
-mod vault;
-mod ui;
+use copperminds::*;
 
+use pretty_env_logger::formatted_builder;
 
-
-use crate::{cli::{MenuOption, choose}, vault::ENV};
+use crate::{cli::{MenuOption}, vault::ENV};
 
 #[tokio::main]
 async fn main() {
+
+    formatted_builder()
+        .filter_module("",            log::LevelFilter::Warn)
+        .filter_module("wgpu_hal",    log::LevelFilter::Off)
+        .filter_module("copperminds", log::LevelFilter::Trace)
+        .init()
+    ;
 
     println!("\n\n---\n");
 
@@ -40,7 +40,7 @@ async fn main() {
 
 
 fn menu() -> Menu {
-    let opts = [
+    let _opts = [
         MenuOption {
             code:  "t",
             name:  "sort by Type",
@@ -63,7 +63,9 @@ fn menu() -> Menu {
         }
     ];
 
-    choose("Sorting method", &opts)
+    // choose("Sorting method", &opts)
+    Menu::IcedUI
+
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -72,4 +74,12 @@ enum Menu {
     SortByAction,
     ActionablesInbox,
     IcedUI,
+}
+
+
+#[allow(unused)]
+fn __() {
+    use std::path::{PathBuf};
+
+    backup::backup(&PathBuf::from(""));
 }

@@ -6,6 +6,7 @@ use futures::{
     SinkExt, StreamExt,
 };
 use notify::{Config, Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher as INWatcher, event::EventKindMask};
+use crate::prelude::*;
 
 
 #[derive(Debug)]
@@ -14,6 +15,7 @@ pub enum ModificationType {
     Update { target: PathBuf },
     Rename { from:   PathBuf, to: PathBuf },
     Delete { target: PathBuf },
+    Unknown,
 }
 
 pub struct Watcher {
@@ -81,7 +83,7 @@ impl Watcher {
         //       - is '.obsidian'
 
         // TODO: should probably exclude vault path prefix from filter checking logic
-        //       ex. moon logic (/home/user/.cache/vault/...)
+        //       ex. /home/user/.cache/moon_logic/vault/...
         let is_git = event
             .paths
             .iter()
@@ -152,11 +154,7 @@ impl Watcher {
 
             Ek::Create(Ck::File)             => create(event),
             Ek::Modify(Mk::Data(_))          => update(event),
-
-            // TODO: debounce from, to, and both
             Ek::Modify(Mk::Name(Rm::Both))   => rename(event),
-
-            Ek::Modify(Mk::Name(Rm::From))   => delete(event),
             Ek::Remove(Rk::File)             => delete(event),
 
             Ek::Access(_) => None?,
@@ -166,8 +164,9 @@ impl Watcher {
                 let kind = event.kind;
                 let name = take(event);
 
-                println!("[{count}] ignored watch: {kind:?}, {name:?}");
-                None?
+                warn!("[{count}] Unknown file watch: {kind:?}, {name:?}");
+
+                ModificationType::Unknown
             },
         })
     }

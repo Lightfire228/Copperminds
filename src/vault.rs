@@ -7,8 +7,9 @@ mod file_utilities;
 mod watch;
 
 
-use crate::{obsidian, backup, vault::{command::VaultCommand, md_file::{FileView}}};
+use crate::{obsidian, vault::{command::VaultCommand, md_file::{FileView}}};
 use file_id::FileId;
+use log::{debug};
 use std::{collections::HashMap, env, path::{Path, PathBuf}};
 
 use tokio::{select, sync::mpsc::{self, Sender}};
@@ -37,7 +38,9 @@ pub(crate) use regex;
 #[derive(Debug)]
 pub struct Index {
     md_files: HashMap<FileId, MdFile>,
-    _path:    PathBuf,
+
+    #[allow(unused)]
+    path:     PathBuf,
 }
 
 impl Index {
@@ -58,17 +61,9 @@ impl Index {
 
         Self {
             md_files,
-            _path:   vault_folder(),
+            path:   vault_folder(),
         }
     }
-
-    #[allow(unused)]
-    pub fn backup(&self) {
-        println!("Backing up vault");
-
-        backup::backup(&self._path);
-    }
-
 
     pub fn delete_empty_unnamed_files(&mut self) {
 
@@ -225,7 +220,7 @@ impl Index {
             return;
         };
 
-        println!("Handle event {event:?}");
+        debug!("Handle event {event:?}");
 
         // TODO: when i hit `ctrl + s` in obsidian, I get 2 update events
         //       do i need to "debounce" events by a few millis?
@@ -233,10 +228,11 @@ impl Index {
         // TODO: propagate events/state back to UI
         type Mt = watch::ModificationType;
         match event {
-            Mt::Create { target }   => self.handle_external_create_event(target),
-            Mt::Update { target }   => self.handle_external_update_event(target),
-            Mt::Delete { target }   => self.handle_external_delete_event(target),
-            Mt::Rename { from, to } => self.handle_external_rename_event(from, to),
+            Mt::Create { target }   => self.handle_external_create_event (target),
+            Mt::Update { target }   => self.handle_external_update_event (target),
+            Mt::Delete { target }   => self.handle_external_delete_event (target),
+            Mt::Rename { from, to } => self.handle_external_rename_event (from, to),
+            Mt::Unknown             => self.handle_external_unknown_event()
         }
     }
 
@@ -291,6 +287,11 @@ impl Index {
         }
 
 
+        todo!()
+    }
+
+    fn handle_external_unknown_event(&self) {
+        // vault rescan
         todo!()
     }
 

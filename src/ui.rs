@@ -16,6 +16,7 @@ use iced::widget::{container, row, space::horizontal, text_editor};
 use iced::{Element, Font, Length, Subscription, Theme, application, event, keyboard, message, theme};
 use iced::widget::{Button, Column, button, column, pick_list, text, tooltip};
 use iced::Task;
+use pretty_env_logger::formatted_builder;
 use tokio::runtime::Runtime;
 use smol_str::SmolStr;
 use tokio::sync::mpsc::Sender;
@@ -27,10 +28,11 @@ use crate::vault::{self, ENV, Env, Index};
 use crate::vault::command::{Cmd, IterFilesWith, OpenInObsidian, VaultCommand};
 use crate::vault::md_file::{FileView, MdFile};
 use crate::obsidian;
+use crate::prelude::*;
 
 
 pub fn main(tx: Sender<VaultCommand>) {
-    println!("iced ui");
+    info!("iced ui");
 
     let starter = AppStarter {
         tx,
