@@ -7,7 +7,7 @@ mod file_utilities;
 mod watch;
 
 
-use crate::{obsidian, vault::{command::VaultCommand, md_file::{FileView}}};
+use crate::{obsidian, vault::{command::VaultCommand, md_file::FileView, watch::FileData}};
 use file_id::FileId;
 use log::{debug};
 use std::{collections::HashMap, env, path::{Path, PathBuf}};
@@ -228,27 +228,25 @@ impl Index {
         // TODO: propagate events/state back to UI
         type Mt = watch::ModificationType;
         match event {
-            Mt::Create { target }   => self.handle_external_create_event (target),
-            Mt::Update { target }   => self.handle_external_update_event (target),
-            Mt::Delete { target }   => self.handle_external_delete_event (target),
-            Mt::Rename { from, to } => self.handle_external_rename_event (from, to),
-            Mt::Unknown             => self.handle_external_unknown_event()
+            Mt::Create (data)      => self.handle_external_create_event (data),
+            Mt::Update (data)      => self.handle_external_update_event (data),
+            Mt::Delete (data)      => self.handle_external_delete_event (data),
+            Mt::Rename (data, was) => self.handle_external_rename_event (data, was),
+            Mt::Unknown(data)      => self.handle_external_unknown_event(data),
         }
     }
 
-    fn handle_external_create_event(&mut self, target: PathBuf) {
-        if !target.ends_with(".md") {
+    fn handle_external_create_event(&mut self, data: FileData) {
+        if !data.name.ends_with(".md") {
             return;
         }
-
-        let id = file_id::get_file_id(&target).unwrap();
 
         let md_file = MdFile::new(id, target);
 
         self.md_files.insert(id, md_file);
     }
 
-    fn handle_external_update_event(&mut self, target: PathBuf) {
+    fn handle_external_update_event(&mut self, data: FileData) {
         if !target.ends_with(".md") {
             return;
         }
@@ -256,31 +254,27 @@ impl Index {
         println!("Updating file: {:?}", target);
 
 
-        let id = self.find_file_id_by_name(&target);
-
         *self.get_file_mut(id) = MdFile::new(id, target);
 
 
 
     }
 
-    fn handle_external_delete_event(&mut self, target: PathBuf) {
+    fn handle_external_delete_event(&mut self, data: FileData) {
         if !target.ends_with(".md") {
             return;
         }
 
 
-        let id = &self.find_file_id_by_name(&target);
-
         self.md_files.remove(id);
     }
 
-    fn handle_external_rename_event(&mut self, from: PathBuf, to: PathBuf) {
+    fn handle_external_rename_event(&mut self, data: FileData, was: PathBuf) {
 
-        match (from.ends_with(".md"), to.ends_with(".md")) {
+        match (was.ends_with(".md"), data.name.ends_with(".md")) {
             (false, false) => return,
 
-            (true,  false) => return self.handle_external_delete_event(from),
+            (true,  false) => return self.handle_external_delete_event(data),
             (false, true)  => return self.handle_external_create_event(to),
 
             _              => {}
@@ -290,7 +284,7 @@ impl Index {
         todo!()
     }
 
-    fn handle_external_unknown_event(&self) {
+    fn handle_external_unknown_event(&self, data: FileData) {
         // vault rescan
         todo!()
     }

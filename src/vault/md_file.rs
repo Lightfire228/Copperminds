@@ -3,7 +3,7 @@ use std::{fs, path::{Path, PathBuf}};
 
 use file_id::FileId;
 
-use crate::vault::{file_utilities::RawFile, fm::{FmProperty, FmType, GetKey}};
+use crate::vault::{file_utilities::RawFile, fm::{FmProperty, FmType, GetKey}, watch::FileData};
 
 use super::regex;
 
@@ -26,13 +26,13 @@ pub struct FileView {
 
 impl MdFile {
 
-    pub fn new(id: FileId, path: PathBuf) -> Self {
-        let text = fs::read_to_string(&path).unwrap();
+    pub fn new(data: FileData) -> Self {
+        let text = fs::read_to_string(&data.name).unwrap();
 
         Self {
-            id,
-            file_name: path.file_name().unwrap().to_str().unwrap().to_owned(),
-            path,
+            id:        data.id,
+            file_name: data.name.file_name().unwrap().to_str().unwrap().to_owned(),
+            path:      data.name,
             raw_file:  RawFile::new(text),
         }
     }
@@ -123,7 +123,8 @@ impl MdFile {
 
 
     pub fn refresh(&mut self) {
-        *self = Self::new(self.id, self.path.clone());
+        let data = (&*self).into();
+        *self = Self::new(data);
     }
 
     pub fn write_file(&self) {
@@ -164,6 +165,24 @@ impl From<&MdFile> for FileView {
         FileView {
             id:   value.id,
             name: value.file_name.clone(),
+        }
+    }
+}
+
+impl From<MdFile> for FileData {
+    fn from(val: MdFile) -> Self {
+        FileData {
+            id:   val.id,
+            name: val.path,
+        }
+    }
+}
+
+impl From<&MdFile> for FileData {
+    fn from(val: &MdFile) -> Self {
+        FileData {
+            id:   val.id,
+            name: val.path.clone(),
         }
     }
 }

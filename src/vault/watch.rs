@@ -1,21 +1,29 @@
 
-use std::{path::PathBuf};
+use std::path::{Path, PathBuf};
 
+use file_id::FileId;
 use futures::{
     channel::mpsc::{channel, Receiver},
     SinkExt, StreamExt,
 };
 use notify::{Config, Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher as INWatcher, event::EventKindMask};
+use tokio::io;
 use crate::prelude::*;
 
 
 #[derive(Debug)]
 pub enum ModificationType {
-    Create { target: PathBuf },
-    Update { target: PathBuf },
-    Rename { from:   PathBuf, to: PathBuf },
-    Delete { target: PathBuf },
-    Unknown,
+    Create (FileData),
+    Update (FileData),
+    Rename (FileData, PathBuf),
+    Delete (FileData),
+    Unknown(FileData),
+}
+
+#[derive(Debug, Clone)]
+pub struct FileData {
+    pub id:   FileId,
+    pub name: PathBuf,
 }
 
 pub struct Watcher {
@@ -118,31 +126,16 @@ impl Watcher {
             return None;
         }
 
-        fn take(event: Event) -> PathBuf {
-            event.paths.into_iter().nth(0).unwrap()
-        }
+        let mut iter   = event.paths.into_iter();
+        let     name_0 = iter.next()?;
+        let     name_1 = iter.next();
 
-        macro_rules! event {
-            ($fn:ident, $enum:ident) => {
-                fn $fn(event: Event) -> ModificationType {
-                    ModificationType::$enum { target: take(event) }
-                }
-            }
-        }
+        let id = get_id(name_0.as_ref()).ok()?;
 
-        event!(create, Create);
-        event!(update, Update);
-        event!(delete, Delete);
-
-        fn rename(event: Event) -> ModificationType {
-            let mut iter = event.paths.into_iter().take(2);
-
-            ModificationType::Rename {
-                from: iter.next().unwrap(),
-                to:   iter.next().unwrap(),
-            }
-        }
-
+        let data = FileData {
+            id,
+            name: name_0,
+        };
 
         type Ek = notify::EventKind;
         type Ck = notify::event::CreateKind;
@@ -152,22 +145,37 @@ impl Watcher {
 
         Some(match event.kind {
 
-            Ek::Create(Ck::File)             => create(event),
-            Ek::Modify(Mk::Data(_))          => update(event),
-            Ek::Modify(Mk::Name(Rm::Both))   => rename(event),
-            Ek::Remove(Rk::File)             => delete(event),
+            Ek::Create(Ck::File)             => ModificationType::Create(data),
+            Ek::Modify(Mk::Data(_))          => ModificationType::Update(data),
+            Ek::Remove(Rk::File)             => ModificationType::Delete(data),
+            Ek::Modify(Mk::Name(Rm::Both))   => {
+                let name_1 = name_1.unwrap();
+                let id     = get_id(&name_1).ok()?;
+
+                ModificationType::Rename(
+                    FileData {
+                        id,
+                        name: name_1,
+                    },
+                    data.name,
+                )
+            },
 
             Ek::Access(_) => None?,
 
             _ => {
                 let count = self.count;
                 let kind = event.kind;
-                let name = take(event);
 
-                warn!("[{count}] Unknown file watch: {kind:?}, {name:?}");
+                warn!("[{count}] Unknown file watch: {kind:?}, {:?}", data.name);
 
-                ModificationType::Unknown
+                ModificationType::Unknown(data)
             },
         })
     }
+}
+
+fn get_id(name: &Path) -> io::Result<FileId> {
+    file_id::get_file_id(name)
+        .inspect_err(|_| error!("unable to get file id for name: {name:?}"))
 }
