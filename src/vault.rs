@@ -53,8 +53,10 @@ impl Index {
                 let path = f.path().to_path_buf();
                 let id   = file_id::get_file_id(&path).unwrap();
 
-
-                (id, MdFile::new(id, path))
+                (id, MdFile::new(FileData {
+                    id,
+                    name: path,
+                }))
             })
             .collect()
         ;
@@ -222,74 +224,25 @@ impl Index {
 
         debug!("Handle event {event:?}");
 
-        // TODO: when i hit `ctrl + s` in obsidian, I get 2 update events
-        //       do i need to "debounce" events by a few millis?
+        // MAYBE: when i hit `ctrl + s` in obsidian, I get 2 update events
+        //        do i need to "debounce" events by a few millis?
 
-        // TODO: propagate events/state back to UI
         type Mt = watch::ModificationType;
         match event {
-            Mt::Create (data)      => self.handle_external_create_event (data),
-            Mt::Update (data)      => self.handle_external_update_event (data),
-            Mt::Delete (data)      => self.handle_external_delete_event (data),
-            Mt::Rename (data, was) => self.handle_external_rename_event (data, was),
-            Mt::Unknown(data)      => self.handle_external_unknown_event(data),
-        }
-    }
-
-    fn handle_external_create_event(&mut self, data: FileData) {
-        if !data.name.ends_with(".md") {
-            return;
+            Mt::Unknown => self.handle_external_unknown_event(),
         }
 
-        let md_file = MdFile::new(id, target);
-
-        self.md_files.insert(id, md_file);
+        // TODO: propagate events/state back to UI
     }
 
-    fn handle_external_update_event(&mut self, data: FileData) {
-        if !target.ends_with(".md") {
-            return;
-        }
 
-        println!("Updating file: {:?}", target);
+    fn handle_external_unknown_event(&mut self) {
+        debug!("Rebuilding the index");
 
-
-        *self.get_file_mut(id) = MdFile::new(id, target);
-
-
-
+        *self = Index::build();
     }
 
-    fn handle_external_delete_event(&mut self, data: FileData) {
-        if !target.ends_with(".md") {
-            return;
-        }
-
-
-        self.md_files.remove(id);
-    }
-
-    fn handle_external_rename_event(&mut self, data: FileData, was: PathBuf) {
-
-        match (was.ends_with(".md"), data.name.ends_with(".md")) {
-            (false, false) => return,
-
-            (true,  false) => return self.handle_external_delete_event(data),
-            (false, true)  => return self.handle_external_create_event(to),
-
-            _              => {}
-        }
-
-
-        todo!()
-    }
-
-    fn handle_external_unknown_event(&self, data: FileData) {
-        // vault rescan
-        todo!()
-    }
-
-    fn find_file_id_by_name(&self, file: &Path) -> FileId {
+    fn _find_file_id_by_name(&self, file: &Path) -> FileId {
         let name = file.to_str().unwrap();
 
         let Some(id) = self.md_files
