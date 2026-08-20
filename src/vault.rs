@@ -7,12 +7,13 @@ mod file_utilities;
 mod watch;
 
 
-use crate::{obsidian, vault::{command::VaultCommand, md_file::FileView, watch::FileData}};
+use crate::{obsidian, vault::{command::{VaultCommand, VaultUpdate}, md_file::FileView, watch::FileData}};
 use file_id::FileId;
+use futures::future::join_all;
 use log::{debug};
-use std::{collections::HashMap, env, path::{Path, PathBuf}};
+use std::{collections::HashMap, env, mem, path::{Path, PathBuf}, usize};
 
-use tokio::{select, sync::mpsc::{self, Sender}};
+use tokio::{select, sync::mpsc::{self, Sender, channel}};
 use walkdir::{DirEntry, WalkDir};
 use trash;
 
@@ -37,10 +38,12 @@ pub(crate) use regex;
 
 #[derive(Debug)]
 pub struct Index {
-    md_files: HashMap<FileId, MdFile>,
+    md_files:    HashMap<FileId, MdFile>,
+
+    subscribers: Vec<Sender<VaultUpdate>>,
 
     #[allow(unused)]
-    path:     PathBuf,
+    path:        PathBuf,
 }
 
 impl Index {
@@ -63,8 +66,17 @@ impl Index {
 
         Self {
             md_files,
-            path:   vault_folder(),
+            path:        vault_folder(),
+            subscribers: vec![],
         }
+    }
+
+    pub fn rebuild(&mut self) {
+        let subs = mem::take(&mut self.subscribers);
+
+        *self = Index::build();
+
+        self.subscribers = subs;
     }
 
     pub fn delete_empty_unnamed_files(&mut self) {
@@ -123,29 +135,36 @@ impl Index {
 
     pub fn handle_command(&mut self, command: VaultCommand) {
 
-        match command {
-            VaultCommand::IterFilesWith(filter, resp) => {
-                resp.send(self
-                    .iter_files_with_cmd(filter.filter)
-                )
-                .unwrap()
-            },
+        macro_rules! send {
+            ($resp:ident => $expr:expr) => {
+                _ = $resp.send($expr)
+            };
+        }
 
-            VaultCommand::SetProperty(prop, resp) => {
-                resp.send(self
+        match command {
+            VaultCommand::IterFilesWith(filter, resp) => send!(resp =>
+                self.iter_files_with_cmd(filter.filter)
+            ),
+
+            VaultCommand::SetProperty(prop, resp) => send!(resp =>
+                self
                     .get_file_mut(prop.id)
                     .set_property(prop.prop, prop.value)
-                )
-                .unwrap()
-            },
+            ),
 
-            VaultCommand::OpenInObsidian(opts, resp) => {
+            VaultCommand::OpenInObsidian(opts, resp) => send!(resp => {
                 let file = &self.md_files[&opts.id];
 
                 obsidian::open_in_obsidian(file);
+            }),
+            VaultCommand::Register(_, resp) => send!(resp => {
+                let (tx, rx) = channel(1000);
 
-                resp.send(()).unwrap()
-            }
+                self.subscribers.push(tx);
+
+                rx
+            })
+
         }
     }
 }
@@ -209,7 +228,7 @@ async fn handle_serve(mut rx: mpsc::Receiver<VaultCommand>, mut watcher: watch::
                 }
             }
             event = watcher.next_event() => {
-                index.handle_watch_event(event).await;
+                index.handle_external_fs_event(event).await;
             }
         };
 
@@ -217,7 +236,7 @@ async fn handle_serve(mut rx: mpsc::Receiver<VaultCommand>, mut watcher: watch::
 }
 
 impl Index {
-    async fn handle_watch_event(&mut self, event: Option<watch::ModificationType>) {
+    async fn handle_external_fs_event(&mut self, event: Option<watch::ModificationType>) {
         let Some(event) = event else {
             return;
         };
@@ -228,18 +247,20 @@ impl Index {
         //        do i need to "debounce" events by a few millis?
 
         type Mt = watch::ModificationType;
-        match event {
+        let event = match event {
             Mt::Unknown => self.handle_external_unknown_event(),
-        }
+        };
 
-        // TODO: propagate events/state back to UI
+        self.send_notifications(event).await;
     }
 
 
-    fn handle_external_unknown_event(&mut self) {
+    fn handle_external_unknown_event(&mut self) -> VaultUpdate {
         debug!("Rebuilding the index");
 
-        *self = Index::build();
+        self.rebuild();
+
+        VaultUpdate::Rescan
     }
 
     fn _find_file_id_by_name(&self, file: &Path) -> FileId {
@@ -257,7 +278,37 @@ impl Index {
         };
 
         id
+    }
 
+    async fn send_notifications(&mut self, event: VaultUpdate) {
+
+        debug!("{}", self.subscribers.len());
+
+        let futures = self.subscribers
+            .iter()
+            .map(|s| async move {
+                s.send(event).await
+            })
+        ;
+
+        let res = join_all(futures).await;
+
+        let closed = res
+            .iter      ()
+            .enumerate ()
+            .filter_map(|s| s.1.map_err(|_| s.0).err())
+        ;
+
+        let mut prv = usize::MAX;
+
+        for s in closed.rev() {
+
+            assert!(s < prv, "the subscriber indices got all fucked");
+            prv = s;
+
+            self.subscribers.remove(s);
+
+        }
     }
 
 }

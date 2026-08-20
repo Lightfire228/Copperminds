@@ -5,7 +5,7 @@ use iced::{Element, Task, keyboard::Key, widget::container};
 use iced::widget::{Button, Column, button, column, pick_list, row, text, tooltip};
 
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
-use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCommand};
+use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCommand, VaultUpdate};
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
 use crate::vault::md_file::{FileView, MdFile};
 
@@ -59,11 +59,7 @@ impl SortQueue {
                 files: Vec::new(),
                 index: 0,
             },
-            Task::future(async move {
-                let files = load_files(vault, queue_type).await;
-
-                Message::LoadFiles(files)
-            })
+            Task::perform(load_files(vault, queue_type), Message::LoadFiles)
 
         )
     }
@@ -136,7 +132,17 @@ impl SortQueue {
 
                 Action::None
             },
-            Message::VaultAction(action) => Action::Run(self.handle_vault_action(action))
+            Message::VaultAction(action) => Action::Run(self.handle_vault_action(action)),
+            Message::VaultUpdate(update) => Action::Run(
+
+                match update {
+                    VaultUpdate::Rescan => Task::perform(
+                        load_files(self.vault.clone(), self.queue_type),
+                        Message::LoadFiles
+                    ),
+                }
+            ),
+
         }
     }
 
@@ -177,12 +183,11 @@ impl SortQueue {
 
         let id = self.files[self.index].id;
 
-
         Task::future(async move {
 
             // TODO: this doesn't actually write the changes to disk
             // i wanna get the file watch in place before then
-            send_vault_cmd(tx, SetProperty {
+            send_vault_cmd(&tx, SetProperty {
                 id,
                 prop,
                 value,
@@ -205,18 +210,17 @@ impl SortQueue {
         let id = file.id;
         let tx = self.vault.clone();
 
-        let task = Task::future(async move {
+        let cmd = OpenInObsidian {
+            id,
+        };
 
-            let cmd = OpenInObsidian {
-                id,
-            };
+        Action::Run(
+            Task::future(async move {
+                send_vault_cmd(&tx, cmd).await;
 
-            send_vault_cmd(tx, cmd).await;
-
-            Message::None
-        });
-
-        Action::Run(task)
+                Message::None
+            })
+        )
 
     }
 
@@ -258,6 +262,7 @@ pub enum Message {
     MoveCursorDown,
     NavigateBack,
     VaultAction(VaultAction),
+    VaultUpdate(VaultUpdate),
 }
 
 
@@ -283,7 +288,7 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Vec<FileVi
     };
 
     send_vault_cmd(
-        vault,
+        &vault,
         IterFilesWith {
             filter: cmd,
         }

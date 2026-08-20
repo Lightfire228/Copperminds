@@ -1,11 +1,13 @@
 #![allow(unused_imports)]
 
 mod components;
+mod vault_subscription;
 
 
 use std::fmt::Display;
+use std::hash::Hash;
 
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use iced::Length::Fill;
 use iced::application::BootFn;
 use iced::keyboard::{Event, Key};
@@ -19,29 +21,35 @@ use iced::Task;
 use pretty_env_logger::formatted_builder;
 use tokio::runtime::Runtime;
 use smol_str::SmolStr;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{self, Sender};
 use tokio::sync::oneshot;
 
 use crate::ui::components::select_queue::{self, SelectQueue};
 use crate::ui::components::sort_queue::{self, SortQueue};
 use crate::vault::{self, ENV, Env, Index};
-use crate::vault::command::{Cmd, IterFilesWith, OpenInObsidian, VaultCommand};
+use crate::vault::command::{Cmd, IterFilesWith, OpenInObsidian, VaultCommand, VaultUpdate};
 use crate::vault::md_file::{FileView, MdFile};
 use crate::obsidian;
 use crate::prelude::*;
+
+use std::mem;
 
 
 pub fn main(tx: Sender<VaultCommand>) {
     info!("iced ui");
 
-    let starter = AppStarter {
-        tx,
-    };
+    debug!("size of Message: {}", mem::size_of::<Message>());
 
-    application(starter, App::update, App::view)
+
+
+    application(
+        move || App::new(tx.clone()),
+        App::update,
+        App::view
+    )
         .theme       (Theme::Dark)
         .title       (App  ::title)
-        .subscription(|_| iced::event::listen().map(Message::Event))
+        .subscription(App::subscription)
         .default_font(Font::MONOSPACE)
         .run         ()
         .unwrap      ()
@@ -59,6 +67,7 @@ enum Message {
     Event           (iced::Event),
     SelectQueue     (select_queue::Message),
     SortQueue       (sort_queue  ::Message),
+    VaultUpdate     (VaultUpdate)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,14 +103,36 @@ impl App {
         format!("Copperminds - {}", ENV.name())
     }
 
+    fn subscription(&self) -> Subscription<Message> {
+        Subscription::batch([
+            iced::event::listen().map(Message::Event),
+            {
+
+                let vault = VaultSubscriber { sub: self.vault.clone() };
+
+                Subscription::run_with(vault, |vault| vault_subscription::connect(vault.sub.clone())).map(Message::VaultUpdate)
+            }
+        ])
+
+    }
+
     fn update(&mut self, message: Message) -> Task<Message> {
 
         match (&mut self.ui_mode, message) {
             (_, Message::Event(iced::Event::Keyboard(event))) => {
                 let message = self.handle_key_event(event);
 
-                return Task::future(async move { message })
+                return Task::done(message)
             }
+            (_, Message::VaultUpdate(message)) => {
+                debug!("Recevied vault update {message:?}");
+
+                // TODO: maybe restructure this
+                self.update(match &self.ui_mode {
+                    UIMode::SelectQueue(_) => Message::None,
+                    UIMode::SortQueue  (_) => Message::SortQueue(sort_queue::Message::VaultUpdate(message)),
+                })
+            },
 
             (UIMode::SelectQueue(x), Message::SelectQueue(message)) => match x.update(message) {
                 select_queue::Action::None                      => Task::none(),
@@ -153,7 +184,7 @@ impl App {
 
 
 
-async fn send_vault_cmd<T>(vault: Sender<VaultCommand>, cmd: impl Cmd<T>) -> T {
+async fn send_vault_cmd<T>(vault: &Sender<VaultCommand>, cmd: impl Cmd<T>) -> T {
     let (tx, rx) = oneshot::channel();
 
     vault
@@ -176,13 +207,14 @@ impl Display for QueueType {
 }
 
 
-
-struct AppStarter {
-    tx: Sender<VaultCommand>,
+struct VaultSubscriber {
+    sub: Sender<VaultCommand>,
 }
 
-impl BootFn<App, Message> for AppStarter {
-    fn boot(&self) -> (App, iced::Task<Message>) {
-        App::new(self.tx.clone())
-    }
+// Subscribers are identified by their data's hash, and their function pointer,
+// but i only need one vault subscriber per app
+// 
+// this may cause weirdness depending on what iced does with the subscribers on repeated app inits
+impl Hash for VaultSubscriber {
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
 }
