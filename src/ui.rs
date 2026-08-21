@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 mod components;
 mod vault_subscription;
 
@@ -105,18 +103,48 @@ impl App {
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
-            iced::event::listen().map(Message::Event),
-            {
-
-                let vault = VaultSubscriber { sub: self.vault.clone() };
-
-                Subscription::run_with(vault, |vault| vault_subscription::connect(vault.sub.clone())).map(Message::VaultUpdate)
-            }
+            self.get_keyboard_subscriber(),
+            self.get_vault_subscriber   (),
         ])
-
     }
 
+    fn get_keyboard_subscriber(&self) -> Subscription<Message> {
+        iced::event::listen().map(Message::Event)
+    }
+
+    fn get_vault_subscriber(&self) -> Subscription<Message> {
+
+        let vault = VaultSubscriber { sub: self.vault.clone() };
+
+        Subscription::run_with(
+            vault,
+            |vault| vault_subscription::connect(
+                vault.sub.clone()
+            )
+        )
+            .map(Message::VaultUpdate)
+    }
+
+
     fn update(&mut self, message: Message) -> Task<Message> {
+
+        match message {
+            Message::Event(iced::Event::Keyboard(event)) => {
+                let message = self.handle_key_event(event);
+
+                return Task::done(message)
+            }
+            Message::VaultUpdate(message) => {
+                debug!("Recevied vault update {message:?}");
+
+                // TODO: maybe restructure this
+                return self.update(match &self.ui_mode {
+                    UIMode::SelectQueue(_) => Message::None,
+                    UIMode::SortQueue  (_) => Message::SortQueue(sort_queue::Message::VaultUpdate(message)),
+                })
+            }
+            _ => {}
+        };
 
         match (&mut self.ui_mode, message) {
             (_, Message::Event(iced::Event::Keyboard(event))) => {
@@ -213,7 +241,7 @@ struct VaultSubscriber {
 
 // Subscribers are identified by their data's hash, and their function pointer,
 // but i only need one vault subscriber per app
-// 
+//
 // this may cause weirdness depending on what iced does with the subscribers on repeated app inits
 impl Hash for VaultSubscriber {
     fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}

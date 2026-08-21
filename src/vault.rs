@@ -5,6 +5,7 @@ pub mod command;
 
 mod file_utilities;
 mod watch;
+mod generator;
 
 
 use crate::{obsidian, vault::{command::{VaultCommand, VaultUpdate}, md_file::FileView, watch::FileData}};
@@ -66,7 +67,7 @@ impl Index {
 
         Self {
             md_files,
-            path:        vault_folder(),
+            path:        ENV.vault_path(),
             subscribers: vec![],
         }
     }
@@ -170,14 +171,8 @@ impl Index {
 }
 
 
-pub fn vault_folder() -> PathBuf {
-    let home = env::home_dir().unwrap();
-
-    home.join(ENV.vault())
-}
-
 fn scan_vault() -> impl Iterator<Item = DirEntry> {
-    WalkDir::new(vault_folder())
+    WalkDir::new(ENV.vault_path())
         .into_iter   ()
         .filter_entry(|e| !is_hidden(e))
         .filter_map  (|e| e.ok())
@@ -204,7 +199,7 @@ pub fn serve() -> Sender<VaultCommand> {
 
     let (tx, rx) = mpsc::channel::<VaultCommand>(1000);
 
-    let watcher = watch::Watcher::new(vault_folder()).unwrap();
+    let watcher = watch::Watcher::new(ENV.vault_path()).unwrap();
 
     tokio::spawn(async move {
         handle_serve(rx, watcher).await;
@@ -282,8 +277,6 @@ impl Index {
 
     async fn send_notifications(&mut self, event: VaultUpdate) {
 
-        debug!("{}", self.subscribers.len());
-
         let futures = self.subscribers
             .iter()
             .map(|s| async move {
@@ -310,21 +303,35 @@ impl Index {
 
         }
     }
-
 }
 
+
+pub fn generate_vault() {
+    generator::generate_sample_vault();
+}
+
+
 #[allow(dead_code)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Env {
     Prod,
     Dev,
 }
 
 impl Env {
-    pub fn vault(&self) -> &'static str {
+    pub fn vault_name(&self) -> &'static str {
         match self {
             Self::Prod => "Notes",
             Self::Dev  => "Notes_dev",
         }
+    }
+
+    pub fn vault_path(&self) -> PathBuf {
+
+        let home = env::home_dir().unwrap();
+
+        home.join(self.vault_name())
+
     }
 
     pub fn name(&self) -> &'static str {

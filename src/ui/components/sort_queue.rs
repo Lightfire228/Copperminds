@@ -9,6 +9,7 @@ use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCom
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
 use crate::vault::md_file::{FileView, MdFile};
 
+use crate::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct SortQueue {

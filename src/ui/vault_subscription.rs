@@ -9,6 +9,9 @@ use crate::{ui::send_vault_cmd, vault::command::{Register, VaultCommand, VaultUp
 
 
 pub fn connect(vault: Sender<VaultCommand>) -> impl Sipper<Never, VaultUpdate> {
+
+    // MAYBE: is a sipper required?
+    // the example uses it https://github.com/iced-rs/iced/blob/0.14/examples/websocket/src/echo.rs
     sipper(async move |mut output| {
         debug!("running vault subscription");
 

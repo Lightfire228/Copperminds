@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 pub mod actionables;
 pub mod backup;
 pub mod cli;

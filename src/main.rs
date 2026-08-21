@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 
 use copperminds::*;
 
@@ -34,13 +35,16 @@ async fn main() {
         Menu::SortByType       => sort_type   ::main(),
         Menu::SortByAction     => sort_actions::main(),
         Menu::ActionablesInbox => actionables ::main(),
+        Menu::GenerateVault    => vault       ::generate_vault(),
         Menu::IcedUI           => ui          ::main(vault::serve()),
     }
 }
 
 
+#[allow(unused)]
 fn menu() -> Menu {
-    let _opts = [
+
+    let opts = [
         MenuOption {
             code:  "t",
             name:  "sort by Type",
@@ -57,14 +61,19 @@ fn menu() -> Menu {
             value: Menu::ActionablesInbox,
         },
         MenuOption {
+            code:  "g",
+            name:  "generate vault",
+            value: Menu::GenerateVault,
+        },
+        MenuOption {
             code:  "u",
             name:  "iced ui",
             value: Menu::IcedUI,
         }
     ];
 
-    // choose("Sorting method", &opts)
-    Menu::IcedUI
+    cli::choose("Sorting method", &opts)
+    // Menu::IcedUI
 
 }
 
@@ -73,6 +82,7 @@ enum Menu {
     SortByType,
     SortByAction,
     ActionablesInbox,
+    GenerateVault,
     IcedUI,
 }
 

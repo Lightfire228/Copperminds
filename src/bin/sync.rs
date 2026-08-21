@@ -27,7 +27,7 @@ macro_rules! continue_on_err {
 /// and auto creates commits, and pushes the results to the backup git repo
 async fn main() {
 
-    let folder = vault::vault_folder();
+    let folder = vault::ENV.vault_path();
 
     let (mut watcher, mut rx) = async_watcher().expect("Unable to get watcher");
 
