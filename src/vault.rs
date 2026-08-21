@@ -82,6 +82,8 @@ impl Index {
 
     pub fn delete_empty_unnamed_files(&mut self) {
 
+        debug!("Deleting empty unnamed files");
+
         let files: Vec<_> = self
             .iter_files()
             .filter(|f| f.is_empty() && f.is_unnamed())
@@ -197,22 +199,24 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
 
 pub fn serve() -> Sender<VaultCommand> {
 
+    let mut index = Index::build();
+
+    // Do this before setting up the file watch
+    index.delete_empty_unnamed_files();
+
+
     let (tx, rx) = mpsc::channel::<VaultCommand>(1000);
 
     let watcher = watch::Watcher::new(ENV.vault_path()).unwrap();
 
     tokio::spawn(async move {
-        handle_serve(rx, watcher).await;
+        handle_serve(index, rx, watcher).await;
     });
 
     tx
 }
 
-async fn handle_serve(mut rx: mpsc::Receiver<VaultCommand>, mut watcher: watch::Watcher) {
-
-    let mut index = Index::build();
-
-    index.delete_empty_unnamed_files();
+async fn handle_serve(mut index: Index, mut rx: mpsc::Receiver<VaultCommand>, mut watcher: watch::Watcher) {
 
     loop {
 
@@ -326,6 +330,7 @@ impl Env {
         }
     }
 
+    // TODO: put this in a config
     pub fn vault_path(&self) -> PathBuf {
 
         let home = env::home_dir().unwrap();

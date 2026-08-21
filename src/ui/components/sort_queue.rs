@@ -72,7 +72,7 @@ impl SortQueue {
             QueueType::NeedsAction => NEEDS_ACTION,
         }
             .iter()
-            .map (|o| text!("{}", o.name).into())
+            .map (|o| text!("{} - {}", o.key, o.name).into())
         ;
 
         container(

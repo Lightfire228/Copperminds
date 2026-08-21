@@ -1,7 +1,10 @@
+use std::path::Path;
 use std::{collections::HashSet, env, fs, path::PathBuf, process::Command};
+use std::hash::Hash;
 
 use fs_extra::dir::CopyOptions;
 use futures::stream::iter;
+use iced::Length::Fill;
 use rand::{self, random_bool};
 
 use crate::vault::{ENV, Env};
@@ -43,26 +46,38 @@ pub fn generate_sample_vault() {
     fs::create_dir(&folder).unwrap();
 
 
-    for title in generate_sample_vault_titles() {
+    for file in generate_sample_vault_titles() {
 
-        let path = folder.join(&title);
+        let path = folder.join(file.title());
 
         fs::File::create(&path).unwrap();
 
-        if !title.contains("TODO") {
-            continue;
-        }
-
-        if random_bool(0.50) {
-            continue;
-        }
-
-        fs::write(path, "---\ntype: action\n---\n")
-            .unwrap()
-        ;
-
+        write_data(&file, &path);
     }
 }
+
+fn write_data(file: &File, path: &Path) {
+
+    macro_rules! with_chance {
+        ($chance:literal, $expr:expr) => {
+
+            if random_bool($chance) {
+
+                fs::write(&path, $expr)
+                    .unwrap()
+                ;
+            }
+        };
+    }
+
+    match &file.kind {
+        FileType::Todo    => with_chance!(0.50, "---\ntype: action\n---\n"),
+        FileType::Info    => with_chance!(0.50, "---\ntype: action\n---\n"),
+        FileType::Unnamed => with_chance!(0.90, "not empty\n"),
+    }
+}
+
+
 
 fn clear_vault(env: Env) {
     assert_ne!(env, Env::Prod, "YOU FOOL");
@@ -79,21 +94,21 @@ fn clear_vault(env: Env) {
 }
 
 
-pub fn generate_sample_vault_titles() -> HashSet<String> {
+fn generate_sample_vault_titles() -> HashSet<File> {
 
     (0..3000)
         .into_iter()
-        .map      (|_| format!("{}.md", generate_title()))
+        .map      (|_| generate_title())
         .collect  ()
 
 }
 
-fn generate_title() -> String {
+fn generate_title() -> File {
     match rand::random_range(0.0 .. 1.0) {
-        0.00 .. 0.25 => generate_title_noun(),
-        0.25 .. 0.50 => generate_title_unique(),
-        0.50 .. 0.75 => generate_title_info(),
-        _            => generate_title_todo(),
+        0.00 .. 0.25 => File { title: generate_title_noun(),   kind: FileType::Info},
+        0.25 .. 0.50 => File { title: generate_title_unique(), kind: FileType::Unnamed},
+        0.50 .. 0.75 => File { title: generate_title_info(),   kind: FileType::Info},
+        _            => File { title: generate_title_todo(),   kind: FileType::Todo},
     }
 }
 
@@ -204,3 +219,30 @@ const WHEN: &[&'static str] = &[
     "this week",
     "a moment ago",
 ];
+
+
+#[derive(Debug, PartialEq, Eq)]
+struct File {
+    title: String,
+    kind:  FileType,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum FileType {
+    Todo,
+    Info,
+    Unnamed,
+}
+
+impl Hash for File {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.title.hash(state);
+    }
+}
+
+
+impl File {
+    pub fn title(&self) -> String {
+        format!("{}.md", self.title)
+    }
+}
