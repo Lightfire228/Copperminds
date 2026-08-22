@@ -1,7 +1,6 @@
-use futures::{SinkExt, Stream, never::Never};
-use iced::{stream, task::{Sipper, sipper}};
-use log::info;
-use tokio::sync::{mpsc::{self, Sender, Receiver}};
+use futures::{never::Never};
+use iced::{task::{Sipper, sipper}};
+use tokio::sync::{mpsc::{Sender}};
 
 use crate::prelude::*;
 

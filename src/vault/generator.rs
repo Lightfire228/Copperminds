@@ -1,13 +1,11 @@
 use std::path::Path;
-use std::{collections::HashSet, env, fs, path::PathBuf, process::Command};
+use std::{collections::HashSet, env, fs, path::PathBuf};
 use std::hash::Hash;
 
 use fs_extra::dir::CopyOptions;
-use futures::stream::iter;
-use iced::Length::Fill;
 use rand::{self, random_bool};
 
-use crate::vault::{ENV, Env};
+use crate::vault::{Env};
 
 mod utils;
 

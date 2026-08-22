@@ -1,10 +1,7 @@
-use iced::message;
-use tokio::sync::mpsc::Sender;
-use iced::{Element, Task, keyboard::Key, widget::container};
-use iced::widget::{Button, Column, button, column, pick_list, text, tooltip};
+use iced::{Element, keyboard::Key, widget::container};
+use iced::widget::{column, text};
 
 use crate::ui::{self, QueueType, UIMode};
-use crate::vault::command::VaultCommand;
 
 
 #[derive(Debug)]

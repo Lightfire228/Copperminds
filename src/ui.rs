@@ -5,29 +5,16 @@ mod vault_subscription;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use futures::{FutureExt, StreamExt};
-use iced::Length::Fill;
-use iced::application::BootFn;
-use iced::keyboard::{Event, Key};
-use iced::wgpu::naga::proc::index;
-use iced::wgpu::wgt::error;
-use iced::widget::text_editor::Content;
-use iced::widget::{container, row, space::horizontal, text_editor};
-use iced::{Element, Font, Length, Subscription, Theme, application, event, keyboard, message, theme};
-use iced::widget::{Button, Column, button, column, pick_list, text, tooltip};
+use iced::keyboard::{Event};
+use iced::{Element, Font, Subscription, Theme, application};
 use iced::Task;
-use pretty_env_logger::formatted_builder;
-use tokio::runtime::Runtime;
-use smol_str::SmolStr;
-use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::mpsc::{Sender};
 use tokio::sync::oneshot;
 
 use crate::ui::components::select_queue::{self, SelectQueue};
 use crate::ui::components::sort_queue::{self, SortQueue};
-use crate::vault::{self, ENV, Env, Index};
-use crate::vault::command::{Cmd, IterFilesWith, OpenInObsidian, VaultCommand, VaultUpdate};
-use crate::vault::md_file::{FileView, MdFile};
-use crate::obsidian;
+use crate::vault::{ENV};
+use crate::vault::command::{Cmd, VaultCommand, VaultUpdate};
 use crate::prelude::*;
 
 use std::mem;

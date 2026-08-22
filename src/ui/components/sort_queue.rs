@@ -2,7 +2,7 @@ use iced::Length::Fill;
 use iced::keyboard;
 use tokio::sync::mpsc::Sender;
 use iced::{Element, Task, keyboard::Key, widget::container};
-use iced::widget::{Button, Column, button, column, pick_list, row, text, tooltip};
+use iced::widget::{column, row, text};
 
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCommand, VaultUpdate};
