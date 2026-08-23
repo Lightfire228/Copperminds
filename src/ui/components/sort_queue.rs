@@ -233,7 +233,6 @@ impl From<SortQueue> for UIMode {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 struct MenuAction {
     pub key:     &'static str,

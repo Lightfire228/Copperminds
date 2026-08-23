@@ -39,16 +39,21 @@ impl MdFile {
 
     // --- queries
 
-    pub fn is_empty(&self) -> bool {
-        self.raw_file.is_empty()
+    pub fn is_empty_parsed(&self) -> bool {
+        self.raw_file.is_empty_parsed()
     }
 
-    pub fn _is_md_empty(&self) -> bool {
+    pub fn is_empty_raw(&self) -> bool {
+        self.raw_file.is_empty_raw()
+    }
+
+    pub fn is_md_empty(&self) -> bool {
         self.raw_file.is_md_empty()
     }
 
     pub fn is_unnamed(&self) -> bool {
-        regex!(RE = r"^([\d \-_]*|Untitled.*?)\.md$");
+        // (?i) - sets case insensitivity
+        regex!(RE = r"(?i)^([\d \-_]*|Untitled(\s.*?)?)\.md$");
 
         RE.is_match(&self.file_name)
     }
@@ -136,7 +141,6 @@ impl MdFile {
         self.raw_file.set_property(property.get_key(), value);
     }
 
-    #[allow(unused)]
     pub fn remove_property(&mut self, property: FmProperty) {
         self.raw_file.remove_property(property.get_key());
     }
@@ -190,10 +194,10 @@ impl From<&MdFile> for FileData {
 
 #[cfg(test)]
 impl MdFile {
-    pub fn parse(id: FileId, text: String) -> Self {
+    pub(crate) fn test_parse(id: FileId, name: String, text: String) -> Self {
         Self {
             id,
-            file_name: String ::new(),
+            file_name: name,
             path:      PathBuf::new(),
             raw_file:  RawFile::new(text),
         }
@@ -232,7 +236,7 @@ mod tests {
                 fm.insert(Value::String($key.get_key()), Value::String($value.get_key()));
             )*
 
-            MdFile::parse(id(), mapping_to_str(fm))
+            MdFile::test_parse(id(), String::new(), mapping_to_str(fm))
         }};
     }
 
@@ -240,7 +244,7 @@ mod tests {
         let yaml: Mapping = yaml_serde::from_str(text).unwrap();
 
         let text = mapping_to_str(yaml);
-        MdFile::parse(id(), text)
+        MdFile::test_parse(id(), String::new(), text)
     }
 
     #[test]

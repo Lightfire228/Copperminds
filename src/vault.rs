@@ -85,9 +85,8 @@ impl Index {
         debug!("Deleting empty unnamed files");
 
         let files: Vec<_> = self
-            .iter_files()
-            .filter(|f| f.is_empty() && f.is_unnamed())
-            .map   (|f| f.id)
+            .get_empty_unnamed_files()
+            .cloned ()
             .collect()
         ;
 
@@ -97,6 +96,14 @@ impl Index {
             trash::delete(path).unwrap();
             self.md_files.remove(id);
         }
+    }
+
+    fn get_empty_unnamed_files(&self) -> impl Iterator<Item = &FileId> {
+        self
+            .iter_files()
+            .filter(|f| f.is_empty_raw() && f.is_unnamed())
+            .map   (|f| &f.id)
+
     }
 
     fn iter_files(&self) -> impl Iterator<Item = &MdFile> {
@@ -127,7 +134,6 @@ impl Index {
             .collect()
     }
 
-    #[allow(dead_code)]
     pub fn get_file(&self, id: FileId) -> &MdFile {
         &self.md_files[&id]
     }
@@ -345,4 +351,136 @@ impl Env {
             Self::Dev  => "Dev",
         }
     }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn id(i: usize) -> FileId {
+        FileId::Inode {
+            device_id:    0,
+            inode_number: i as u64,
+        }
+    }
+
+    fn build_empty_unnamed_test_cases(
+        empty_titles:     &[String],
+        non_empty_titles: &[String],
+        non_empty_bodies: &[&str],
+    )
+        -> Vec<Test>
+    {
+
+        let mut i = 0;
+
+        macro_rules! test {
+            ($n:expr, $b:expr, $e:expr) => {{
+                i += 1;
+                Test {
+                    id:            id(i),
+                    file_name:     $n.to_owned(),
+                    file_body:     $b.to_owned(),
+                    empty_unnamed: $e,
+                }
+            }};
+        }
+
+        let mut test_cases = vec![];
+
+        for empty_title in empty_titles.iter() {
+            test_cases.push(test!(empty_title, "",      true));
+            test_cases.push(test!(empty_title, " \t\n", true));
+
+            for body in non_empty_bodies.iter() {
+                test_cases.push(test!(empty_title, *body, false));
+            }
+        }
+
+        for non_empty_title in non_empty_titles.iter() {
+            test_cases.push(test!(non_empty_title, "",      false));
+            test_cases.push(test!(non_empty_title, " \t\n", false));
+
+            for body in non_empty_bodies.iter() {
+                test_cases.push(test!(non_empty_title, *body, false));
+            }
+        }
+
+        test_cases
+    }
+
+
+
+
+    #[derive(Debug)]
+    struct Test {
+        id:            FileId,
+        file_name:     String,
+        file_body:     String,
+        empty_unnamed: bool,
+    }
+
+    #[test]
+    fn test_empty_unnamed_files() {
+        let empty_titles = [
+            "Untitled",
+            "untitled",
+            "Untitled - 1",
+            "Untitled (2)",
+            "2026-01-01",
+            "2026-01-01 ",
+            "2026-01-01 - 00_00_00",
+            "2026-01-01 - 00",
+            "2026",
+            "1",
+            "___ ---",
+        ]
+            .map(|f| format!("{f}.md"))
+        ;
+
+        let non_empty_titles = [
+            "Untitledtropolis",
+            "Untitled-thingy",
+            "2026-01-01 - 00_00_00 - titled",
+            "2026-01-01 - titled",
+            "2026-01-01 titled",
+            "2026-01 there are rats in my basement",
+            "dorktastic",
+        ]
+            .map(|f| format!("{f}.md"))
+        ;
+
+        let non_empty_bodies = [
+            "---\n\n---\n",
+            ".",
+        ];
+
+        let test_cases = build_empty_unnamed_test_cases(&empty_titles, &non_empty_titles, &non_empty_bodies);
+
+        let files: HashMap<FileId, MdFile> = test_cases
+            .iter()
+            .map      (|t| (t.id.clone(), MdFile::test_parse(t.id.clone(), t.file_name.clone(), t.file_body.clone())))
+            .collect  ()
+        ;
+
+        let vault = Index {
+            md_files:    files,
+            subscribers: vec![],
+            path:        PathBuf::new()
+        };
+
+        let empty_unamed: Vec<_> = vault.get_empty_unnamed_files().collect();
+
+        println!("{empty_unamed:?}");
+
+        for file in test_cases {
+
+            println!("{file:?}");
+
+            assert_eq!(empty_unamed.contains(&&file.id), file.empty_unnamed)
+        }
+
+    }
+
 }

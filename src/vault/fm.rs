@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,13 +12,11 @@ pub enum FmProperty {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum FmType {
     Info,
     Action,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum FmAction {
     WaitingFor,
     Calendar,
@@ -26,7 +25,6 @@ pub enum FmAction {
     Project,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum FmStatus {
     Completed,
     Complete,

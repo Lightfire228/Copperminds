@@ -14,6 +14,9 @@ pub struct RawFile {
 
     pub md_text:          String,
     pub fm_text:          String,
+
+    /// this tracks if the file is empty or whitespace, before parsing the frontmatter fences
+    pub is_empty_raw:     bool,
 }
 
 impl RawFile {
@@ -36,8 +39,14 @@ impl RawFile {
         format!("---\n{}---\n{}", fm_to_text(&fm), self.md_text)
     }
 
-    pub fn is_empty(&self) -> bool {
+    /// if the file's markdown and frontmatter sections are empty
+    pub fn is_empty_parsed(&self) -> bool {
         self.is_md_empty() && self.is_fm_empty()
+    }
+
+    /// if the raw file is empty
+    pub fn is_empty_raw(&self) -> bool {
+        self.is_empty_raw
     }
 
     pub fn is_md_empty(&self) -> bool {
@@ -46,6 +55,8 @@ impl RawFile {
         RE.is_match(&self.md_text)
     }
 
+    /// if the frontmatter section is empty
+    /// NOTE: this does *not* include the --- fences
     pub fn is_fm_empty(&self) -> bool {
         regex!(RE = RE_EMPTY);
 
@@ -61,7 +72,6 @@ impl RawFile {
         get_val_by_name(fm, property)
     }
 
-    #[allow(unused)]
     pub fn get_property_as_list(&self, property: &str) -> Result<Vec<String>, PropertyListError> {
         let fm = self.frontmatter.as_ref().ok_or(PropertyListError::PropertyNotFound)?;
 
@@ -93,13 +103,17 @@ impl RawFile {
 }
 
 fn parse_md_file(text: String) -> RawFile {
+    regex!(RE = RE_EMPTY);
 
+
+    let is_empty = RE.is_match(&text);
 
     let blank = |text: String| {
         RawFile {
             frontmatter: None,
             md_text:     text.clone(),
             fm_text:     String::new(),
+            is_empty_raw: is_empty,
         }
     };
 
@@ -118,6 +132,7 @@ fn parse_md_file(text: String) -> RawFile {
         frontmatter: Some(fm),
         md_text:     parsed.body,
         fm_text:     parsed.fm,
+        is_empty_raw: is_empty,
     }
 }
 
@@ -322,17 +337,19 @@ mod tests {
         let not_empty_01 = format!("{}.{}", empty, empty);
         let not_empty_02 = format!("{}-{}", empty, empty);
         let not_empty_03 = format!("{}a{}", empty, empty);
+        let not_empty_04 = format!("{}{}.", empty, empty);
 
         let tests = vec![
             (empty,        true),
             (not_empty_01, false),
             (not_empty_02, false),
             (not_empty_03, false),
+            (not_empty_04, false),
         ];
 
         for (text, val) in tests {
             let parsed = parse_md_file(text);
-            assert_eq!(parsed.is_empty(), val);
+            assert_eq!(parsed.is_empty_parsed(), val);
         }
     }
 
