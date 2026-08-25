@@ -1,9 +1,11 @@
+use file_id::FileId;
 use iced::Length::Fill;
 use iced::keyboard;
 use tokio::sync::mpsc::Sender;
 use iced::{Element, Task, keyboard::Key, widget::container};
 use iced::widget::{column, row, text};
 
+use crate::ui::components::file_list::{self, FileList};
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCommand, VaultUpdate};
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
@@ -13,10 +15,11 @@ use crate::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct SortQueue {
-    pub vault:        Sender<VaultCommand>,
-    pub queue_type:   QueueType,
-    pub files:        Vec<FileView>,
-    pub index:        usize,
+    vault:        Sender<VaultCommand>,
+    queue_type:   QueueType,
+    index:        usize,
+
+    file_list:    FileList,
 }
 
 macro_rules! table {
@@ -53,14 +56,20 @@ static NEEDS_ACTION: &'static [MenuAction] = &table!(
 impl SortQueue {
 
     pub fn new(queue_type: QueueType, vault: Sender<VaultCommand>) -> (Self, Task<Message>) {
+
+        let (list_state, list_task) = FileList::new();
+
         (
             Self {
                 queue_type,
-                vault: vault.clone(),
-                files: Vec::new(),
-                index: 0,
+                vault:     vault.clone(),
+                index:     0,
+                file_list: list_state,
             },
-            Task::perform(load_files(vault, queue_type), Message::LoadFiles)
+            Task::batch([
+                Task::perform(load_files(vault, queue_type), Message::LoadFiles),
+                list_task.map(|_| Message::None),
+            ])
 
         )
     }
@@ -87,22 +96,7 @@ impl SortQueue {
                     .width  (300)
                     .padding(10)
                 ,
-                container(
-                    column(self
-                        .files
-                        .iter     ()
-                        .enumerate()
-                        .map      (|(i, f)| {
-                            let x = if i == self.index { "> " } else { "" };
-
-                            text!("{}{}", x, f.name)
-                                .wrapping(text::Wrapping::None)
-                                .into()
-                        })
-                    )
-                )
-                    .width  (Fill)
-                    .padding(10)
+                self.file_list.view().map(Message::FileList),
             ]
             .spacing(40)
         )
@@ -113,26 +107,19 @@ impl SortQueue {
     pub fn update(&mut self, message: Message) -> Action {
 
         match message {
-            Message::MoveCursorUp   => {
-                if self.index > 0 {
-                    self.index -= 1;
-                }
+            Message::FileList(message) => {
+                let action = self.file_list.update(message);
+                self.handle_file_list_action(action)
+            }            ,
+            Message::LoadFiles(files) => {
+                let message = file_list::Message::Files(files);
 
-                self.open_obsidian()
-            },
-            Message::MoveCursorDown => {
-                self.index += 1;
-
-                self.open_obsidian()
-            },
+                let action = self.file_list.update(message);
+                self.handle_file_list_action(action)
+            }
             Message::None         => Action::None,
             Message::NavigateBack => Action::NavigateBack,
 
-            Message::LoadFiles(files) => {
-                self.files = files;
-
-                Action::None
-            },
             Message::VaultAction(action) => Action::Run(self.handle_vault_action(action)),
             Message::VaultUpdate(update) => Action::Run(
 
@@ -147,6 +134,13 @@ impl SortQueue {
         }
     }
 
+    fn handle_file_list_action(&mut self, action: file_list::Action) -> Action {
+        match action {
+            file_list::Action::None               => Action::None,
+            file_list::Action::OpenInObsidian(id) => self.open_obsidian(id),
+        }
+    }
+
     pub fn handle_key_event(&self, key: Key) -> Message {
 
         type N = keyboard::key::Named;
@@ -155,9 +149,6 @@ impl SortQueue {
         match key {
             Key::Named(N::ArrowLeft)   |
             Key::Named(N::Escape)      => Message::NavigateBack,
-
-            Key::Named(N::ArrowUp)     => Message::MoveCursorUp,
-            Key::Named(N::ArrowDown)   => Message::MoveCursorDown,
 
             Key::Character(key) => {
                 let list = match self.queue_type {
@@ -173,8 +164,9 @@ impl SortQueue {
 
                 Message::VaultAction(action.action)
             },
-            _ => Message::None
+            _ => self.file_list.handle_key_event(key).into()
         }
+
     }
 
     fn handle_vault_action(&mut self, action: VaultAction) -> Task<Message> {
@@ -182,7 +174,15 @@ impl SortQueue {
         let tx = self.vault.clone();
         let (prop, value) = action.get_value();
 
-        let id = self.files[self.index].id;
+        let id = self
+            .file_list
+            .get_selected()
+            .map(|f| f.id)
+        ;
+
+        let Some(id) = id else {
+            return Task::none();
+        };
 
         Task::future(async move {
 
@@ -202,13 +202,8 @@ impl SortQueue {
     }
 
 
-    fn open_obsidian(&self) -> Action {
+    fn open_obsidian(&self, id: FileId) -> Action {
 
-        let Some(file) = self.files.get(self.index) else {
-            return Action::None;
-        };
-
-        let id = file.id;
         let tx = self.vault.clone();
 
         let cmd = OpenInObsidian {
@@ -233,6 +228,7 @@ impl From<SortQueue> for UIMode {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct MenuAction {
     pub key:     &'static str,
@@ -257,9 +253,9 @@ pub enum VaultAction {
 #[derive(Debug)]
 pub enum Message {
     None,
+    FileList (file_list::Message),
+
     LoadFiles(Vec<FileView>),
-    MoveCursorUp,
-    MoveCursorDown,
     NavigateBack,
     VaultAction(VaultAction),
     VaultUpdate(VaultUpdate),
@@ -276,6 +272,12 @@ pub enum Action {
 impl From<Message> for ui::Message {
     fn from(val: Message) -> Self {
         ui::Message::SortQueue(val)
+    }
+}
+
+impl Into<Message> for file_list::Message {
+    fn into(self) -> Message {
+        Message::FileList(self)
     }
 }
 

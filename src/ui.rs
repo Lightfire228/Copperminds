@@ -7,7 +7,6 @@ use std::hash::Hash;
 
 use iced::keyboard::{Event};
 use iced::{Element, Font, Subscription, Theme, application};
-use iced::Task;
 use tokio::sync::mpsc::{Sender};
 use tokio::sync::oneshot;
 
@@ -19,6 +18,8 @@ use crate::prelude::*;
 
 use std::mem;
 
+
+type Task = iced::Task<Message>;
 
 pub fn main(tx: Sender<VaultCommand>) {
     info!("iced ui");
@@ -70,7 +71,7 @@ enum UIMode {
 
 
 impl App {
-    fn new(tx: Sender<VaultCommand>) -> (Self, Task<Message>) {(
+    fn new(tx: Sender<VaultCommand>) -> (Self, Task) {(
 
         Self {
             vault:   tx,
@@ -80,7 +81,7 @@ impl App {
 
     )}
 
-    fn on_startup() -> Task<Message> {
+    fn on_startup() -> Task {
         Task::none()
     }
 
@@ -113,65 +114,79 @@ impl App {
     }
 
 
-    fn update(&mut self, message: Message) -> Task<Message> {
+    fn update(&mut self, message: Message) -> Task {
+
+        use iced::Event::Keyboard;
 
         match message {
-            Message::Event(iced::Event::Keyboard(event)) => {
+            Message::Event(Keyboard(event)) => {
                 let message = self.handle_key_event(event);
 
                 return Task::done(message)
             }
+
             Message::VaultUpdate(message) => {
                 debug!("Recevied vault update {message:?}");
 
-                // TODO: maybe restructure this
+                use sort_queue::Message::VaultUpdate;
+
                 return self.update(match &self.ui_mode {
                     UIMode::SelectQueue(_) => Message::None,
-                    UIMode::SortQueue  (_) => Message::SortQueue(sort_queue::Message::VaultUpdate(message)),
-                })
-            }
-            _ => {}
-        };
-
-        match (&mut self.ui_mode, message) {
-            (_, Message::Event(iced::Event::Keyboard(event))) => {
-                let message = self.handle_key_event(event);
-
-                return Task::done(message)
-            }
-            (_, Message::VaultUpdate(message)) => {
-                debug!("Recevied vault update {message:?}");
-
-                // TODO: maybe restructure this
-                self.update(match &self.ui_mode {
-                    UIMode::SelectQueue(_) => Message::None,
-                    UIMode::SortQueue  (_) => Message::SortQueue(sort_queue::Message::VaultUpdate(message)),
+                    UIMode::SortQueue  (_) => Message::SortQueue(VaultUpdate(message)),
                 })
             },
 
-            (UIMode::SelectQueue(x), Message::SelectQueue(message)) => match x.update(message) {
-                select_queue::Action::None                      => Task::none(),
-                select_queue::Action::QueueSelected(queue_type) => {
-                    let (state, task) = SortQueue::new(queue_type, self.vault.clone());
-
-                    self.ui_mode = state.into();
-
-                    task.map(Message::SortQueue)
-
-                }
-            }
-            (UIMode::SortQueue(x), Message::SortQueue(message)) => match x.update(message) {
-
-                sort_queue::Action::None         => Task::none (),
-                sort_queue::Action::Run(task)    => task.map   (Message::SortQueue),
-                sort_queue::Action::NavigateBack => {
-                    self.ui_mode = SelectQueue::new().into();
-                    Task::none()
-                },
-            }
-            _ => Task::none(),
+            _ => {}
         }
 
+        macro_rules! handle {
+            ( $( ($type:ident, $func:ident), )*$(,)? ) => {
+
+                match (&mut self.ui_mode, message) {$(
+                    (UIMode::$type(component), Message::$type(message)) => {
+                        let action = component.update(message);
+
+                        self.$func(action)
+                    })*
+
+                    _ => Task::none(),
+                }
+            };
+        }
+
+        handle!(
+            (SelectQueue, handle_action_select_queue),
+            (SortQueue,   handle_action_sort_queue),
+        )
+
+    }
+
+    fn handle_action_select_queue(&mut self, action: select_queue::Action) -> Task {
+        type Action = select_queue::Action;
+
+        match action {
+            Action::None                      => Task::none(),
+            Action::QueueSelected(queue_type) => {
+                let (state, task) = SortQueue::new(queue_type, self.vault.clone());
+
+                self.ui_mode = state.into();
+
+                task.map(Message::SortQueue)
+            }
+        }
+    }
+
+    fn handle_action_sort_queue(&mut self, action: sort_queue::Action) -> Task {
+        type Action = sort_queue::Action;
+
+        match action {
+            Action::None         => Task::none (),
+            Action::Run(task)    => task.map   (Message::SortQueue),
+            Action::NavigateBack => {
+                self.ui_mode = SelectQueue::new().into();
+                Task::none()
+            },
+        }
     }
 
     fn handle_key_event(&self, event: Event) -> Message {
@@ -227,7 +242,7 @@ struct VaultSubscriber {
 }
 
 // Subscribers are identified by their data's hash, and their function pointer,
-// but i only need one vault subscriber per app
+// but (my assumption is) i only need one vault subscriber per app
 //
 // this may cause weirdness depending on what iced does with the subscribers on repeated app inits
 impl Hash for VaultSubscriber {

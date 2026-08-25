@@ -15,7 +15,7 @@ pub struct RawFile {
     pub md_text:          String,
     pub fm_text:          String,
 
-    /// this tracks if the file is empty or whitespace, before parsing the frontmatter fences
+    /// this tracks if the file (pre frontmatter processing) is empty or whitespace
     pub is_empty_raw:     bool,
 }
 
@@ -25,10 +25,13 @@ impl RawFile {
         parse_md_file(text)
     }
 
-    pub fn write(&self, path: &Path) {
+    pub fn write(&mut self, path: &Path) {
         let text = self.to_file_text();
 
         fs::write(path, &text).unwrap();
+
+        self.is_empty_raw = is_empty(&text);
+
     }
 
     fn to_file_text(&self) -> String {
@@ -50,17 +53,13 @@ impl RawFile {
     }
 
     pub fn is_md_empty(&self) -> bool {
-        regex!(RE = RE_EMPTY);
-
-        RE.is_match(&self.md_text)
+        is_empty(&self.md_text)
     }
 
     /// if the frontmatter section is empty
     /// NOTE: this does *not* include the --- fences
     pub fn is_fm_empty(&self) -> bool {
-        regex!(RE = RE_EMPTY);
-
-        RE.is_match(&self.fm_text)
+        is_empty(&self.fm_text)
     }
 
 
@@ -110,9 +109,9 @@ fn parse_md_file(text: String) -> RawFile {
 
     let blank = |text: String| {
         RawFile {
-            frontmatter: None,
-            md_text:     text.clone(),
-            fm_text:     String::new(),
+            frontmatter:  None,
+            md_text:      text.clone(),
+            fm_text:      String::new(),
             is_empty_raw: is_empty,
         }
     };
@@ -129,9 +128,9 @@ fn parse_md_file(text: String) -> RawFile {
     };
 
     RawFile {
-        frontmatter: Some(fm),
-        md_text:     parsed.body,
-        fm_text:     parsed.fm,
+        frontmatter:  Some(fm),
+        md_text:      parsed.body,
+        fm_text:      parsed.fm,
         is_empty_raw: is_empty,
     }
 }
@@ -245,6 +244,15 @@ pub enum PropertyListError {
 fn fm_to_text(fm: &Mapping) -> String {
     yaml_serde::to_string(fm).unwrap()
 }
+
+fn is_empty(text: &str) -> bool {
+    regex!(RE = RE_EMPTY);
+
+    RE.is_match(text)
+}
+
+
+
 
 /// The main concern here is avoiding data loss.
 /// Nothing should change the file in any way other than the intended effect

@@ -76,6 +76,7 @@ impl MdFile {
         self.get_property(FmProperty::Type).is_none()
         && !self.path
             .ancestors()
+            // TODO: move this to a config
             .any      (|p| p.ends_with("03 Data"))
     }
 
@@ -132,7 +133,7 @@ impl MdFile {
         *self = Self::new(data);
     }
 
-    pub fn write_file(&self) {
+    pub fn write_file(&mut self) {
         self.raw_file.write(&self.path);
     }
 
@@ -149,9 +150,7 @@ impl MdFile {
 
 impl PartialEq for MdFile {
     fn eq(&self, other: &Self) -> bool {
-        // MAYBE: should probably check if file inodes are the same instead
-        // or otherwise ask the OS to check the paths for me
-        self.path == other.path
+        self.id == other.id
     }
 }
 
