@@ -7,6 +7,8 @@ use crate::ui::{self, QueueType, UIMode};
 #[derive(Debug)]
 pub struct SelectQueue {}
 
+type _Task = iced::Task<Message>;
+
 impl SelectQueue {
 
     pub fn new() -> Self {
@@ -32,20 +34,20 @@ impl SelectQueue {
         }
     }
 
-    pub fn handle_key_event(&self, key: &Key) -> Message {
+    pub fn handle_key_event(&mut self, key: &Key) -> Action {
         let Key::Character(key) = key else {
-            return Message::None;
+            return Action::None;
         };
 
         let queue = match key.as_str() {
             "t" => QueueType::NeedsType,
             "a" => QueueType::NeedsAction,
             _   => {
-                return Message::None;
+                return Action::None;
             }
         };
 
-        Message::QueueSelected(queue)
+        Action::QueueSelected(queue)
     }
 
 }

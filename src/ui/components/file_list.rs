@@ -23,8 +23,6 @@ pub struct FileList {
 pub enum Message {
     None,
     LoadFiles(Files),
-    MoveCursorUp,
-    MoveCursorDown,
 
 }
 
@@ -87,21 +85,6 @@ impl FileList {
 
                 Action::None
             }
-            Message::MoveCursorUp   => {
-                if self.cursor > 0 {
-                    self.cursor -= 1;
-                }
-
-                self.on_selected()
-            },
-            Message::MoveCursorDown => {
-                if self.cursor < self.files.len() -1 {
-                    self.cursor += 1;
-                }
-
-                self.on_selected()
-
-            },
         }
     }
 
@@ -114,15 +97,28 @@ impl FileList {
     }
 
     #[must_use]
-    pub fn handle_key_event(&self, key: &Key) -> Message {
+    pub fn handle_key_event(&mut self, key: &Key) -> Action {
 
         type N = keyboard::key::Named;
 
         match key {
-            Key::Named(N::ArrowUp)     => Message::MoveCursorUp,
-            Key::Named(N::ArrowDown)   => Message::MoveCursorDown,
+            Key::Named(N::ArrowUp)     => {
+                if self.cursor > 0 {
+                    self.cursor -= 1;
+                }
 
-            _ => Message::None
+                self.on_selected()
+            },
+            Key::Named(N::ArrowDown)   => {
+                if self.cursor < self.files.len() -1 {
+                    self.cursor += 1;
+                }
+
+                self.on_selected()
+
+            },
+
+            _ => Action::None
         }
     }
 

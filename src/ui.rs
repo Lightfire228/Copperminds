@@ -53,6 +53,13 @@ enum Message {
     VaultUpdate     (VaultUpdate)
 }
 
+#[derive(Debug)]
+enum Action {
+    None,
+    SelectQueue     (select_queue::Action),
+    SortQueue       (sort_queue  ::Action),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum QueueType {
     NeedsType,
@@ -119,9 +126,9 @@ impl App {
         match message {
             Message::Event(Keyboard(event)) => {
                 trace!("keyboard event {event:?}");
-                let message = self.handle_key_event(event);
+                let action = self.handle_key_event(event);
 
-                return Task::done(message)
+                return self.handle_action(action)
             }
 
             Message::VaultUpdate(message) => {
@@ -139,28 +146,38 @@ impl App {
         }
 
         macro_rules! handle {
-            ( $( ($type:ident, $func:ident), )*$(,)? ) => {
+            ( $($type:ident,)*$(,)? ) => {
 
                 match (&mut self.ui_mode, message) {$(
                     (UIMode::$type(component), Message::$type(message)) => {
                         let t = stringify!($type);
                         debug!("{t} event {message:?}");
 
-                        let action = component.update(message);
+                        Some(Action::$type(component.update(message)))
 
-                        self.$func(action)
                     })*
 
-                    _ => Task::none(),
+                    _ => None,
                 }
             };
         }
 
-        handle!(
-            (SelectQueue, handle_action_select_queue),
-            (SortQueue,   handle_action_sort_queue),
-        )
+        let Some(action) = handle!(
+            SelectQueue,
+            SortQueue,
+        ) else {
+            return Task::none()
+        };
 
+        self.handle_action(action)
+    }
+
+    fn handle_action(&mut self, action: Action) -> Task {
+        match action {
+            Action::None                => Task::none(),
+            Action::SelectQueue(action) => self.handle_action_select_queue(action),
+            Action::SortQueue  (action) => self.handle_action_sort_queue  (action),
+        }
     }
 
     fn handle_action_select_queue(&mut self, action: select_queue::Action) -> Task {
@@ -191,16 +208,16 @@ impl App {
         }
     }
 
-    fn handle_key_event(&self, event: Event) -> Message {
+    fn handle_key_event(&mut self, event: Event) -> Action {
 
         let Event::KeyPressed { key, .. } = event else {
-            return Message::None;
+            return Action::None;
         };
 
 
-        match &self.ui_mode {
-            UIMode::SelectQueue(x) => x.handle_key_event(&key).into(),
-            UIMode::SortQueue  (x) => x.handle_key_event( key).into(),
+        match &mut self.ui_mode {
+            UIMode::SelectQueue(x) => Action::SelectQueue(x.handle_key_event(&key)),
+            UIMode::SortQueue  (x) => Action::SortQueue  (x.handle_key_event( key)),
         }
     }
 

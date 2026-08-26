@@ -112,6 +112,8 @@ impl SortQueue {
     pub fn update(&mut self, message: Message) -> Action {
 
         match message {
+            Message::None => Action::None,
+
             Message::FileListMessage(message) => {
                 let action = self.file_list.update(message);
                 self.handle_file_list_action(action)
@@ -126,10 +128,7 @@ impl SortQueue {
                 let action = self.file_list.update(message);
                 self.handle_file_list_action(action)
             }
-            Message::None         => Action::None,
-            Message::NavigateBack => Action::NavigateBack,
 
-            Message::VaultAction(action) => Action::Run(self.handle_vault_action(action)),
             Message::VaultUpdate(update) => Action::Run(
 
                 match update {
@@ -156,13 +155,13 @@ impl SortQueue {
         }
     }
 
-    pub fn handle_key_event(&self, key: Key) -> Message {
+    pub fn handle_key_event(&mut self, key: Key) -> Action {
 
         type N = keyboard::key::Named;
 
         match key {
             Key::Named(N::ArrowLeft)   |
-            Key::Named(N::Escape)      => return Message::NavigateBack,
+            Key::Named(N::Escape)      => return Action::NavigateBack,
 
             Key::Character(ref key) => {
                 let list = match self.queue_type {
@@ -173,7 +172,7 @@ impl SortQueue {
                 let action = list.iter().filter(|a| a.key == key.as_str()).next();
 
                 if let Some(action) = action {
-                    return Message::VaultAction(action.action)
+                    return Action::Run(self.handle_vault_action(action.action))
                 };
 
             },
@@ -181,12 +180,13 @@ impl SortQueue {
         };
 
         match self.file_list.handle_key_event(&key) {
-            file_list::Message::None => {},
+            file_list::Action::None => {},
 
-            action => return action.into(),
+            action => return self.handle_file_list_action(action),
         };
 
-        self.prompt.handle_key_event(key).into()
+        let action = self.prompt.handle_key_event(key);
+        self.handle_prompt_action(action)
 
 
     }
@@ -276,8 +276,6 @@ pub enum Message {
     PromptMessage   (prompt   ::Message),
 
     LoadFiles(Files),
-    NavigateBack,
-    VaultAction(VaultAction),
     VaultUpdate(VaultUpdate),
 }
 
@@ -292,18 +290,6 @@ pub enum Action {
 impl From<Message> for ui::Message {
     fn from(val: Message) -> Self {
         ui::Message::SortQueue(val)
-    }
-}
-
-impl Into<Message> for file_list::Message {
-    fn into(self) -> Message {
-        Message::FileListMessage(self)
-    }
-}
-
-impl Into<Message> for prompt::Message {
-    fn into(self) -> Message {
-        Message::PromptMessage(self)
     }
 }
 

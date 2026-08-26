@@ -11,7 +11,6 @@ use crate::prelude::*;
 
 #[derive(Debug)]
 pub enum Message {
-    Key(SmolStr),
     None,
 }
 
@@ -49,22 +48,21 @@ impl Prompt {
 
         match message {
             Message::None          => Action::None,
-            Message::Key(smol_str) => {
-                self.text.push_str(smol_str.as_str());
-
-                Action::None
-            },
         }
     }
 
     #[must_use]
-    pub fn handle_key_event(&self, key: Key) -> Message {
+    pub fn handle_key_event(&mut self, key: Key) -> Action {
         trace!("prompt key: {key:?}");
 
         match key {
-            Key::Character(ch) => Message::Key(ch),
+            Key::Character(ch) => {
+                self.text.push_str(ch.as_str());
 
-            _ => Message::None
+                Action::None
+            },
+
+            _ => Action::None
         }
 
     }
