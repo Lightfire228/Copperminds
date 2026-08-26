@@ -55,7 +55,6 @@ enum Message {
 
 #[derive(Debug)]
 enum Action {
-    None,
     SelectQueue     (select_queue::Action),
     SortQueue       (sort_queue  ::Action),
 }
@@ -128,6 +127,10 @@ impl App {
                 trace!("keyboard event {event:?}");
                 let action = self.handle_key_event(event);
 
+                let Some(action) = action else {
+                    return Task::none();
+                };
+
                 return self.handle_action(action)
             }
 
@@ -153,7 +156,9 @@ impl App {
                         let t = stringify!($type);
                         debug!("{t} event {message:?}");
 
-                        Some(Action::$type(component.update(message)))
+                        let action = component.update(message);
+
+                        action.map(Action::$type)
 
                     })*
 
@@ -174,7 +179,6 @@ impl App {
 
     fn handle_action(&mut self, action: Action) -> Task {
         match action {
-            Action::None                => Task::none(),
             Action::SelectQueue(action) => self.handle_action_select_queue(action),
             Action::SortQueue  (action) => self.handle_action_sort_queue  (action),
         }
@@ -184,7 +188,6 @@ impl App {
         type Action = select_queue::Action;
 
         match action {
-            Action::None                      => Task::none(),
             Action::QueueSelected(queue_type) => {
                 let (state, task) = SortQueue::new(queue_type, self.vault.clone());
 
@@ -199,7 +202,6 @@ impl App {
         type Action = sort_queue::Action;
 
         match action {
-            Action::None         => Task::none (),
             Action::Run(task)    => task.map   (Message::SortQueue),
             Action::NavigateBack => {
                 self.ui_mode = SelectQueue::new().into();
@@ -208,17 +210,17 @@ impl App {
         }
     }
 
-    fn handle_key_event(&mut self, event: Event) -> Action {
+    fn handle_key_event(&mut self, event: Event) -> Option<Action> {
 
         let Event::KeyPressed { key, .. } = event else {
-            return Action::None;
+            return None;
         };
 
 
-        match &mut self.ui_mode {
-            UIMode::SelectQueue(x) => Action::SelectQueue(x.handle_key_event(&key)),
-            UIMode::SortQueue  (x) => Action::SortQueue  (x.handle_key_event( key)),
-        }
+        Some(match &mut self.ui_mode {
+            UIMode::SelectQueue(x) => Action::SelectQueue(x.handle_key_event(&key)?),
+            UIMode::SortQueue  (x) => Action::SortQueue  (x.handle_key_event( key)?),
+        })
     }
 
     fn view(&self) -> Element<'_, Message> {

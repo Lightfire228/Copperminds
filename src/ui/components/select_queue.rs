@@ -27,27 +27,25 @@ impl SelectQueue {
             .into()
     }
 
-    pub fn update(&mut self, message: Message) -> Action {
+    pub fn update(&mut self, message: Message) -> Option<Action> {
         match message {
-            Message::None                      => Action::None,
-            Message::QueueSelected(queue_type) => Action::QueueSelected(queue_type),
         }
     }
 
-    pub fn handle_key_event(&mut self, key: &Key) -> Action {
+    pub fn handle_key_event(&mut self, key: &Key) -> Option<Action> {
         let Key::Character(key) = key else {
-            return Action::None;
+            return None;
         };
 
         let queue = match key.as_str() {
             "t" => QueueType::NeedsType,
             "a" => QueueType::NeedsAction,
             _   => {
-                return Action::None;
+                return None;
             }
         };
 
-        Action::QueueSelected(queue)
+        Some(Action::QueueSelected(queue))
     }
 
 }
@@ -61,13 +59,10 @@ impl From<SelectQueue> for UIMode {
 
 #[derive(Debug)]
 pub enum Message {
-    None,
-    QueueSelected(QueueType)
 }
 
 #[derive(Debug)]
 pub enum Action {
-    None,
     QueueSelected(QueueType)
 }
 

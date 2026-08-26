@@ -17,7 +17,6 @@ pub enum Message {
 
 #[derive(Debug)]
 pub enum Action {
-    None,
 }
 
 
@@ -44,25 +43,25 @@ impl Prompt {
     }
 
     #[must_use]
-    pub fn update(&mut self, message: Message) -> Action {
+    pub fn update(&mut self, message: Message) -> Option<Action> {
 
         match message {
-            Message::None          => Action::None,
+            Message::None => None,
         }
     }
 
     #[must_use]
-    pub fn handle_key_event(&mut self, key: Key) -> Action {
+    pub fn handle_key_event(&mut self, key: Key) -> Option<Action> {
         trace!("prompt key: {key:?}");
 
         match key {
             Key::Character(ch) => {
                 self.text.push_str(ch.as_str());
 
-                Action::None
+                None
             },
 
-            _ => Action::None
+            _ => None
         }
 
     }

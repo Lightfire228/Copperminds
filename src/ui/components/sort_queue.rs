@@ -109,24 +109,20 @@ impl SortQueue {
     }
 
     #[must_use]
-    pub fn update(&mut self, message: Message) -> Action {
+    pub fn update(&mut self, message: Message) -> Option<Action> {
 
-        match message {
-            Message::None => Action::None,
+        Some(match message {
+            Message::None => None?,
 
             Message::FileListMessage(message) => {
-                let action = self.file_list.update(message);
-                self.handle_file_list_action(action)
-            }
-            Message::PromptMessage(message) => {
-                let action = self.prompt.update(message);
-                self.handle_prompt_action(action)
+                let action = self.file_list.update(message)?;
+                self.handle_file_list_action(action)?
             }
             Message::LoadFiles(files) => {
                 let message = file_list::Message::LoadFiles(files.into());
 
-                let action = self.file_list.update(message);
-                self.handle_file_list_action(action)
+                let action = self.file_list.update(message)?;
+                self.handle_file_list_action(action)?
             }
 
             Message::VaultUpdate(update) => Action::Run(
@@ -138,30 +134,27 @@ impl SortQueue {
                     ),
                 }
             ),
-
-        }
+        })
     }
 
-    fn handle_file_list_action(&mut self, action: file_list::Action) -> Action {
-        match action {
-            file_list::Action::None         => Action::None,
+    fn handle_file_list_action(&mut self, action: file_list::Action) -> Option<Action> {
+        Some(match action {
             file_list::Action::Selected(id) => self.open_obsidian(id),
-        }
+        })
     }
 
-    fn handle_prompt_action(&mut self, action: prompt::Action) -> Action {
+    fn handle_prompt_action(&mut self, action: prompt::Action) -> Option<Action> {
         match action {
-            prompt::Action::None => Action::None,
         }
     }
 
-    pub fn handle_key_event(&mut self, key: Key) -> Action {
+    pub fn handle_key_event(&mut self, key: Key) -> Option<Action> {
 
         type N = keyboard::key::Named;
 
         match key {
             Key::Named(N::ArrowLeft)   |
-            Key::Named(N::Escape)      => return Action::NavigateBack,
+            Key::Named(N::Escape)      => return Some(Action::NavigateBack),
 
             Key::Character(ref key) => {
                 let list = match self.queue_type {
@@ -172,21 +165,19 @@ impl SortQueue {
                 let action = list.iter().filter(|a| a.key == key.as_str()).next();
 
                 if let Some(action) = action {
-                    return Action::Run(self.handle_vault_action(action.action))
+                    return Some(Action::Run(self.handle_vault_action(action.action)))
                 };
 
             },
             _ => {}
         };
 
-        match self.file_list.handle_key_event(&key) {
-            file_list::Action::None => {},
-
-            action => return self.handle_file_list_action(action),
-        };
+        if let Some(action) = self.file_list.handle_key_event(&key) {
+            return self.handle_file_list_action(action);
+        }
 
         let action = self.prompt.handle_key_event(key);
-        self.handle_prompt_action(action)
+        self.handle_prompt_action(action?)
 
 
     }
@@ -273,7 +264,6 @@ pub enum VaultAction {
 pub enum Message {
     None,
     FileListMessage (file_list::Message),
-    PromptMessage   (prompt   ::Message),
 
     LoadFiles(Files),
     VaultUpdate(VaultUpdate),
@@ -282,7 +272,6 @@ pub enum Message {
 
 #[derive(Debug)]
 pub enum Action {
-    None,
     Run(Task<Message>),
     NavigateBack,
 }

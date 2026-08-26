@@ -21,7 +21,6 @@ pub struct FileList {
 
 #[derive(Debug)]
 pub enum Message {
-    None,
     LoadFiles(Files),
 
 }
@@ -29,11 +28,10 @@ pub enum Message {
 
 #[derive(Debug)]
 pub enum Action {
-    None,
     Selected(FileId)
 }
 
-type Task = iced::Task<Message>;
+type _Task = iced::Task<Message>;
 
 impl FileList {
 
@@ -76,28 +74,26 @@ impl FileList {
     }
 
     #[must_use]
-    pub fn update(&mut self, message: Message) -> Action {
+    pub fn update(&mut self, message: Message) -> Option<Action> {
 
         match message {
-            Message::None         => Action::None,
             Message::LoadFiles(files) => {
                 self.files = files.into();
 
-                Action::None
+                None
             }
         }
     }
 
-    fn on_selected(&self) -> Action {
+    fn on_selected(&self) -> Option<Action> {
         self
             .get_selected()
-            .map      (|f| Action::Selected(f.id))
-            .unwrap_or(    Action::None)
+            .map         (|f| Action::Selected(f.id))
 
     }
 
     #[must_use]
-    pub fn handle_key_event(&mut self, key: &Key) -> Action {
+    pub fn handle_key_event(&mut self, key: &Key) -> Option<Action> {
 
         type N = keyboard::key::Named;
 
@@ -118,7 +114,7 @@ impl FileList {
 
             },
 
-            _ => Action::None
+            _ => None
         }
     }
 
