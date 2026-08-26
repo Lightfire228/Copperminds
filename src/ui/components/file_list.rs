@@ -7,6 +7,7 @@ use iced::widget::text_input::cursor;
 use iced::{Element, keyboard::Key, widget::container};
 use iced::widget::{column, row, text};
 
+use crate::collections::Files;
 use crate::prelude::*;
 use crate::vault::md_file::FileView;
 
@@ -21,7 +22,7 @@ pub struct FileList {
 #[derive(Debug)]
 pub enum Message {
     None,
-    Files(Vec<FileView>),
+    LoadFiles(Files),
     MoveCursorUp,
     MoveCursorDown,
 
@@ -31,22 +32,18 @@ pub enum Message {
 #[derive(Debug)]
 pub enum Action {
     None,
-    OpenInObsidian(FileId)
+    Selected(FileId)
 }
 
 type Task = iced::Task<Message>;
 
 impl FileList {
 
-    pub fn new() -> (Self, Task) {
-        (
-            Self {
-                files:  vec![],
-                cursor: 0,
-            },
-            Task::none(),
-
-        )
+    pub fn new() -> Self {
+        Self {
+            files:  vec![],
+            cursor: 0,
+        }
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -67,12 +64,14 @@ impl FileList {
         ;
 
         row![
-            column(cursors),
+            container(column(cursors))
+                .padding([10, 0])
+            ,
             container(
                 column(files)
             )
                 .width  (Fill)
-                .padding(10)
+                .padding([10, 0])
         ]
             .into()
 
@@ -83,8 +82,8 @@ impl FileList {
 
         match message {
             Message::None         => Action::None,
-            Message::Files(files) => {
-                self.files = files;
+            Message::LoadFiles(files) => {
+                self.files = files.into();
 
                 Action::None
             }
@@ -93,29 +92,29 @@ impl FileList {
                     self.cursor -= 1;
                 }
 
-                self.open_in_obsidian()
+                self.on_selected()
             },
             Message::MoveCursorDown => {
                 if self.cursor < self.files.len() -1 {
                     self.cursor += 1;
                 }
 
-                self.open_in_obsidian()
+                self.on_selected()
 
             },
         }
     }
 
-    fn open_in_obsidian(&self) -> Action {
+    fn on_selected(&self) -> Action {
         self
             .get_selected()
-            .map      (|f| Action::OpenInObsidian(f.id))
+            .map      (|f| Action::Selected(f.id))
             .unwrap_or(    Action::None)
 
     }
 
     #[must_use]
-    pub fn handle_key_event(&self, key: Key) -> Message {
+    pub fn handle_key_event(&self, key: &Key) -> Message {
 
         type N = keyboard::key::Named;
 

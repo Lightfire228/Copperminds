@@ -1,11 +1,14 @@
 use file_id::FileId;
-use iced::Length::Fill;
+use iced::Length::{self, Fill};
 use iced::keyboard;
+use tokio::fs::File;
 use tokio::sync::mpsc::Sender;
 use iced::{Element, Task, keyboard::Key, widget::container};
-use iced::widget::{column, row, text};
+use iced::widget::{Space, column, row, space, text};
 
+use crate::collections::Files;
 use crate::ui::components::file_list::{self, FileList};
+use crate::ui::components::prompt::{self, Prompt};
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCommand, VaultUpdate};
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
@@ -17,9 +20,9 @@ use crate::prelude::*;
 pub struct SortQueue {
     vault:        Sender<VaultCommand>,
     queue_type:   QueueType,
-    index:        usize,
 
     file_list:    FileList,
+    prompt:       Prompt,
 }
 
 macro_rules! table {
@@ -56,19 +59,15 @@ static NEEDS_ACTION: &'static [MenuAction] = &table!(
 impl SortQueue {
 
     pub fn new(queue_type: QueueType, vault: Sender<VaultCommand>) -> (Self, Task<Message>) {
-
-        let (list_state, list_task) = FileList::new();
-
         (
             Self {
                 queue_type,
                 vault:     vault.clone(),
-                index:     0,
-                file_list: list_state,
+                file_list: FileList::new(),
+                prompt:    Prompt  ::new(),
             },
             Task::batch([
                 Task::perform(load_files(vault, queue_type), Message::LoadFiles),
-                list_task.map(|_| Message::None),
             ])
 
         )
@@ -91,12 +90,18 @@ impl SortQueue {
                         text!("{}", self.queue_type),
                         text!("==="),
                         column(options),
+
+                        Space::new().height(Fill),
+
+                        text!("==="),
+                        self.prompt.view().map(|_| Message::None)
+
                     ]
                 )
                     .width  (300)
                     .padding(10)
                 ,
-                self.file_list.view().map(Message::FileList),
+                self.file_list.view().map(Message::FileListMessage),
             ]
             .spacing(40)
         )
@@ -107,12 +112,16 @@ impl SortQueue {
     pub fn update(&mut self, message: Message) -> Action {
 
         match message {
-            Message::FileList(message) => {
+            Message::FileListMessage(message) => {
                 let action = self.file_list.update(message);
                 self.handle_file_list_action(action)
-            }            ,
+            }
+            Message::PromptMessage(message) => {
+                let action = self.prompt.update(message);
+                self.handle_prompt_action(action)
+            }
             Message::LoadFiles(files) => {
-                let message = file_list::Message::Files(files);
+                let message = file_list::Message::LoadFiles(files.into());
 
                 let action = self.file_list.update(message);
                 self.handle_file_list_action(action)
@@ -136,8 +145,14 @@ impl SortQueue {
 
     fn handle_file_list_action(&mut self, action: file_list::Action) -> Action {
         match action {
-            file_list::Action::None               => Action::None,
-            file_list::Action::OpenInObsidian(id) => self.open_obsidian(id),
+            file_list::Action::None         => Action::None,
+            file_list::Action::Selected(id) => self.open_obsidian(id),
+        }
+    }
+
+    fn handle_prompt_action(&mut self, action: prompt::Action) -> Action {
+        match action {
+            prompt::Action::None => Action::None,
         }
     }
 
@@ -145,12 +160,11 @@ impl SortQueue {
 
         type N = keyboard::key::Named;
 
-
         match key {
             Key::Named(N::ArrowLeft)   |
-            Key::Named(N::Escape)      => Message::NavigateBack,
+            Key::Named(N::Escape)      => return Message::NavigateBack,
 
-            Key::Character(key) => {
+            Key::Character(ref key) => {
                 let list = match self.queue_type {
                     QueueType::NeedsType   => NEEDS_TYPE,
                     QueueType::NeedsAction => NEEDS_ACTION,
@@ -158,14 +172,22 @@ impl SortQueue {
 
                 let action = list.iter().filter(|a| a.key == key.as_str()).next();
 
-                let Some(action) = action else {
-                    return Message::None;
+                if let Some(action) = action {
+                    return Message::VaultAction(action.action)
                 };
 
-                Message::VaultAction(action.action)
             },
-            _ => self.file_list.handle_key_event(key).into()
-        }
+            _ => {}
+        };
+
+        match self.file_list.handle_key_event(&key) {
+            file_list::Message::None => {},
+
+            action => return action.into(),
+        };
+
+        self.prompt.handle_key_event(key).into()
+
 
     }
 
@@ -187,17 +209,14 @@ impl SortQueue {
         Task::future(async move {
 
             // TODO: this doesn't actually write the changes to disk
-            // i wanna get the file watch in place before then
             send_vault_cmd(&tx, SetProperty {
                 id,
                 prop,
                 value,
             })
                 .await
-            ;
-
-            Message::None
         })
+            .discard()
 
     }
 
@@ -210,12 +229,12 @@ impl SortQueue {
             id,
         };
 
-        Action::Run(
-            Task::future(async move {
-                send_vault_cmd(&tx, cmd).await;
+        let future = async move {
+            send_vault_cmd(&tx, cmd).await;
+        };
 
-                Message::None
-            })
+        Action::Run(
+            Task::future(future).discard()
         )
 
     }
@@ -253,9 +272,10 @@ pub enum VaultAction {
 #[derive(Debug)]
 pub enum Message {
     None,
-    FileList (file_list::Message),
+    FileListMessage (file_list::Message),
+    PromptMessage   (prompt   ::Message),
 
-    LoadFiles(Vec<FileView>),
+    LoadFiles(Files),
     NavigateBack,
     VaultAction(VaultAction),
     VaultUpdate(VaultUpdate),
@@ -277,12 +297,18 @@ impl From<Message> for ui::Message {
 
 impl Into<Message> for file_list::Message {
     fn into(self) -> Message {
-        Message::FileList(self)
+        Message::FileListMessage(self)
+    }
+}
+
+impl Into<Message> for prompt::Message {
+    fn into(self) -> Message {
+        Message::PromptMessage(self)
     }
 }
 
 
-async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Vec<FileView> {
+async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 
     let cmd = match queue {
         QueueType::NeedsType   => |f: &MdFile| f.needs_type(),
@@ -296,6 +322,7 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Vec<FileVi
         }
     )
     .await
+    .into()
 }
 
 

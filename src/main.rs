@@ -1,13 +1,15 @@
+#![allow(unused_imports)]
+
 use copperminds::*;
 
-use pretty_env_logger::formatted_builder;
+use pretty_env_logger::{formatted_builder, formatted_timed_builder};
 
 use crate::{cli::{MenuOption}, vault::ENV};
 
 #[tokio::main]
 async fn main() {
 
-    formatted_builder()
+    formatted_timed_builder()
         .filter_module("",            log::LevelFilter::Warn)
         .filter_module("wgpu_hal",    log::LevelFilter::Off)
         .filter_module("copperminds", log::LevelFilter::Trace)

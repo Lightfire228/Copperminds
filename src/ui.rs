@@ -24,9 +24,6 @@ type Task = iced::Task<Message>;
 pub fn main(tx: Sender<VaultCommand>) {
     info!("iced ui");
 
-    debug!("size of Message: {}", mem::size_of::<Message>());
-
-
 
     application(
         move || App::new(tx.clone()),
@@ -35,8 +32,8 @@ pub fn main(tx: Sender<VaultCommand>) {
     )
         .theme       (Theme::Dark)
         .title       (App  ::title)
-        .subscription(App::subscription)
-        .default_font(Font::MONOSPACE)
+        .subscription(App  ::subscription)
+        .default_font(Font ::MONOSPACE)
         .run         ()
         .unwrap      ()
     ;
@@ -116,17 +113,19 @@ impl App {
 
     fn update(&mut self, message: Message) -> Task {
 
+
         use iced::Event::Keyboard;
 
         match message {
             Message::Event(Keyboard(event)) => {
+                trace!("keyboard event {event:?}");
                 let message = self.handle_key_event(event);
 
                 return Task::done(message)
             }
 
             Message::VaultUpdate(message) => {
-                debug!("Recevied vault update {message:?}");
+                debug!("vault update event {message:?}");
 
                 use sort_queue::Message::VaultUpdate;
 
@@ -144,6 +143,9 @@ impl App {
 
                 match (&mut self.ui_mode, message) {$(
                     (UIMode::$type(component), Message::$type(message)) => {
+                        let t = stringify!($type);
+                        debug!("{t} event {message:?}");
+
                         let action = component.update(message);
 
                         self.$func(action)
@@ -197,8 +199,8 @@ impl App {
 
 
         match &self.ui_mode {
-            UIMode::SelectQueue(x) => x.handle_key_event(key).into(),
-            UIMode::SortQueue  (x) => x.handle_key_event(key).into(),
+            UIMode::SelectQueue(x) => x.handle_key_event(&key).into(),
+            UIMode::SortQueue  (x) => x.handle_key_event( key).into(),
         }
     }
 
@@ -208,7 +210,6 @@ impl App {
             UIMode::SelectQueue(x) => x.view().map(Message::SelectQueue),
             UIMode::SortQueue  (x) => x.view().map(Message::SortQueue),
         }
-
     }
 }
 

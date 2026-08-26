@@ -32,7 +32,7 @@ impl SelectQueue {
         }
     }
 
-    pub fn handle_key_event(&self, key: Key) -> Message {
+    pub fn handle_key_event(&self, key: &Key) -> Message {
         let Key::Character(key) = key else {
             return Message::None;
         };

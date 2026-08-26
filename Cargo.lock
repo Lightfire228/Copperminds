@@ -540,6 +540,7 @@ dependencies = [
  "async-stdin",
  "chrono",
  "enum_ext",
+ "env_logger",
  "file-id",
  "fs_extra",
  "futures",
