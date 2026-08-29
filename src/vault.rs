@@ -13,6 +13,7 @@ use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};
 use std::{collections::HashMap, env, mem, path::{Path, PathBuf}, usize};
+use crate::prelude::*;
 
 use tokio::{select, sync::mpsc::{self, Sender, channel}};
 use walkdir::{DirEntry, WalkDir};
@@ -98,6 +99,18 @@ impl Index {
         }
     }
 
+    pub fn delete_file(&mut self, id: FileId) {
+
+        let file = self.get_file(id);
+
+        warn!("Deleting file: {}", file.file_name);
+
+        let path = &self.md_files[&id].path;
+
+        trash::delete(path).unwrap();
+        self.md_files.remove(&id);
+    }
+
     fn get_empty_unnamed_files(&self) -> impl Iterator<Item = &FileId> {
         self
             .iter_files()
@@ -150,21 +163,17 @@ impl Index {
             };
         }
 
+        // TODO: write races
         match command {
             VaultCommand::IterFilesWith(filter, resp) => send!(resp =>
                 self.iter_files_with_cmd(filter.filter)
-            ),
-
-            VaultCommand::SetProperty(prop, resp) => send!(resp =>
-                self
-                    .get_file_mut(prop.id)
-                    .set_property(prop.prop, prop.value)
             ),
 
             VaultCommand::OpenInObsidian(opts, resp) => send!(resp => {
                 let file = &self.md_files[&opts.id];
 
                 obsidian::open_in_obsidian(file);
+
             }),
             VaultCommand::Register(_, resp) => send!(resp => {
                 let (tx, rx) = channel(1000);
@@ -172,7 +181,19 @@ impl Index {
                 self.subscribers.push(tx);
 
                 rx
-            })
+            }),
+
+            VaultCommand::SetProperty(prop, resp) => send!(resp => {
+
+                let file = self.get_file_mut(prop.id);
+
+                file.set_property(prop.prop, prop.value);
+                file.write_file();
+
+            }),
+            VaultCommand::DeleteFile(opts, resp) => send!(resp => {
+                self.delete_file(opts.id);
+            }),
 
         }
     }
@@ -467,7 +488,7 @@ mod tests {
         let vault = Index {
             md_files:    files,
             subscribers: vec![],
-            path:        PathBuf::new()
+            path:        PathBuf::new(),
         };
 
         let empty_unamed: Vec<_> = vault.get_empty_unnamed_files().collect();

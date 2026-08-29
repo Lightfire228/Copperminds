@@ -236,8 +236,9 @@ impl App {
 async fn send_vault_cmd<T>(vault: &Sender<VaultCommand>, cmd: impl Cmd<T>) -> T {
     let (tx, rx) = oneshot::channel();
 
+
     vault
-        .send(cmd.to_command(tx))
+        .send(dbg!(cmd.to_command(tx)))
         .await
         .unwrap()
     ;

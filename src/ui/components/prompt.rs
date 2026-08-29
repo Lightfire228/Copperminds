@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 
 use anyhow::Ok as _;
 
+use file_id::FileId;
 use iced::Length::Fill;
 use iced::keyboard;
 use iced::{Element, keyboard::Key, widget::container};
@@ -24,7 +25,8 @@ pub enum Message {
 
 #[derive(Debug)]
 pub enum Action {
-    RunCommand(Vec<Command>)
+    // RunCommand(Vec<Command>)
+    RunCommand(Command)
 }
 
 
@@ -82,6 +84,7 @@ impl Prompt {
                 None?
             }
             Key::Named(Named::Enter) => {
+
                 let commands = self.parse_commands()
                     .inspect_err(|err| warn!("Unable to parse commands: {err}"))
                     .ok()?
@@ -96,7 +99,11 @@ impl Prompt {
                     None?
                 }
 
-                Action::RunCommand(commands)
+                if commands.len() > 1 {
+                    error!("multiple commands not yet supported")
+                }
+
+                Action::RunCommand(commands[0])
             }
             Key::Character(ch) => {
 
@@ -195,6 +202,7 @@ pub enum Command {
     SetStatusArchived,
     DeleteFile,
 }
+
 
 #[derive(Debug)]
 pub struct MenuCommand {

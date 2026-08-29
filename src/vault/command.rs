@@ -7,10 +7,23 @@ use crate::vault::{fm::FmProperty, md_file::{FileView, MdFile}};
 #[derive(Debug)]
 pub enum VaultCommand {
     IterFilesWith (IterFilesWith,  Responder<Vec<FileView>>),
-    SetProperty   (SetProperty,    Responder<()>),
     OpenInObsidian(OpenInObsidian, Responder<()>),
-    Register      (Register,       Responder<Subscriber<VaultUpdate>>)
+    Register      (Register,       Responder<Subscriber<VaultUpdate>>),
+
+    SetProperty   (SetProperty,    Responder<()>),
+    DeleteFile    (DeleteFile,     Responder<()>),
 }
+
+#[derive(Debug)]
+pub enum VaultCommandOpts {
+    IterFilesWith (IterFilesWith),
+    OpenInObsidian(OpenInObsidian),
+    Register      (Register),
+
+    SetProperty   (SetProperty),
+    DeleteFile    (DeleteFile),
+}
+
 
 
 pub type Responder <T> = oneshot::Sender<T>;
@@ -30,6 +43,11 @@ pub struct SetProperty {
     pub id:     FileId,
     pub prop:   FmProperty,
     pub value:  String,
+}
+
+#[derive(Debug)]
+pub struct DeleteFile {
+    pub id: FileId,
 }
 
 #[derive(Debug)]
@@ -58,9 +76,10 @@ macro_rules! to_command {
 }
 
 to_command!(IterFilesWith,  Vec<FileView>);
-to_command!(SetProperty,    ());
 to_command!(OpenInObsidian, ());
 to_command!(Register,       Subscriber<VaultUpdate>);
+to_command!(SetProperty,    ());
+to_command!(DeleteFile,     ());
 
 impl<T> Cmd<T> for VaultCommand {
     fn to_command(self, _: Responder<T>) -> VaultCommand {

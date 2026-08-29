@@ -11,7 +11,7 @@ use crate::ui::components::file_list::{self, FileList};
 use crate::ui::components::prompt::{self, COMMANDS, Command, Prompt};
 use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
-use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCommand, VaultUpdate};
+use crate::vault::command::{Cmd, DeleteFile, IterFilesWith, OpenInObsidian, SetProperty, VaultCommand, VaultUpdate};
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
 use crate::vault::md_file::{FileView, MdFile};
 
@@ -113,10 +113,7 @@ impl SortQueue {
 
     fn handle_prompt_action(&mut self, action: prompt::Action) -> Option<Action> {
         Some(match action {
-            prompt::Action::RunCommand(command) => {
-                warn!("TODO: run {command:?}");
-                None?
-            }
+            prompt::Action::RunCommand(command) => Action::Run(self.handle_vault_action(command))
         })
     }
 
@@ -156,11 +153,9 @@ impl SortQueue {
 
     }
 
-    fn handle_vault_action(&mut self, action: prompt::Command) -> Task<Message> {
+    fn handle_vault_action(&mut self, command: prompt::Command) -> Task<Message> {
 
-        // TODO:
         let tx = self.vault.clone();
-        let (prop, value) = action.set_property();
 
         let id = self
             .file_list
@@ -174,13 +169,11 @@ impl SortQueue {
 
         Task::future(async move {
 
-            // TODO: this doesn't actually write the changes to disk
-            send_vault_cmd(&tx, SetProperty {
-                id,
-                prop,
-                value,
-            })
-                .await
+            // TODO: this is kludgey
+            match vault_command(command, id) {
+                VaultCmd::SetProp(cmd) => send_vault_cmd(&tx, cmd).await,
+                VaultCmd::Delete (cmd) => send_vault_cmd(&tx, cmd).await,
+            }
         })
             .discard()
 
@@ -254,18 +247,47 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
     .into()
 }
 
+fn vault_command(command: Command, id: FileId) -> VaultCmd {
 
-impl Command {
-    fn set_property(&self) -> Option<(FmProperty, String)> {
-        Some(match self {
-            Command::SetTypeInfo           => (FmProperty::Type,   FmType  ::Info        .get_key()),
-            Command::SetActionTodo         => (FmProperty::Action, FmAction::Todo        .get_key()),
-            Command::SetActionWaitingFor   => (FmProperty::Action, FmAction::WaitingFor  .get_key()),
-            Command::SetActionProject      => (FmProperty::Action, FmAction::Project     .get_key()),
-            Command::SetActionMaybeSomeday => (FmProperty::Action, FmAction::MaybeSomeday.get_key()),
-            Command::SetStatusComplete     => (FmProperty::Status, FmStatus::Archived    .get_key()),
-            Command::SetStatusArchived     => (FmProperty::Status, FmStatus::Completed   .get_key()),
-            Command::DeleteFile            => None?,
-        })
+    let set_prop = |prop, value| {
+        SetProperty {
+            id,
+            prop,
+            value,
+        }
+            .into()
+    };
+
+    match command {
+        Command::SetTypeInfo           => set_prop(FmProperty::Type,   FmType  ::Info        .get_key()),
+        Command::SetActionTodo         => set_prop(FmProperty::Action, FmAction::Todo        .get_key()),
+        Command::SetActionWaitingFor   => set_prop(FmProperty::Action, FmAction::WaitingFor  .get_key()),
+        Command::SetActionProject      => set_prop(FmProperty::Action, FmAction::Project     .get_key()),
+        Command::SetActionMaybeSomeday => set_prop(FmProperty::Action, FmAction::MaybeSomeday.get_key()),
+        Command::SetStatusComplete     => set_prop(FmProperty::Status, FmStatus::Completed   .get_key()),
+        Command::SetStatusArchived     => set_prop(FmProperty::Status, FmStatus::Archived    .get_key()),
+        Command::DeleteFile            => DeleteFile {
+            id,
+        }
+            .into()
+    }
+
+}
+
+enum VaultCmd {
+    SetProp(SetProperty),
+    Delete (DeleteFile),
+}
+
+
+impl From<SetProperty> for VaultCmd {
+    fn from(val: SetProperty) -> Self {
+        VaultCmd::SetProp(val)
+    }
+}
+
+impl From<DeleteFile> for VaultCmd {
+    fn from(val: DeleteFile) -> Self {
+        VaultCmd::Delete(val)
     }
 }
