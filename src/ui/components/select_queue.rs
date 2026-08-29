@@ -1,6 +1,7 @@
 use iced::{Element, keyboard::Key, widget::container};
 use iced::widget::{column, text};
 
+use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode};
 
 
@@ -32,8 +33,8 @@ impl SelectQueue {
         }
     }
 
-    pub fn handle_key_event(&mut self, key: &Key) -> Option<Action> {
-        let Key::Character(key) = key else {
+    pub fn handle_key_event(&mut self, key: &KeyPressed) -> Option<Action> {
+        let Key::Character(key) = &key.key else {
             return None;
         };
 

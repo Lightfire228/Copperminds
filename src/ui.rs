@@ -1,5 +1,6 @@
 mod components;
 mod vault_subscription;
+mod key_event;
 
 
 use std::fmt::Display;
@@ -12,6 +13,7 @@ use tokio::sync::oneshot;
 
 use crate::ui::components::select_queue::{self, SelectQueue};
 use crate::ui::components::sort_queue::{self, SortQueue};
+use crate::ui::key_event::KeyPressed;
 use crate::vault::{ENV};
 use crate::vault::command::{Cmd, VaultCommand, VaultUpdate};
 use crate::prelude::*;
@@ -212,14 +214,11 @@ impl App {
 
     fn handle_key_event(&mut self, event: Event) -> Option<Action> {
 
-        let Event::KeyPressed { key, .. } = event else {
-            return None;
-        };
-
+        let key = KeyPressed::try_from(event).ok()?;
 
         Some(match &mut self.ui_mode {
             UIMode::SelectQueue(x) => Action::SelectQueue(x.handle_key_event(&key)?),
-            UIMode::SortQueue  (x) => Action::SortQueue  (x.handle_key_event( key)?),
+            UIMode::SortQueue  (x) => Action::SortQueue  (x.handle_key_event(&key)?),
         })
     }
 

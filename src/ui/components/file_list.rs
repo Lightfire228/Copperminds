@@ -3,12 +3,14 @@ use std::usize;
 use file_id::FileId;
 use iced::Length::Fill;
 use iced::keyboard;
+use iced::widget::text_editor::KeyPress;
 use iced::widget::text_input::cursor;
 use iced::{Element, keyboard::Key, widget::container};
 use iced::widget::{column, row, text};
 
 use crate::collections::Files;
 use crate::prelude::*;
+use crate::ui::key_event::KeyPressed;
 use crate::vault::md_file::FileView;
 
 
@@ -93,11 +95,11 @@ impl FileList {
     }
 
     #[must_use]
-    pub fn handle_key_event(&mut self, key: &Key) -> Option<Action> {
+    pub fn handle_key_event(&mut self, key: &KeyPressed) -> Option<Action> {
 
         type N = keyboard::key::Named;
 
-        match key {
+        match key.key {
             Key::Named(N::ArrowUp)     => {
                 if self.cursor > 0 {
                     self.cursor -= 1;

@@ -8,7 +8,8 @@ use iced::widget::{Space, column, row, space, text};
 
 use crate::collections::Files;
 use crate::ui::components::file_list::{self, FileList};
-use crate::ui::components::prompt::{self, Prompt};
+use crate::ui::components::prompt::{self, COMMANDS, Command, Prompt};
+use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::command::{IterFilesWith, OpenInObsidian, SetProperty, VaultCommand, VaultUpdate};
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
@@ -24,36 +25,6 @@ pub struct SortQueue {
     file_list:    FileList,
     prompt:       Prompt,
 }
-
-macro_rules! table {
-    ($( ($action:ident, $key:literal, $name:literal) ),*$(,)? ) => {[
-
-        $(
-            MenuAction {
-                key:    $key,
-                name:   $name,
-                action: VaultAction::$action
-            },
-        )*
-    ]}
-}
-
-
-static NEEDS_TYPE: &'static [MenuAction] = &table!(
-    (SetTypeInfo,           "i", "type - info"),
-    (SetTypeAction,         "a", "type - action"),
-);
-
-static NEEDS_ACTION: &'static [MenuAction] = &table!(
-    (SetActionTodo,         "t", "action - todo"),
-    (SetActionWaitingFor,   "w", "action - waiting for"),
-    // (SetActionCalendar,     "c", "action - calendar"),
-    (SetActionProject,      "p", "action - project"),
-    (SetActionMaybeSomeday, "m", "action - maybe someday"),
-    (SetTypeInfo,           "i", "type   - info"),
-    (SetStatusComplete,     "c", "status - complete"),
-    (SetStatusArchived,     "a", "status - archived"),
-);
 
 
 impl SortQueue {
@@ -75,12 +46,9 @@ impl SortQueue {
 
     pub fn view(&self) -> Element<'_, Message> {
 
-        let options = match self.queue_type {
-            QueueType::NeedsType   => NEEDS_TYPE,
-            QueueType::NeedsAction => NEEDS_ACTION,
-        }
+        let options = COMMANDS
             .iter()
-            .map (|o| text!("{} - {}", o.key, o.name).into())
+            .map (|o| text!("{} - {}", o.code, o.name).into())
         ;
 
         container(
@@ -144,35 +112,41 @@ impl SortQueue {
     }
 
     fn handle_prompt_action(&mut self, action: prompt::Action) -> Option<Action> {
-        match action {
-        }
+        Some(match action {
+            prompt::Action::RunCommand(command) => {
+                warn!("TODO: run {command:?}");
+                None?
+            }
+        })
     }
 
-    pub fn handle_key_event(&mut self, key: Key) -> Option<Action> {
+    pub fn handle_key_event(&mut self, key: &KeyPressed) -> Option<Action> {
 
         type N = keyboard::key::Named;
 
-        match key {
+
+
+        match key.key {
             Key::Named(N::ArrowLeft)   |
             Key::Named(N::Escape)      => return Some(Action::NavigateBack),
 
-            Key::Character(ref key) => {
-                let list = match self.queue_type {
-                    QueueType::NeedsType   => NEEDS_TYPE,
-                    QueueType::NeedsAction => NEEDS_ACTION,
-                };
+            // Key::Character(ref key) => {
+            //     let list = match self.queue_type {
+            //         QueueType::NeedsType   => NEEDS_TYPE,
+            //         QueueType::NeedsAction => NEEDS_ACTION,
+            //     };
 
-                let action = list.iter().filter(|a| a.key == key.as_str()).next();
+            //     let action = list.iter().filter(|a| a.key == key.as_str()).next();
 
-                if let Some(action) = action {
-                    return Some(Action::Run(self.handle_vault_action(action.action)))
-                };
+            //     if let Some(action) = action {
+            //         return Some(Action::Run(self.handle_vault_action(action.action)))
+            //     };
 
-            },
+            // },
             _ => {}
         };
 
-        if let Some(action) = self.file_list.handle_key_event(&key) {
+        if let Some(action) = self.file_list.handle_key_event(key) {
             return self.handle_file_list_action(action);
         }
 
@@ -182,10 +156,11 @@ impl SortQueue {
 
     }
 
-    fn handle_vault_action(&mut self, action: VaultAction) -> Task<Message> {
+    fn handle_vault_action(&mut self, action: prompt::Command) -> Task<Message> {
 
+        // TODO:
         let tx = self.vault.clone();
-        let (prop, value) = action.get_value();
+        let (prop, value) = action.set_property();
 
         let id = self
             .file_list
@@ -238,27 +213,6 @@ impl From<SortQueue> for UIMode {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
-struct MenuAction {
-    pub key:     &'static str,
-    pub name:    &'static str,
-    pub action:  VaultAction,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum VaultAction {
-    SetTypeInfo,
-    SetTypeAction,
-    SetActionWaitingFor,
-    // SetActionCalendar,
-    SetActionProject,
-    SetActionTodo,
-    SetActionMaybeSomeday,
-    SetStatusComplete,
-    SetStatusArchived,
-}
-
 
 #[derive(Debug)]
 pub enum Message {
@@ -301,17 +255,17 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 }
 
 
-impl VaultAction {
-    fn get_value(&self) -> (FmProperty, String) {
-        match self {
-            VaultAction::SetTypeInfo           => (FmProperty::Type,   FmType  ::Info        .get_key()),
-            VaultAction::SetTypeAction         => (FmProperty::Type,   FmType  ::Action      .get_key()),
-            VaultAction::SetActionWaitingFor   => (FmProperty::Action, FmAction::WaitingFor  .get_key()),
-            VaultAction::SetActionProject      => (FmProperty::Action, FmAction::Project     .get_key()),
-            VaultAction::SetActionTodo         => (FmProperty::Action, FmAction::Todo        .get_key()),
-            VaultAction::SetActionMaybeSomeday => (FmProperty::Action, FmAction::MaybeSomeday.get_key()),
-            VaultAction::SetStatusComplete     => (FmProperty::Status, FmStatus::Completed   .get_key()),
-            VaultAction::SetStatusArchived     => (FmProperty::Status, FmStatus::Archived    .get_key()),
-        }
+impl Command {
+    fn set_property(&self) -> Option<(FmProperty, String)> {
+        Some(match self {
+            Command::SetTypeInfo           => (FmProperty::Type,   FmType  ::Info        .get_key()),
+            Command::SetActionTodo         => (FmProperty::Action, FmAction::Todo        .get_key()),
+            Command::SetActionWaitingFor   => (FmProperty::Action, FmAction::WaitingFor  .get_key()),
+            Command::SetActionProject      => (FmProperty::Action, FmAction::Project     .get_key()),
+            Command::SetActionMaybeSomeday => (FmProperty::Action, FmAction::MaybeSomeday.get_key()),
+            Command::SetStatusComplete     => (FmProperty::Status, FmStatus::Archived    .get_key()),
+            Command::SetStatusArchived     => (FmProperty::Status, FmStatus::Completed   .get_key()),
+            Command::DeleteFile            => None?,
+        })
     }
 }
