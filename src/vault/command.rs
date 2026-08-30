@@ -6,22 +6,12 @@ use crate::vault::{fm::FmProperty, md_file::{FileView, MdFile}};
 // https://tokio.rs/tokio/tutorial/channels
 #[derive(Debug)]
 pub enum VaultCommand {
-    IterFilesWith (IterFilesWith,  Responder<Vec<FileView>>),
-    OpenInObsidian(OpenInObsidian, Responder<()>),
-    Register      (Register,       Responder<Subscriber<VaultUpdate>>),
+    IterFilesWith   (IterFilesWith,    Responder<Vec<FileView>>),
+    OpenInObsidian  (OpenInObsidian,   Responder<()>),
+    Register        (Register,         Responder<Subscriber<VaultUpdate>>),
 
-    SetProperty   (SetProperty,    Responder<()>),
-    DeleteFile    (DeleteFile,     Responder<()>),
-}
-
-#[derive(Debug)]
-pub enum VaultCommandOpts {
-    IterFilesWith (IterFilesWith),
-    OpenInObsidian(OpenInObsidian),
-    Register      (Register),
-
-    SetProperty   (SetProperty),
-    DeleteFile    (DeleteFile),
+    ModifyFile      (ModifyFile,       Responder<Result<(), String>>),
+    DeleteFile      (DeleteFile,       Responder<()>),
 }
 
 
@@ -39,10 +29,9 @@ pub struct IterFilesWith {
 }
 
 #[derive(Debug)]
-pub struct SetProperty {
-    pub id:     FileId,
-    pub prop:   FmProperty,
-    pub value:  String,
+pub struct ModifyFile {
+    pub id:      FileId,
+    pub changes: Vec<ModifyFileKind>,
 }
 
 #[derive(Debug)]
@@ -75,11 +64,11 @@ macro_rules! to_command {
     };
 }
 
-to_command!(IterFilesWith,  Vec<FileView>);
-to_command!(OpenInObsidian, ());
-to_command!(Register,       Subscriber<VaultUpdate>);
-to_command!(SetProperty,    ());
-to_command!(DeleteFile,     ());
+to_command!(IterFilesWith,    Vec<FileView>);
+to_command!(OpenInObsidian,   ());
+to_command!(Register,         Subscriber<VaultUpdate>);
+to_command!(ModifyFile,       Result<(), String>);
+to_command!(DeleteFile,       ());
 
 impl<T> Cmd<T> for VaultCommand {
     fn to_command(self, _: Responder<T>) -> VaultCommand {
@@ -91,4 +80,15 @@ impl<T> Cmd<T> for VaultCommand {
 #[derive(Debug, Clone, Copy)]
 pub enum VaultUpdate {
     Rescan,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ModifyFileKind {
+    SetTypeInfo,
+    SetActionTodo,
+    SetActionWaitingFor,
+    SetActionProject,
+    SetActionMaybeSomeday,
+    SetStatusComplete,
+    SetStatusArchived,
 }

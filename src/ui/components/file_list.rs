@@ -16,8 +16,8 @@ use crate::vault::md_file::FileView;
 
 #[derive(Debug, Clone)]
 pub struct FileList {
-    files:  Vec<FileView>,
-    cursor: usize,
+    files:    Vec<FileView>,
+    cursor:   usize,
 }
 
 
@@ -39,8 +39,8 @@ impl FileList {
 
     pub fn new() -> Self {
         Self {
-            files:  vec![],
-            cursor: 0,
+            files:    vec![],
+            cursor:   0,
         }
     }
 
@@ -82,16 +82,17 @@ impl FileList {
             Message::LoadFiles(files) => {
                 self.files = files.into();
 
+                self.files.sort_by_key(|x| x.id);
+
                 None
             }
         }
     }
 
-    fn on_selected(&self) -> Option<Action> {
+    fn on_selected(&mut self) -> Option<Action> {
         self
             .get_selected()
-            .map         (|f| Action::Selected(f.id))
-
+            .map(|f| Action::Selected(f.id))
     }
 
     #[must_use]
@@ -101,6 +102,7 @@ impl FileList {
 
         match key.key {
             Key::Named(N::ArrowUp)     => {
+
                 if self.cursor > 0 {
                     self.cursor -= 1;
                 }

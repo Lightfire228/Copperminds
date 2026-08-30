@@ -17,6 +17,9 @@ pub struct RawFile {
 
     /// this tracks if the file (pre frontmatter processing) is empty or whitespace
     pub is_empty_raw:     bool,
+
+    /// this is for debug purposes
+    og_text: String,
 }
 
 impl RawFile {
@@ -26,6 +29,8 @@ impl RawFile {
     }
 
     pub fn write(&mut self, path: &Path) {
+        self.assert_unmodified(path);
+
         let text = self.to_file_text();
 
         fs::write(path, &text).unwrap();
@@ -60,6 +65,13 @@ impl RawFile {
     /// NOTE: this does *not* include the --- fences
     pub fn is_fm_empty(&self) -> bool {
         is_empty(&self.fm_text)
+    }
+
+
+    fn assert_unmodified(&self, path: &Path) {
+        let text = fs::read_to_string(path).unwrap();
+
+        assert_eq!(self.og_text, text, "there's a disturbance in the force");
     }
 
 
@@ -113,6 +125,7 @@ fn parse_md_file(text: String) -> RawFile {
             md_text:      text.clone(),
             fm_text:      String::new(),
             is_empty_raw: is_empty,
+            og_text:      text,
         }
     };
 
@@ -132,6 +145,7 @@ fn parse_md_file(text: String) -> RawFile {
         md_text:      parsed.body,
         fm_text:      parsed.fm,
         is_empty_raw: is_empty,
+        og_text:      parsed.raw_text,
     }
 }
 

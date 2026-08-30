@@ -238,7 +238,7 @@ async fn send_vault_cmd<T>(vault: &Sender<VaultCommand>, cmd: impl Cmd<T>) -> T 
 
 
     vault
-        .send(dbg!(cmd.to_command(tx)))
+        .send(cmd.to_command(tx))
         .await
         .unwrap()
     ;

@@ -20,13 +20,14 @@ use crate::ui::key_event::KeyPressed;
 #[derive(Debug)]
 pub enum Message {
     None,
+    Clear,
 }
 
 
 #[derive(Debug)]
 pub enum Action {
-    // RunCommand(Vec<Command>)
-    RunCommand(Command)
+    RunCommand(Vec<Command>),
+    OpenSelected,
 }
 
 
@@ -57,7 +58,18 @@ impl Prompt {
 
         match message {
             Message::None => None,
+
+            Message::Clear => {
+                self.clear();
+
+                None
+            },
         }
+    }
+
+
+    fn clear(&mut self) {
+        self.text.clear();
     }
 
     #[must_use]
@@ -68,6 +80,11 @@ impl Prompt {
 
         Some(match &key.key {
             Key::Named(Named::Space) => {
+
+                if self.text.is_empty() {
+                    None?
+                }
+
                 self.text.push(' ');
 
                 None?
@@ -75,7 +92,8 @@ impl Prompt {
             Key::Named(Named::Backspace) => {
 
                 if key.modifiers.control() {
-                    self.text.clear();
+                    // todo: delete_word_left
+                    self.clear();
                 }
                 else {
                     self.text.pop();
@@ -84,6 +102,10 @@ impl Prompt {
                 None?
             }
             Key::Named(Named::Enter) => {
+
+                if self.text.is_empty() {
+                    return Some(Action::OpenSelected);
+                }
 
                 let commands = self.parse_commands()
                     .inspect_err(|err| warn!("Unable to parse commands: {err}"))
@@ -99,11 +121,7 @@ impl Prompt {
                     None?
                 }
 
-                if commands.len() > 1 {
-                    error!("multiple commands not yet supported")
-                }
-
-                Action::RunCommand(commands[0])
+                Action::RunCommand(commands)
             }
             Key::Character(ch) => {
 
@@ -140,51 +158,19 @@ impl Prompt {
 
         let mut delete     = vec![];
         let mut not_delete = vec![];
-        let mut info       = vec![];
-        let mut action     = vec![];
-        let mut status     = vec![];
 
         for cmd in commands.iter() {
-            match cmd {
-                Command::SetTypeInfo           => info.push(cmd),
-
-                Command::SetActionTodo         |
-                Command::SetActionWaitingFor   |
-                Command::SetActionProject      |
-                Command::SetActionMaybeSomeday => action.push(cmd),
-
-                Command::SetStatusComplete     |
-                Command::SetStatusArchived     => status.push(cmd),
-                _ => {}
-            }
-
             match cmd {
                 Command::DeleteFile => delete    .push(cmd),
                 _                   => not_delete.push(cmd),
             }
         }
 
-        macro_rules! check {
-            ($first:expr, $second:expr, $err:expr) => {
-                if !$first.is_empty() && !$second.is_empty() {
-                    Err($err)?
-                }
-            };
-        }
-        macro_rules! check_1 {
-            ($list:expr, $err:expr) => {
-                if $list.len() > 1 {
-                    Err($err)?
-                }
-            };
-        }
-
-        check!(delete, not_delete, format!("Incompatible commands, Delete and {:?}",   not_delete));
-        check!(info,   action,     format!("Incompatible commands, Set Info and {:?}", action));
-
-        check_1!(delete, format!("Only 1 Delete command allowed"));
-        check_1!(action, format!("Only 1 Set Action command allowed: {:?}", action));
-        check_1!(status, format!("Only 1 Set Status command allowed: {:?}", status));
+        if !delete.is_empty() && !not_delete.is_empty() {
+            Err(
+                format!("Incompatible commands, Delete and {:?}", not_delete)
+            )?
+        };
 
         Ok(commands)
     }

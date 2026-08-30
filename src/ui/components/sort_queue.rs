@@ -1,3 +1,4 @@
+
 use file_id::FileId;
 use iced::Length::{self, Fill};
 use iced::keyboard;
@@ -11,7 +12,7 @@ use crate::ui::components::file_list::{self, FileList};
 use crate::ui::components::prompt::{self, COMMANDS, Command, Prompt};
 use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
-use crate::vault::command::{Cmd, DeleteFile, IterFilesWith, OpenInObsidian, SetProperty, VaultCommand, VaultUpdate};
+use crate::vault::command::{Cmd, DeleteFile, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
 use crate::vault::md_file::{FileView, MdFile};
 
@@ -82,6 +83,11 @@ impl SortQueue {
         Some(match message {
             Message::None => None?,
 
+            Message::PromptMessage(message) => {
+                let action = self.prompt.update(message)?;
+                self.handle_prompt_action(action)?
+            }
+
             Message::FileListMessage(message) => {
                 let action = self.file_list.update(message)?;
                 self.handle_file_list_action(action)?
@@ -112,8 +118,14 @@ impl SortQueue {
     }
 
     fn handle_prompt_action(&mut self, action: prompt::Action) -> Option<Action> {
+
         Some(match action {
-            prompt::Action::RunCommand(command) => Action::Run(self.handle_vault_action(command))
+            prompt::Action::RunCommand(command) => Action::Run(self.handle_vault_action(command)),
+            prompt::Action::OpenSelected        => {
+                let id = self.file_list.get_selected()?.id;
+
+                self.open_obsidian(id)
+            }
         })
     }
 
@@ -127,19 +139,6 @@ impl SortQueue {
             Key::Named(N::ArrowLeft)   |
             Key::Named(N::Escape)      => return Some(Action::NavigateBack),
 
-            // Key::Character(ref key) => {
-            //     let list = match self.queue_type {
-            //         QueueType::NeedsType   => NEEDS_TYPE,
-            //         QueueType::NeedsAction => NEEDS_ACTION,
-            //     };
-
-            //     let action = list.iter().filter(|a| a.key == key.as_str()).next();
-
-            //     if let Some(action) = action {
-            //         return Some(Action::Run(self.handle_vault_action(action.action)))
-            //     };
-
-            // },
             _ => {}
         };
 
@@ -153,7 +152,7 @@ impl SortQueue {
 
     }
 
-    fn handle_vault_action(&mut self, command: prompt::Command) -> Task<Message> {
+    fn handle_vault_action(&mut self, commands: Vec<prompt::Command>) -> Task<Message> {
 
         let tx = self.vault.clone();
 
@@ -167,18 +166,59 @@ impl SortQueue {
             return Task::none();
         };
 
+        let is_delete = commands.iter().find(|x| matches!(x, Command::DeleteFile)).is_some();
+
+        if is_delete {
+            return Task::future(async move {
+                send_vault_cmd(&tx, DeleteFile {
+                    id,
+                })
+                    .await
+                ;
+
+                Message::PromptMessage(prompt::Message::Clear)
+            })
+        }
+
+        let changes: Vec<_> = commands
+            .into_iter()
+            .map(|x| match x {
+                Command::SetTypeInfo           => ModifyFileKind::SetTypeInfo,
+                Command::SetActionTodo         => ModifyFileKind::SetActionTodo,
+                Command::SetActionWaitingFor   => ModifyFileKind::SetActionWaitingFor,
+                Command::SetActionProject      => ModifyFileKind::SetActionProject,
+                Command::SetActionMaybeSomeday => ModifyFileKind::SetActionMaybeSomeday,
+                Command::SetStatusComplete     => ModifyFileKind::SetStatusComplete,
+                Command::SetStatusArchived     => ModifyFileKind::SetStatusArchived,
+                Command::DeleteFile            => unreachable!(),
+            })
+            .collect()
+        ;
+
         Task::future(async move {
 
-            // TODO: this is kludgey
-            match vault_command(command, id) {
-                VaultCmd::SetProp(cmd) => send_vault_cmd(&tx, cmd).await,
-                VaultCmd::Delete (cmd) => send_vault_cmd(&tx, cmd).await,
+            let res = send_vault_cmd(&tx, ModifyFile {
+                id,
+                changes,
+            })
+                .await
+            ;
+
+
+            match res {
+                Err(err) => {
+                    // TODO: make this a sort_queue message and display to the user
+                    error!("Error while running vault command: {err}");
+                    Message::None
+
+                },
+                Ok (_) => Message::PromptMessage(prompt::Message::Clear),
             }
+
+
         })
-            .discard()
 
     }
-
 
     fn open_obsidian(&self, id: FileId) -> Action {
 
@@ -211,6 +251,7 @@ impl From<SortQueue> for UIMode {
 pub enum Message {
     None,
     FileListMessage (file_list::Message),
+    PromptMessage   (prompt   ::Message),
 
     LoadFiles(Files),
     VaultUpdate(VaultUpdate),
@@ -245,49 +286,4 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
     )
     .await
     .into()
-}
-
-fn vault_command(command: Command, id: FileId) -> VaultCmd {
-
-    let set_prop = |prop, value| {
-        SetProperty {
-            id,
-            prop,
-            value,
-        }
-            .into()
-    };
-
-    match command {
-        Command::SetTypeInfo           => set_prop(FmProperty::Type,   FmType  ::Info        .get_key()),
-        Command::SetActionTodo         => set_prop(FmProperty::Action, FmAction::Todo        .get_key()),
-        Command::SetActionWaitingFor   => set_prop(FmProperty::Action, FmAction::WaitingFor  .get_key()),
-        Command::SetActionProject      => set_prop(FmProperty::Action, FmAction::Project     .get_key()),
-        Command::SetActionMaybeSomeday => set_prop(FmProperty::Action, FmAction::MaybeSomeday.get_key()),
-        Command::SetStatusComplete     => set_prop(FmProperty::Status, FmStatus::Completed   .get_key()),
-        Command::SetStatusArchived     => set_prop(FmProperty::Status, FmStatus::Archived    .get_key()),
-        Command::DeleteFile            => DeleteFile {
-            id,
-        }
-            .into()
-    }
-
-}
-
-enum VaultCmd {
-    SetProp(SetProperty),
-    Delete (DeleteFile),
-}
-
-
-impl From<SetProperty> for VaultCmd {
-    fn from(val: SetProperty) -> Self {
-        VaultCmd::SetProp(val)
-    }
-}
-
-impl From<DeleteFile> for VaultCmd {
-    fn from(val: DeleteFile) -> Self {
-        VaultCmd::Delete(val)
-    }
 }

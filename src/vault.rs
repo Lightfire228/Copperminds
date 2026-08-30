@@ -8,14 +8,14 @@ mod watch;
 mod generator;
 
 
-use crate::{obsidian, vault::{command::{VaultCommand, VaultUpdate}, md_file::FileView, watch::FileData}};
+use crate::{obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}, md_file::FileView, watch::FileData}};
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};
 use std::{collections::HashMap, env, mem, path::{Path, PathBuf}, usize};
 use crate::prelude::*;
 
-use tokio::{select, sync::mpsc::{self, Sender, channel}};
+use tokio::{select, sync::{mpsc::{self, Sender, Receiver, channel}}};
 use walkdir::{DirEntry, WalkDir};
 use trash;
 
@@ -163,42 +163,111 @@ impl Index {
             };
         }
 
-        // TODO: write races
         match command {
-            VaultCommand::IterFilesWith(filter, resp) => send!(resp =>
-                self.iter_files_with_cmd(filter.filter)
-            ),
-
-            VaultCommand::OpenInObsidian(opts, resp) => send!(resp => {
-                let file = &self.md_files[&opts.id];
-
-                obsidian::open_in_obsidian(file);
-
-            }),
-            VaultCommand::Register(_, resp) => send!(resp => {
-                let (tx, rx) = channel(1000);
-
-                self.subscribers.push(tx);
-
-                rx
-            }),
-
-            VaultCommand::SetProperty(prop, resp) => send!(resp => {
-
-                let file = self.get_file_mut(prop.id);
-
-                file.set_property(prop.prop, prop.value);
-                file.write_file();
-
-            }),
-            VaultCommand::DeleteFile(opts, resp) => send!(resp => {
-                self.delete_file(opts.id);
-            }),
-
+            VaultCommand::IterFilesWith (opts, resp) => send!(resp => self.iter_files_with_cmd    (opts.filter)),
+            VaultCommand::OpenInObsidian(opts, resp) => send!(resp => self.handle_open_in_obsidian(opts)),
+            VaultCommand::Register      (_,    resp) => send!(resp => self.handle_register        ()),
+            VaultCommand::ModifyFile    (opts, resp) => send!(resp => self.handle_modify_file     (opts)),
+            VaultCommand::DeleteFile    (opts, resp) => send!(resp => self.delete_file            (opts.id)),
         }
     }
-}
 
+    fn handle_open_in_obsidian(&self, opts: OpenInObsidian) {
+        let file = &self.md_files[&opts.id];
+
+        obsidian::open_in_obsidian(file);
+    }
+
+    fn handle_register(&mut self) -> Receiver<VaultUpdate> {
+        let (tx, rx) = channel(1000);
+
+        self.subscribers.push(tx);
+
+        rx
+    }
+
+    fn handle_modify_file(&mut self, opts: ModifyFile) -> Result<(), String> {
+
+        self.validate_commands(&opts.changes)?;
+
+        let file = self.get_file_mut(opts.id);
+
+        opts
+            .changes
+            .iter()
+            .filter_map(|command| Some(match command {
+                ModifyFileKind::SetTypeInfo           => (FmProperty::Type, FmType::Info  .get_key()),
+
+                ModifyFileKind::SetActionTodo         |
+                ModifyFileKind::SetActionWaitingFor   |
+                ModifyFileKind::SetActionProject      |
+                ModifyFileKind::SetActionMaybeSomeday => (FmProperty::Type, FmType::Action.get_key()),
+                _ => None?
+            }))
+            .for_each(|prop| file.set_property(prop.0, prop.1))
+        ;
+
+        opts
+            .changes
+            .iter()
+            .filter_map(|command| Some(match command {
+                ModifyFileKind::SetActionTodo         => (FmProperty::Action, FmAction::Todo        .get_key()),
+                ModifyFileKind::SetActionWaitingFor   => (FmProperty::Action, FmAction::WaitingFor  .get_key()),
+                ModifyFileKind::SetActionProject      => (FmProperty::Action, FmAction::Project     .get_key()),
+                ModifyFileKind::SetActionMaybeSomeday => (FmProperty::Action, FmAction::MaybeSomeday.get_key()),
+                ModifyFileKind::SetStatusComplete     => (FmProperty::Status, FmStatus::Completed   .get_key()),
+                ModifyFileKind::SetStatusArchived     => (FmProperty::Status, FmStatus::Archived    .get_key()),
+                _ => None?
+            }))
+            .for_each(|prop| file.set_property(prop.0, prop.1))
+        ;
+
+        file.write_file();
+
+        Ok(())
+    }
+
+    fn validate_commands(&self, changes: &[ModifyFileKind]) -> Result<(), String> {
+
+        let mut info       = vec![];
+        let mut action     = vec![];
+        let mut status     = vec![];
+
+        for cmd in changes.iter() {
+            match cmd {
+                ModifyFileKind::SetTypeInfo           => info.push(cmd),
+
+                ModifyFileKind::SetActionTodo         |
+                ModifyFileKind::SetActionWaitingFor   |
+                ModifyFileKind::SetActionProject      |
+                ModifyFileKind::SetActionMaybeSomeday => action.push(cmd),
+
+                ModifyFileKind::SetStatusComplete     |
+                ModifyFileKind::SetStatusArchived     => status.push(cmd),
+            }
+        }
+
+        macro_rules! check {
+            ($first:expr, $second:expr, $err:expr) => {
+                if !$first.is_empty() && !$second.is_empty() {
+                    Err($err)?
+                }
+            };
+            ($list:expr, $err:expr) => {
+                if $list.len() > 1 {
+                    Err($err)?
+                }
+            };
+        }
+
+        check!(info, action, format!("Incompatible commands, Set Info and {:?}", action));
+
+        check!(action, format!("Only 1 Set Action command allowed: {:?}", action));
+        check!(status, format!("Only 1 Set Status command allowed: {:?}", status));
+
+        Ok(())
+    }
+}
 
 fn scan_vault() -> impl Iterator<Item = DirEntry> {
     WalkDir::new(ENV.vault_path())
