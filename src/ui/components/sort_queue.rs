@@ -182,17 +182,8 @@ impl SortQueue {
 
         let changes: Vec<_> = commands
             .into_iter()
-            .map(|x| match x {
-                Command::SetTypeInfo           => ModifyFileKind::SetTypeInfo,
-                Command::SetActionTodo         => ModifyFileKind::SetActionTodo,
-                Command::SetActionWaitingFor   => ModifyFileKind::SetActionWaitingFor,
-                Command::SetActionProject      => ModifyFileKind::SetActionProject,
-                Command::SetActionMaybeSomeday => ModifyFileKind::SetActionMaybeSomeday,
-                Command::SetStatusComplete     => ModifyFileKind::SetStatusComplete,
-                Command::SetStatusArchived     => ModifyFileKind::SetStatusArchived,
-                Command::DeleteFile            => unreachable!(),
-            })
-            .collect()
+            .map      (|x| x.try_into().expect("unreachable"))
+            .collect  ()
         ;
 
         Task::future(async move {
@@ -286,4 +277,22 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
     )
     .await
     .into()
+}
+
+
+impl TryInto<ModifyFileKind> for Command {
+    type Error = ();
+
+    fn try_into(self) -> Result<ModifyFileKind, Self::Error> {
+        Ok(match self {
+            Command::SetTypeInfo           => ModifyFileKind::SetTypeInfo,
+            Command::SetActionTodo         => ModifyFileKind::SetActionTodo,
+            Command::SetActionWaitingFor   => ModifyFileKind::SetActionWaitingFor,
+            Command::SetActionProject      => ModifyFileKind::SetActionProject,
+            Command::SetActionMaybeSomeday => ModifyFileKind::SetActionMaybeSomeday,
+            Command::SetStatusComplete     => ModifyFileKind::SetStatusComplete,
+            Command::SetStatusArchived     => ModifyFileKind::SetStatusArchived,
+            Command::DeleteFile            => Err(())?,
+        })
+    }
 }
