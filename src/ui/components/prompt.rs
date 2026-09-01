@@ -178,6 +178,8 @@ impl Prompt {
 }
 
 #[derive(Debug, Clone, Copy)]
+// TODO: make Prompt accept a list of commands and keybindings,
+//       and have SortQueue handle validation and action dispatching
 pub enum Command {
     SetTypeInfo,
     SetActionTodo,

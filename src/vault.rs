@@ -39,6 +39,7 @@ pub(crate) use regex;
 
 
 #[derive(Debug)]
+// TODO: restructure this like an ECS
 pub struct Index {
     md_files:    HashMap<FileId, MdFile>,
 
