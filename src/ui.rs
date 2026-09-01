@@ -61,12 +61,6 @@ enum Action {
     SortQueue       (sort_queue  ::Action),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum QueueType {
-    NeedsType,
-    NeedsAction,
-}
-
 
 #[derive(Debug)]
 enum UIMode {
@@ -247,11 +241,15 @@ async fn send_vault_cmd<T>(vault: &Sender<VaultCommand>, cmd: impl Cmd<T>) -> T 
 }
 
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QueueType {
+    Inbox,
+}
+
 impl Display for QueueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            QueueType::NeedsType   => write!(f, "Needs Type"),
-            QueueType::NeedsAction => write!(f, "Needs Action"),
+            QueueType::Inbox => write!(f, "Inbox"),
         }
     }
 }

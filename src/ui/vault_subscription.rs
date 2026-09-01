@@ -1,3 +1,6 @@
+
+use std::process::abort;
+
 use futures::{never::Never};
 use iced::{task::{Sipper, sipper}};
 use tokio::sync::{mpsc::{Sender}};
@@ -23,7 +26,6 @@ pub fn connect(vault: Sender<VaultCommand>) -> impl Sipper<Never, VaultUpdate> {
         }
 
         error!("vault sub has closed");
-        panic!();
-
+        abort()
     })
 }

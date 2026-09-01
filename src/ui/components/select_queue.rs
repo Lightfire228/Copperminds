@@ -20,8 +20,7 @@ impl SelectQueue {
         container(
             column![
                 text!("Select queue type"),
-                text!("T - type"),
-                text!("A - action"),
+                text!("T - Queue"),
             ],
         )
             .padding(10)
@@ -39,8 +38,7 @@ impl SelectQueue {
         };
 
         let queue = match key.as_str() {
-            "t" => QueueType::NeedsType,
-            "a" => QueueType::NeedsAction,
+            "t" => QueueType::Inbox,
             _   => {
                 return None;
             }

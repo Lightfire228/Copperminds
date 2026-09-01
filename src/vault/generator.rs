@@ -1,9 +1,11 @@
+use std::io::Write;
 use std::path::Path;
 use std::{collections::HashSet, env, fs, path::PathBuf};
 use std::hash::Hash;
 
 use fs_extra::dir::CopyOptions;
 use rand::{self, random_bool};
+use crate::prelude::*;
 
 use crate::vault::{Env};
 
@@ -35,6 +37,8 @@ macro_rules! pick {
 
 
 pub fn generate_sample_vault() {
+    info!("Running generator");
+
     let env = Env::Dev;
 
     let dev_vault = env.vault_path();
@@ -52,6 +56,10 @@ pub fn generate_sample_vault() {
 
         write_data(&file, &path);
     }
+
+    write_generator_statistics(&dev_vault);
+
+
 }
 
 fn write_data(file: &File, path: &Path) {
@@ -91,6 +99,33 @@ fn clear_vault(env: Env) {
 
 }
 
+
+
+fn write_generator_statistics(dev_vault: &Path) {
+
+    macro_rules! f {
+        ($($args:tt)*) => {
+            format!($($args)*)
+        };
+    }
+
+    let file = dev_vault.join("Generator Stats.md");
+    let now  = chrono::Local::now();
+
+    // MAYBE: can this be proc macroed like quote!{} ?
+    let text = vec![
+        f!("Generated on"),
+        f!("- {}", now.format("%Y-%m-%d %H:%M:%S")),
+        f!(""),
+    ]
+        .join("\n")
+    ;
+
+    fs::write(file, text).unwrap()
+}
+
+
+// --- Generators
 
 fn generate_sample_vault_titles() -> HashSet<File> {
 

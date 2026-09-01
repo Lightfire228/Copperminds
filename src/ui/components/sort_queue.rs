@@ -63,6 +63,8 @@ impl SortQueue {
                         Space::new().height(Fill),
 
                         text!("==="),
+                        text!("cursor:     {}", self.file_list.cursor()),
+                        text!("file count: {}", self.file_list.file_count()),
                         self.prompt.view().map(|_| Message::None)
 
                     ]
@@ -211,6 +213,7 @@ impl SortQueue {
 
     }
 
+    // TODO: debounce this while holding the up/down keys
     fn open_obsidian(&self, id: FileId) -> Action {
 
         let tx = self.vault.clone();
@@ -262,17 +265,19 @@ impl From<Message> for ui::Message {
 }
 
 
-async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
+async fn load_files(vault: Sender<VaultCommand>, _queue: QueueType) -> Files {
 
-    let cmd = match queue {
-        QueueType::NeedsType   => |f: &MdFile| f.needs_type(),
-        QueueType::NeedsAction => |f: &MdFile| f.needs_action_type(),
-    };
+
+    // let cmd = match queue {
+    //     QueueType::NeedsType   => |f: &MdFile| f.needs_type(),
+    //     QueueType::NeedsAction => |f: &MdFile| f.needs_action_type(),
+    // };
+
 
     send_vault_cmd(
         &vault,
         IterFilesWith {
-            filter: cmd,
+            filter: |f: &MdFile| f.needs_sorting(),
         }
     )
     .await

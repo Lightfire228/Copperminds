@@ -80,6 +80,17 @@ impl MdFile {
             .any      (|p| p.ends_with("03 Data"))
     }
 
+    pub fn needs_sorting(&self) -> bool {
+        [
+            self.needs_type       (),
+            self.needs_action_type(),
+            self.is_unnamed       (),
+        ]
+            .iter()
+            .any (|x| *x)
+
+
+    }
     /// returns true if the file has type of action, and doesn't have an action assigned
     pub fn needs_action_type(&self) -> bool {
            self.is_property (FmProperty::Type, FmType::Action)
