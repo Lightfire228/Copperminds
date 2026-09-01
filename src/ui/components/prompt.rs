@@ -25,25 +25,27 @@ pub enum Message {
 
 
 #[derive(Debug)]
-pub enum Action {
-    RunCommand(Vec<Command>),
+pub enum Action<T> {
+    RunCommand(Vec<T>),
     OpenSelected,
 }
 
 
 #[derive(Debug, Clone)]
-pub struct Prompt {
-    text: String,
+pub struct Prompt<T: Copy> {
+    text:     String,
+    commands: Vec<MenuCommand<T>>,
 }
 
 type Task = iced::Task<Message>;
 
 
-impl Prompt {
+impl<T: Copy> Prompt<T> {
 
-    pub fn new() -> Self {
+    pub fn new(commands: Vec<MenuCommand<T>>) -> Self {
         Self {
             text: String::new(),
+            commands,
         }
     }
 
@@ -54,7 +56,7 @@ impl Prompt {
     }
 
     #[must_use]
-    pub fn update(&mut self, message: Message) -> Option<Action> {
+    pub fn update(&mut self, message: Message) -> Option<Action<T>> {
 
         match message {
             Message::None => None,
@@ -73,7 +75,7 @@ impl Prompt {
     }
 
     #[must_use]
-    pub fn handle_key_event(&mut self, key: &KeyPressed) -> Option<Action> {
+    pub fn handle_key_event(&mut self, key: &KeyPressed) -> Option<Action<T>> {
         trace!("prompt key: {key:?}");
 
         use keyboard::key::Named;
@@ -112,11 +114,6 @@ impl Prompt {
                     .ok()?
                 ;
 
-                let commands = self.validate_commands(commands)
-                    .inspect_err(|err| warn!("{err}"))
-                    .ok()?
-                ;
-
                 if commands.is_empty() {
                     None?
                 }
@@ -134,9 +131,9 @@ impl Prompt {
         })
     }
 
-    fn parse_commands(&self) -> Result<Vec<Command>, String> {
+    fn parse_commands(&self) -> Result<Vec<T>, String> {
 
-        let command_map: HashMap<&'static str, Command> = COMMANDS
+        let command_map: HashMap<&'static str, T> = self.commands
             .iter   ()
             .map    (|x| (x.code, x.command))
             .collect()
@@ -154,88 +151,12 @@ impl Prompt {
             .collect()
     }
 
-    fn validate_commands(&self, commands: Vec<Command>) -> Result<Vec<Command>, String> {
-
-        let mut delete     = vec![];
-        let mut not_delete = vec![];
-
-        for cmd in commands.iter() {
-            match cmd {
-                Command::DeleteFile => delete    .push(cmd),
-                _                   => not_delete.push(cmd),
-            }
-        }
-
-        if !delete.is_empty() && !not_delete.is_empty() {
-            Err(
-                format!("Incompatible commands, Delete and {:?}", not_delete)
-            )?
-        };
-
-        Ok(commands)
-    }
-
-}
-
-#[derive(Debug, Clone, Copy)]
-// TODO: make Prompt accept a list of commands and keybindings,
-//       and have SortQueue handle validation and action dispatching
-pub enum Command {
-    SetTypeInfo,
-    SetActionTodo,
-    SetActionWaitingFor,
-    SetActionProject,
-    SetActionMaybeSomeday,
-    SetStatusComplete,
-    SetStatusArchived,
-    DeleteFile,
 }
 
 
-#[derive(Debug)]
-pub struct MenuCommand {
+#[derive(Debug, Clone)]
+pub struct MenuCommand<T: Copy> {
     pub code:    &'static str,
     pub name:    &'static str,
-    pub command: Command,
-}
-
-macro_rules! table {
-    ($( ($command:ident, $code:literal, $name:literal) ),*$(,)? ) => {[
-
-        $(
-            MenuCommand {
-                code:    $code,
-                name:    $name,
-                command: Command::$command
-            },
-        )*
-    ]}
-}
-
-
-pub static COMMANDS: &'static [MenuCommand] = &table!(
-    (SetTypeInfo,           "i", "type    - info"),
-    (SetActionTodo,         "t", "action  - todo"),
-    (SetActionWaitingFor,   "w", "action  - waiting for"),
-    (SetActionProject,      "p", "action  - project"),
-    (SetActionMaybeSomeday, "m", "action  - maybe someday"),
-    (SetStatusComplete,     "c", "status  - complete"),
-    (SetStatusArchived,     "a", "status  - archived"),
-    (DeleteFile,            "d", "command - delete file"),
-);
-
-
-impl Display for Command {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Command::SetTypeInfo           => write!(f, "Set Type Info"),
-            Command::SetActionTodo         => write!(f, "Set Action Todo"),
-            Command::SetActionWaitingFor   => write!(f, "Set Action Waiting For"),
-            Command::SetActionProject      => write!(f, "Set Action Project"),
-            Command::SetActionMaybeSomeday => write!(f, "Set Action Maybe Someday"),
-            Command::SetStatusComplete     => write!(f, "Set Status Complete"),
-            Command::SetStatusArchived     => write!(f, "Set Status Archived"),
-            Command::DeleteFile            => write!(f, "Delete File"),
-        }
-    }
+    pub command: T,
 }

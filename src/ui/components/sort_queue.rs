@@ -1,4 +1,6 @@
 
+use std::fmt::Display;
+
 use file_id::FileId;
 use iced::Length::{self, Fill};
 use iced::keyboard;
@@ -9,7 +11,7 @@ use iced::widget::{Space, column, row, space, text};
 
 use crate::collections::Files;
 use crate::ui::components::file_list::{self, FileList};
-use crate::ui::components::prompt::{self, COMMANDS, Command, Prompt};
+use crate::ui::components::prompt::{self, MenuCommand, Prompt};
 use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::command::{Cmd, DeleteFile, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
@@ -24,7 +26,7 @@ pub struct SortQueue {
     queue_type:   QueueType,
 
     file_list:    FileList,
-    prompt:       Prompt,
+    prompt:       Prompt<Command>,
 }
 
 
@@ -36,7 +38,7 @@ impl SortQueue {
                 queue_type,
                 vault:     vault.clone(),
                 file_list: FileList::new(),
-                prompt:    Prompt  ::new(),
+                prompt:    Prompt  ::new(COMMANDS.to_owned()),
             },
             Task::batch([
                 Task::perform(load_files(vault, queue_type), Message::LoadFiles),
@@ -119,7 +121,7 @@ impl SortQueue {
         })
     }
 
-    fn handle_prompt_action(&mut self, action: prompt::Action) -> Option<Action> {
+    fn handle_prompt_action(&mut self, action: prompt::Action<Command>) -> Option<Action> {
 
         Some(match action {
             prompt::Action::RunCommand(command) => Action::Run(self.handle_vault_action(command)),
@@ -154,7 +156,14 @@ impl SortQueue {
 
     }
 
-    fn handle_vault_action(&mut self, commands: Vec<prompt::Command>) -> Task<Message> {
+    fn handle_vault_action(&mut self, commands: Vec<Command>) -> Task<Message> {
+
+        let Ok(commands) = self
+            .validate_commands(commands)
+            .inspect_err      (|err| warn!("{err}"))
+        else {
+            return Task::none();
+        };
 
         let tx = self.vault.clone();
 
@@ -213,6 +222,27 @@ impl SortQueue {
 
     }
 
+    fn validate_commands(&self, commands: Vec<Command>) -> Result<Vec<Command>, String> {
+
+        let mut delete     = vec![];
+        let mut not_delete = vec![];
+
+        for cmd in commands.iter() {
+            match cmd {
+                Command::DeleteFile => delete    .push(cmd),
+                _                   => not_delete.push(cmd),
+            }
+        }
+
+        if !delete.is_empty() && !not_delete.is_empty() {
+            Err(
+                format!("Incompatible commands, Delete and {:?}", not_delete)
+            )?
+        };
+
+        Ok(commands)
+    }
+
     // TODO: debounce this while holding the up/down keys
     fn open_obsidian(&self, id: FileId) -> Action {
 
@@ -233,6 +263,7 @@ impl SortQueue {
     }
 
 }
+
 
 impl From<SortQueue> for UIMode {
     fn from(val: SortQueue) -> Self {
@@ -265,19 +296,18 @@ impl From<Message> for ui::Message {
 }
 
 
-async fn load_files(vault: Sender<VaultCommand>, _queue: QueueType) -> Files {
+async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 
 
-    // let cmd = match queue {
-    //     QueueType::NeedsType   => |f: &MdFile| f.needs_type(),
-    //     QueueType::NeedsAction => |f: &MdFile| f.needs_action_type(),
-    // };
+    let cmd = match queue {
+        QueueType::Inbox => |f: &MdFile| f.needs_sorting(),
+    };
 
 
     send_vault_cmd(
         &vault,
         IterFilesWith {
-            filter: |f: &MdFile| f.needs_sorting(),
+            filter: cmd,
         }
     )
     .await
@@ -300,4 +330,57 @@ impl TryInto<ModifyFileKind> for Command {
             Command::DeleteFile            => Err(())?,
         })
     }
+}
+
+macro_rules! table {
+    ($( ($command:ident, $code:literal, $name:literal) ),*$(,)? ) => {[
+
+        $(
+            MenuCommand {
+                code:    $code,
+                name:    $name,
+                command: Command::$command
+            },
+        )*
+    ]}
+}
+
+
+pub static COMMANDS: &'static [MenuCommand<Command>] = &table!(
+    (SetTypeInfo,           "i", "type    - info"),
+    (SetActionTodo,         "t", "action  - todo"),
+    (SetActionWaitingFor,   "w", "action  - waiting for"),
+    (SetActionProject,      "p", "action  - project"),
+    (SetActionMaybeSomeday, "m", "action  - maybe someday"),
+    (SetStatusComplete,     "c", "status  - complete"),
+    (SetStatusArchived,     "a", "status  - archived"),
+    (DeleteFile,            "d", "command - delete file"),
+);
+
+
+impl Display for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Command::SetTypeInfo           => write!(f, "Set Type Info"),
+            Command::SetActionTodo         => write!(f, "Set Action Todo"),
+            Command::SetActionWaitingFor   => write!(f, "Set Action Waiting For"),
+            Command::SetActionProject      => write!(f, "Set Action Project"),
+            Command::SetActionMaybeSomeday => write!(f, "Set Action Maybe Someday"),
+            Command::SetStatusComplete     => write!(f, "Set Status Complete"),
+            Command::SetStatusArchived     => write!(f, "Set Status Archived"),
+            Command::DeleteFile            => write!(f, "Delete File"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Command {
+    SetTypeInfo,
+    SetActionTodo,
+    SetActionWaitingFor,
+    SetActionProject,
+    SetActionMaybeSomeday,
+    SetStatusComplete,
+    SetStatusArchived,
+    DeleteFile,
 }
