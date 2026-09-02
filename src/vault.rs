@@ -23,7 +23,7 @@ use trash;
 use md_file::{MdFile};
 
 
-pub const ENV: Env = Env::Dev;
+pub const ENV: Env = Env::Prod;
 
 macro_rules! regex {
     ($i:ident = $r:expr) => {
@@ -463,6 +463,7 @@ pub struct VaultStats {
     pub actionables_archived:   usize,
 
     pub needs_action:           usize,
+    pub needs_sorted:           usize,
 }
 
 impl Index {
@@ -478,6 +479,7 @@ impl Index {
             actionables_archived: self.count(|x| x.is_type_action() && x.is_archived()),
 
             needs_action:         self.count(|x| x.needs_action_assigned()),
+            needs_sorted:         self.count(|x| x.needs_sorting()),
         }
 
     }

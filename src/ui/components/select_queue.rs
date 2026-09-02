@@ -2,6 +2,7 @@ use iced::{Element, keyboard::Key, widget::container};
 use iced::widget::{column, text};
 use tokio::sync::mpsc::Sender;
 
+use crate::ui::components::vault_stats::{self, VaultStatsComponent};
 use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::VaultStats;
@@ -10,7 +11,7 @@ use crate::vault::command::{GetVaultStats, VaultCommand};
 
 #[derive(Debug)]
 pub struct SelectQueue {
-    stats: VaultStats,
+    stats: VaultStatsComponent,
 }
 
 type Task = iced::Task<Message>;
@@ -18,15 +19,13 @@ type Task = iced::Task<Message>;
 impl SelectQueue {
 
     pub fn new(vault: Sender<VaultCommand>) -> (Self, Task) {
+        let (stats, task) = VaultStatsComponent::new(vault);
+
         (
             Self {
-                stats: VaultStats::default(),
+                stats,
             },
-            Task::future(async move {
-                let stats = send_vault_cmd(&vault, GetVaultStats {}).await;
-
-                Message::VaultStats(stats)
-            })
+            task.map(Message::VaultStats)
         )
     }
 
@@ -37,16 +36,7 @@ impl SelectQueue {
                 text!("T - Queue"),
                 text!("A - Actionables"),
                 text!(""),
-                text!("Vault Stats"),
-                text!("==="),
-                text!("info        | total    - {}", self.stats.info_total),
-                text!("info        | archived - {}", self.stats.info_archived),
-                text!("info        | complete - {}", self.stats.info_complete),
-                text!("actionables | total    - {}", self.stats.actionables_total),
-                text!("actionables | open     - {}", self.stats.actionables_open),
-                text!("actionables | complete - {}", self.stats.actionables_complete),
-                text!("actionables | archived - {}", self.stats.actionables_archived),
-                text!("needs action           - {}", self.stats.needs_action),
+                self.stats.view().map(Message::VaultStats),
             ],
         )
             .padding(10)
@@ -58,7 +48,7 @@ impl SelectQueue {
             // Message::None => None,
 
             Message::VaultStats(stats) => {
-                self.stats = stats;
+                self.stats.update(stats);
 
                 None
             },
@@ -93,7 +83,7 @@ impl From<SelectQueue> for UIMode {
 #[derive(Debug)]
 pub enum Message {
     // None,
-    VaultStats(VaultStats),
+    VaultStats(vault_stats::Message),
 }
 
 #[derive(Debug)]
