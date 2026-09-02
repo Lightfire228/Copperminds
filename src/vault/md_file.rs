@@ -82,9 +82,9 @@ impl MdFile {
 
     pub fn needs_sorting(&self) -> bool {
         [
-            self.needs_type       (),
-            self.needs_action_type(),
-            self.is_unnamed       (),
+            self.needs_type           (),
+            self.needs_action_assigned(),
+            self.is_unnamed           (),
         ]
             .iter()
             .any (|x| *x)
@@ -92,15 +92,29 @@ impl MdFile {
 
     }
     /// returns true if the file has type of action, and doesn't have an action assigned
-    pub fn needs_action_type(&self) -> bool {
-           self.is_property (FmProperty::Type, FmType::Action)
+    pub fn needs_action_assigned(&self) -> bool {
+           self.is_type_action()
         && self.get_property(FmProperty::Action).is_none()
     }
 
     /// returns true if the file has type of action, and has an action assigned
+    /// does not account for Complete or Archived status
     pub fn is_actionable(&self) -> bool {
-           self.is_property (FmProperty::Type, FmType::Action)
+           self.is_type_action()
         && self.get_property(FmProperty::Action).is_some()
+    }
+
+    pub fn is_type_info(&self) -> bool {
+        self.is_property(FmProperty::Type, FmType::Info)
+    }
+
+    pub fn is_type_action(&self) -> bool {
+        self.is_property(FmProperty::Type, FmType::Action)
+    }
+
+    /// not completed nor archived
+    pub fn is_open(&self) -> bool {
+        !(self.is_complete() || self.is_archived())
     }
 
     pub fn is_archived(&self) -> bool {
@@ -281,17 +295,17 @@ mod tests {
         let action_todo        = fm!(FmProperty::Type => FmType::Action, FmProperty::Action => FmAction::Todo);
         let action_waiting_for = fm!(FmProperty::Type => FmType::Action, FmProperty::Action => FmAction::WaitingFor);
 
-        assert_eq!(no_action_info    .needs_action_type(), false);
-        assert_eq!(no_action         .needs_action_type(), false);
-        assert_eq!(needs_action      .needs_action_type(), true);
-        assert_eq!(action_todo       .needs_action_type(), false);
-        assert_eq!(action_waiting_for.needs_action_type(), false);
+        assert_eq!(no_action_info    .needs_action_assigned(), false);
+        assert_eq!(no_action         .needs_action_assigned(), false);
+        assert_eq!(needs_action      .needs_action_assigned(), true);
+        assert_eq!(action_todo       .needs_action_assigned(), false);
+        assert_eq!(action_waiting_for.needs_action_assigned(), false);
 
-        assert_eq!(no_action_info    .is_actionable(),     false);
-        assert_eq!(no_action         .is_actionable(),     false);
-        assert_eq!(needs_action      .is_actionable(),     false);
-        assert_eq!(action_todo       .is_actionable(),     true);
-        assert_eq!(action_waiting_for.is_actionable(),     true);
+        assert_eq!(no_action_info    .is_actionable(),         false);
+        assert_eq!(no_action         .is_actionable(),         false);
+        assert_eq!(needs_action      .is_actionable(),         false);
+        assert_eq!(action_todo       .is_actionable(),         true);
+        assert_eq!(action_waiting_for.is_actionable(),         true);
     }
 
     #[test]

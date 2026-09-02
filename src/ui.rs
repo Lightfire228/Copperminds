@@ -70,15 +70,22 @@ enum UIMode {
 
 
 impl App {
-    fn new(tx: Sender<VaultCommand>) -> (Self, Task) {(
+    fn new(tx: Sender<VaultCommand>) -> (Self, Task) {
+        let (component, task) = SelectQueue::new(tx.clone());
 
-        Self {
-            vault:   tx,
-            ui_mode: SelectQueue::new().into(),
-        },
-        Self::on_startup(),
+        (
 
-    )}
+            Self {
+                vault:   tx,
+                ui_mode: component.into(),
+            },
+            Task::batch([
+                Self::on_startup(),
+                task.map(Message::SelectQueue)
+            ]),
+
+        )
+    }
 
     fn on_startup() -> Task {
         Task::none()
@@ -197,11 +204,15 @@ impl App {
     fn handle_action_sort_queue(&mut self, action: sort_queue::Action) -> Task {
         type Action = sort_queue::Action;
 
+        let tx = self.vault.clone();
+
         match action {
             Action::Run(task)    => task.map   (Message::SortQueue),
             Action::NavigateBack => {
-                self.ui_mode = SelectQueue::new().into();
-                Task::none()
+                let (component, task) = SelectQueue::new(tx);
+
+                self.ui_mode = component.into();
+                task.map(Message::SelectQueue)
             },
         }
     }
@@ -244,12 +255,14 @@ async fn send_vault_cmd<T>(vault: &Sender<VaultCommand>, cmd: impl Cmd<T>) -> T 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum QueueType {
     Inbox,
+    Actionables,
 }
 
 impl Display for QueueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            QueueType::Inbox => write!(f, "Inbox"),
+            QueueType::Inbox       => write!(f, "Inbox"),
+            QueueType::Actionables => write!(f, "Actionables"),
         }
     }
 }

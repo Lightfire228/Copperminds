@@ -170,6 +170,7 @@ impl Index {
             VaultCommand::Register      (_,    resp) => send!(resp => self.handle_register        ()),
             VaultCommand::ModifyFile    (opts, resp) => send!(resp => self.handle_modify_file     (opts)),
             VaultCommand::DeleteFile    (opts, resp) => send!(resp => self.delete_file            (opts.id)),
+            VaultCommand::GetVaultStats (_,    resp) => send!(resp => self.calc_vault_stats       ()),
         }
     }
 
@@ -441,6 +442,54 @@ impl Env {
             Self::Prod => "Prod",
             Self::Dev  => "Dev",
         }
+    }
+}
+
+
+#[derive(Debug, Default)]
+pub struct VaultStats {
+    pub info_total:             usize,
+
+    pub info_archived:          usize,
+    pub info_complete:          usize,
+
+
+    pub actionables_total:      usize,
+
+    /// Actionables that aren't complete or archived
+    pub actionables_open:       usize,
+
+    pub actionables_complete:   usize,
+    pub actionables_archived:   usize,
+
+    pub needs_action:           usize,
+}
+
+impl Index {
+    pub fn calc_vault_stats(&self) -> VaultStats {
+
+        VaultStats {
+            info_total:           self.count(|x| x.is_type_info  ()                   ),
+            info_archived:        self.count(|x| x.is_type_info  () && x.is_archived()),
+            info_complete:        self.count(|x| x.is_type_info  () && x.is_complete()),
+            actionables_total:    self.count(|x| x.is_type_action()                   ),
+            actionables_open:     self.count(|x| x.is_type_action() && x.is_open()    ),
+            actionables_complete: self.count(|x| x.is_type_action() && x.is_complete()),
+            actionables_archived: self.count(|x| x.is_type_action() && x.is_archived()),
+
+            needs_action:         self.count(|x| x.needs_action_assigned()),
+        }
+
+    }
+
+    fn count<T>(&self, x: T) -> usize
+    where
+        T: FnMut(&&MdFile) -> bool
+    {
+        self
+            .iter_files()
+            .filter    (x)
+            .count     ()
     }
 }
 

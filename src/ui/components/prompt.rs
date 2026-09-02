@@ -34,7 +34,7 @@ pub enum Action<T> {
 #[derive(Debug, Clone)]
 pub struct Prompt<T: Copy> {
     text:     String,
-    commands: Vec<MenuCommand<T>>,
+    commands: HashMap<&'static str, T>,
 }
 
 type Task = iced::Task<Message>;
@@ -44,8 +44,11 @@ impl<T: Copy> Prompt<T> {
 
     pub fn new(commands: Vec<MenuCommand<T>>) -> Self {
         Self {
-            text: String::new(),
-            commands,
+            text:     String::new(),
+            commands: commands
+                .iter   ()
+                .map    (|x| (x.code, x.command))
+                .collect(),
         }
     }
 
@@ -133,17 +136,11 @@ impl<T: Copy> Prompt<T> {
 
     fn parse_commands(&self) -> Result<Vec<T>, String> {
 
-        let command_map: HashMap<&'static str, T> = self.commands
-            .iter   ()
-            .map    (|x| (x.code, x.command))
-            .collect()
-        ;
-
         self
             .text
             .split    ("")
             .filter   (|x| *x != "")
-            .map      (|ch| command_map
+            .map      (|ch| self.commands
                 .get       (ch)
                 .copied    ()
                 .ok_or_else(|| format!("No command found for '{ch}'"))

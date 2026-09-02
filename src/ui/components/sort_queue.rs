@@ -38,7 +38,7 @@ impl SortQueue {
                 queue_type,
                 vault:     vault.clone(),
                 file_list: FileList::new(),
-                prompt:    Prompt  ::new(COMMANDS.to_owned()),
+                prompt:    Prompt  ::new(queue_type.get_command_list().to_owned()),
             },
             Task::batch([
                 Task::perform(load_files(vault, queue_type), Message::LoadFiles),
@@ -49,7 +49,7 @@ impl SortQueue {
 
     pub fn view(&self) -> Element<'_, Message> {
 
-        let options = COMMANDS
+        let options = self.queue_type.get_command_list()
             .iter()
             .map (|o| text!("{} - {}", o.code, o.name).into())
         ;
@@ -300,7 +300,8 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 
 
     let cmd = match queue {
-        QueueType::Inbox => |f: &MdFile| f.needs_sorting(),
+        QueueType::Inbox       => |f: &MdFile| f.needs_sorting(),
+        QueueType::Actionables => |f: &MdFile| f.is_actionable(),
     };
 
 
@@ -345,7 +346,7 @@ macro_rules! table {
     ]}
 }
 
-
+// TODO: make sort queue command agnostic
 pub static COMMANDS: &'static [MenuCommand<Command>] = &table!(
     (SetTypeInfo,           "i", "type    - info"),
     (SetActionTodo,         "t", "action  - todo"),
@@ -355,6 +356,17 @@ pub static COMMANDS: &'static [MenuCommand<Command>] = &table!(
     (SetStatusComplete,     "c", "status  - complete"),
     (SetStatusArchived,     "a", "status  - archived"),
     (DeleteFile,            "d", "command - delete file"),
+);
+
+pub static ACTIONABLES_COMMANDS: &'static [MenuCommand<Command>] = &table!(
+    // (SetTypeInfo,           "i", "type    - info"),
+    // (SetActionTodo,         "t", "action  - todo"),
+    // (SetActionWaitingFor,   "w", "action  - waiting for"),
+    // (SetActionProject,      "p", "action  - project"),
+    // (SetActionMaybeSomeday, "m", "action  - maybe someday"),
+    // (SetStatusComplete,     "c", "status  - complete"),
+    // (SetStatusArchived,     "a", "status  - archived"),
+    // (DeleteFile,            "d", "command - delete file"),
 );
 
 
@@ -383,4 +395,14 @@ pub enum Command {
     SetStatusComplete,
     SetStatusArchived,
     DeleteFile,
+}
+
+
+impl QueueType {
+    fn get_command_list(&self) -> &'static [MenuCommand<Command>] {
+        match self {
+            QueueType::Inbox       => COMMANDS,
+            QueueType::Actionables => ACTIONABLES_COMMANDS,
+        }
+    }
 }

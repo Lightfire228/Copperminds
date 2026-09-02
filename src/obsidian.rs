@@ -10,9 +10,11 @@ pub fn open_in_obsidian(file: &MdFile) {
 
     let uri = format!("obsidian://open?vault={vault}&file={}", urlencoding::encode(&file.file_name));
 
-    Command::new("xdg-open")
-        .arg   (uri)
-        .output()
-        .unwrap()
-    ;
+    tokio::spawn(async {
+        Command::new("xdg-open")
+            .arg   (uri)
+            .output()
+            .unwrap()
+        ;
+    });
 }
