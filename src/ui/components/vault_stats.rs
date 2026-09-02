@@ -5,12 +5,13 @@ use tokio::sync::mpsc::Sender;
 use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::VaultStats;
-use crate::vault::command::{GetVaultStats, VaultCommand};
+use crate::vault::command::{GetVaultStats, VaultCommand, VaultUpdate};
 
 
 #[derive(Debug)]
 pub struct VaultStatsComponent {
     stats: VaultStats,
+    vault: Sender<VaultCommand>,
 }
 
 type Task = iced::Task<Message>;
@@ -18,12 +19,14 @@ type Task = iced::Task<Message>;
 impl VaultStatsComponent {
 
     pub fn new(vault: Sender<VaultCommand>) -> (Self, Task) {
+        let tx = vault.clone();
         (
             Self {
                 stats: VaultStats::default(),
+                vault,
             },
             Task::future(async move {
-                let stats = send_vault_cmd(&vault, GetVaultStats {}).await;
+                let stats = send_vault_cmd(&tx, GetVaultStats {}).await;
 
                 Message::VaultStats(stats)
             })
@@ -48,15 +51,34 @@ impl VaultStatsComponent {
             .into()
     }
 
-    pub fn update(&mut self, message: Message) {
-        match message {
-            Message::VaultStats(stats) => self.stats = stats,
-        }
+    pub fn update(&mut self, message: Message) -> Option<Action> {
+        Some(match message {
+            Message::VaultStats(stats) => {
+                self.stats = stats;
+                None?
+            },
+            Message::VaultUpdate(_) => {
+
+                let tx = self.vault.clone();
+
+                Action::Run(Task::future(async move {
+                    let stats = send_vault_cmd(&tx, GetVaultStats {}).await;
+
+                    Message::VaultStats(stats)
+                }))
+            }
+        })
     }
 }
 
 
 #[derive(Debug)]
 pub enum Message {
-    VaultStats(VaultStats),
+    VaultStats (VaultStats),
+    VaultUpdate(VaultUpdate),
+}
+
+#[derive(Debug)]
+pub enum Action {
+    Run(Task)
 }

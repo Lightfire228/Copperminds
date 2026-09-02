@@ -11,13 +11,17 @@ use crate::{cli::{MenuOption}, vault::ENV};
 #[tokio::main]
 async fn main() {
 
+    let log_level = log::LevelFilter::Info;
+    // let log_level = log::LevelFilter::Trace;
+
     formatted_timed_builder()
         .filter_module("",            log::LevelFilter::Warn)
         .filter_module("wgpu_hal",    log::LevelFilter::Off)
-        // .filter_module("copperminds", log::LevelFilter::Trace)
-        .filter_module("copperminds", log::LevelFilter::Info)
+        .filter_module("copperminds", log_level)
+        // .filter_module("copperminds", log::LevelFilter::Info)
         .init()
     ;
+
 
     println!("\n\n---\n");
 
@@ -32,6 +36,7 @@ async fn main() {
         _ => {}
     }
 
+    println!("Log Level: {log_level:?}\n");
 
 
     match menu() {
@@ -59,6 +64,7 @@ fn menu() -> Menu {
 
     // cli::choose("Sorting method", &opts)
     Menu::IcedUI
+    // Menu::GenerateVault
 
 }
 

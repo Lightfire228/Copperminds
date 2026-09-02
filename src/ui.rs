@@ -15,7 +15,7 @@ use crate::ui::components::select_queue::{self, SelectQueue};
 use crate::ui::components::sort_queue::{self, SortQueue};
 use crate::ui::key_event::KeyPressed;
 use crate::vault::{ENV};
-use crate::vault::command::{Cmd, VaultCommand, VaultUpdate};
+use crate::vault::command::{Cmd, NukeActionables, VaultCommand, VaultUpdate};
 use crate::prelude::*;
 
 use std::mem;
@@ -48,7 +48,6 @@ struct App {
 
 #[derive(Debug)]
 enum Message {
-    None,
     Event           (iced::Event),
     SelectQueue     (select_queue::Message),
     SortQueue       (sort_queue  ::Message),
@@ -143,8 +142,8 @@ impl App {
                 use sort_queue::Message::VaultUpdate;
 
                 return self.update(match &self.ui_mode {
-                    UIMode::SelectQueue(_) => Message::None,
-                    UIMode::SortQueue  (_) => Message::SortQueue(VaultUpdate(message)),
+                    UIMode::SelectQueue(_) => Message::SelectQueue(select_queue::Message::VaultUpdate(message)),
+                    UIMode::SortQueue  (_) => Message::SortQueue  (sort_queue  ::Message::VaultUpdate(message)),
                 })
             },
 
@@ -197,6 +196,9 @@ impl App {
                 self.ui_mode = state.into();
 
                 task.map(Message::SortQueue)
+            },
+            Action::Run(task) => {
+                task.map(Message::SelectQueue)
             }
         }
     }
@@ -218,6 +220,7 @@ impl App {
     }
 
     fn handle_key_event(&mut self, event: Event) -> Option<Action> {
+        trace!("key event: {event:?}");
 
         let key = KeyPressed::try_from(event).ok()?;
 

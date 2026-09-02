@@ -77,7 +77,17 @@ fn write_data(file: &File, path: &Path) {
     }
 
     match &file.kind {
-        FileType::Todo    => with_chance!(0.50, "---\ntype: action\n---\n"),
+        FileType::Todo    => {
+            if random_bool(0.33) {
+                fs::write(&path, "---\ntype: action\n---\n").unwrap();
+            }
+            else if random_bool(0.33) {
+                fs::write(&path, "---\ntype: action\naction: todo\n---\n").unwrap();
+            }
+            else {
+                fs::write(&path, "---\ntype: action\naction: todo\nstatus: complete\n---\n").unwrap();
+            }
+        },
         FileType::Info    => with_chance!(0.50, "---\ntype: info\n---\n"),
         FileType::Unnamed => with_chance!(0.90, "not empty\n"),
     }

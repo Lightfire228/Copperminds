@@ -127,6 +127,13 @@ impl Index {
             .map (|f| f.1)
     }
 
+    fn iter_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
+        self
+            .md_files
+            .iter_mut()
+            .map (|f| f.1)
+    }
+
     pub fn iter_files_with<P>(&self, mut predicate: P) -> impl Iterator<Item = FileId>
     where
         P: FnMut(&MdFile) -> bool,
@@ -165,12 +172,13 @@ impl Index {
         }
 
         match command {
-            VaultCommand::IterFilesWith (opts, resp) => send!(resp => self.iter_files_with_cmd    (opts.filter)),
-            VaultCommand::OpenInObsidian(opts, resp) => send!(resp => self.handle_open_in_obsidian(opts)),
-            VaultCommand::Register      (_,    resp) => send!(resp => self.handle_register        ()),
-            VaultCommand::ModifyFile    (opts, resp) => send!(resp => self.handle_modify_file     (opts)),
-            VaultCommand::DeleteFile    (opts, resp) => send!(resp => self.delete_file            (opts.id)),
-            VaultCommand::GetVaultStats (_,    resp) => send!(resp => self.calc_vault_stats       ()),
+            VaultCommand::IterFilesWith  (opts, resp) => send!(resp => self.iter_files_with_cmd    (opts.filter)),
+            VaultCommand::OpenInObsidian (opts, resp) => send!(resp => self.handle_open_in_obsidian(opts)),
+            VaultCommand::Register       (_,    resp) => send!(resp => self.handle_register        ()),
+            VaultCommand::ModifyFile     (opts, resp) => send!(resp => self.handle_modify_file     (opts)),
+            VaultCommand::DeleteFile     (opts, resp) => send!(resp => self.delete_file            (opts.id)),
+            VaultCommand::GetVaultStats  (_,    resp) => send!(resp => self.calc_vault_stats       ()),
+            VaultCommand::NukeActionables(_,    resp) => send!(resp => self.nuke_action_property   ()),
         }
     }
 
@@ -190,7 +198,7 @@ impl Index {
 
     fn handle_modify_file(&mut self, opts: ModifyFile) -> Result<(), String> {
 
-        self.validate_commands(&opts.changes)?;
+        self.validate_modify_commands(&opts.changes)?;
 
         let file = self.get_file_mut(opts.id);
 
@@ -229,7 +237,7 @@ impl Index {
         Ok(())
     }
 
-    fn validate_commands(&self, changes: &[ModifyFileKind]) -> Result<(), String> {
+    fn validate_modify_commands(&self, changes: &[ModifyFileKind]) -> Result<(), String> {
 
         let mut info       = vec![];
         let mut action     = vec![];
@@ -268,6 +276,25 @@ impl Index {
         check!(status, format!("Only 1 Set Status command allowed: {:?}", status));
 
         Ok(())
+    }
+
+    fn nuke_action_property(&mut self) {
+        debug!("Nuking action property");
+
+        self
+            .iter_files_mut()
+            .filter        (|f| f.is_type_action())
+            .for_each      (|f| {
+                f.remove_property(FmProperty::Action);
+                f.remove_property(FmProperty::Status);
+
+                f.write_file();
+            })
+        ;
+
+
+
+
     }
 }
 
@@ -494,6 +521,9 @@ impl Index {
             .count     ()
     }
 }
+
+
+
 
 
 #[cfg(test)]

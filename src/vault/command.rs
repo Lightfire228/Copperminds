@@ -10,6 +10,7 @@ pub enum VaultCommand {
     OpenInObsidian  (OpenInObsidian,   Responder<()>),
     Register        (Register,         Responder<Subscriber<VaultUpdate>>),
     GetVaultStats   (GetVaultStats,    Responder<VaultStats>),
+    NukeActionables (NukeActionables,  Responder<()>),
 
     ModifyFile      (ModifyFile,       Responder<Result<(), String>>),
     DeleteFile      (DeleteFile,       Responder<()>),
@@ -51,6 +52,9 @@ pub struct Register {}
 #[derive(Debug)]
 pub struct GetVaultStats {}
 
+#[derive(Debug)]
+pub struct NukeActionables {}
+
 
 
 pub trait Cmd<T> {
@@ -74,6 +78,7 @@ to_command!(Register,         Subscriber<VaultUpdate>);
 to_command!(GetVaultStats,    VaultStats);
 to_command!(ModifyFile,       Result<(), String>);
 to_command!(DeleteFile,       ());
+to_command!(NukeActionables,  ());
 
 impl<T> Cmd<T> for VaultCommand {
     fn to_command(self, _: Responder<T>) -> VaultCommand {
