@@ -23,7 +23,7 @@ use trash;
 use md_file::{MdFile};
 
 
-pub const ENV: Env = Env::Prod;
+pub const ENV: Env = Env::Dev;
 
 macro_rules! regex {
     ($i:ident = $r:expr) => {

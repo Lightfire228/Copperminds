@@ -62,8 +62,8 @@ fn menu() -> Menu {
         }
     ];
 
-    // cli::choose("Sorting method", &opts)
-    Menu::IcedUI
+    cli::choose("Sorting method", &opts)
+    // Menu::IcedUI
     // Menu::GenerateVault
 
 }

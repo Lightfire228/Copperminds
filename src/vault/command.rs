@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use file_id::FileId;
 use tokio::sync::{mpsc, oneshot};
 
@@ -21,11 +23,10 @@ pub enum VaultCommand {
 pub type Responder <T> = oneshot::Sender<T>;
 pub type Subscriber<T> = mpsc   ::Receiver<T>;
 
-// Cannot be a Box<dyn Fn> because those aren't Send
+// pub type Predicate = Box<dyn Fn(&MdFile) -> bool + Send>;
 pub type Predicate = fn(&MdFile) -> bool;
 
 
-#[derive(Debug)]
 pub struct IterFilesWith {
     pub filter: Predicate,
 }
@@ -101,4 +102,11 @@ pub enum ModifyFileKind {
     SetActionMaybeSomeday,
     SetStatusComplete,
     SetStatusArchived,
+}
+
+
+impl Debug for IterFilesWith {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IterFilesWith").field("filter", &self.filter).finish()
+    }
 }

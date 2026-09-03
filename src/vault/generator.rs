@@ -1,29 +1,33 @@
+use std::f64;
 use std::io::Write;
+use std::ops::Range;
 use std::path::Path;
 use std::{collections::HashSet, env, fs, path::PathBuf};
 use std::hash::Hash;
 
 use fs_extra::dir::CopyOptions;
-use rand::{self, random_bool};
+use rand::{self, random_bool, random_range};
+use yaml_serde::Mapping;
 use crate::prelude::*;
 
+use crate::vault::fm::{FmAction, GetKey};
 use crate::vault::{Env};
 
 mod utils;
 
 macro_rules! pick {
-    ($ident:ident) => {{
+    ($ident:expr) => {{
         let i = rand::random_range(0..$ident.len());
-        $ident[i]
+        $ident.get(i).unwrap()
     }};
-    [$($ident:ident,)+$(,)?] => {{
+    [$($ident:expr,)+$(,)?] => {{
         let     max = [$($ident,)+].iter().map(|x| x.len()).sum();
         let mut choice = rand::random_range(0..max);
 
         let mut run = || {
             $(
                 if choice < $ident.len() {
-                    return $ident[choice];
+                    return *($ident.get(choice).unwrap());
                 }
                 choice -= $ident.len();
             )+
@@ -33,6 +37,12 @@ macro_rules! pick {
         run()
 
     }};
+}
+
+struct GeneratorOpts {
+    path:       PathBuf,
+
+    file_count: Range<usize>,
 }
 
 
@@ -48,49 +58,18 @@ pub fn generate_sample_vault() {
     fs::create_dir(&folder).unwrap();
 
 
-    for file in generate_sample_vault_titles() {
+    let opts = GeneratorOpts {
+        path:       folder,
+        file_count: 3000..4000
+    };
 
-        let path = folder.join(file.title());
+    let file_count = random_range(opts.file_count.clone());
 
-        fs::File::create(&path).unwrap();
-
-        write_data(&file, &path);
+    for _ in 0..file_count {
+        generate_file(&opts);
     }
 
-    write_generator_statistics(&dev_vault);
-
-
-}
-
-fn write_data(file: &File, path: &Path) {
-
-    macro_rules! with_chance {
-        ($chance:literal, $expr:expr) => {
-
-            if random_bool($chance) {
-
-                fs::write(&path, $expr)
-                    .unwrap()
-                ;
-            }
-        };
-    }
-
-    match &file.kind {
-        FileType::Todo    => {
-            if random_bool(0.33) {
-                fs::write(&path, "---\ntype: action\n---\n").unwrap();
-            }
-            else if random_bool(0.33) {
-                fs::write(&path, "---\ntype: action\naction: todo\n---\n").unwrap();
-            }
-            else {
-                fs::write(&path, "---\ntype: action\naction: todo\nstatus: complete\n---\n").unwrap();
-            }
-        },
-        FileType::Info    => with_chance!(0.50, "---\ntype: info\n---\n"),
-        FileType::Unnamed => with_chance!(0.90, "not empty\n"),
-    }
+    write_generator_statistics(&dev_vault, file_count);
 }
 
 
@@ -111,7 +90,7 @@ fn clear_vault(env: Env) {
 
 
 
-fn write_generator_statistics(dev_vault: &Path) {
+fn write_generator_statistics(dev_vault: &Path, file_count: usize) {
 
     macro_rules! f {
         ($($args:tt)*) => {
@@ -127,6 +106,9 @@ fn write_generator_statistics(dev_vault: &Path) {
         f!("Generated on"),
         f!("- {}", now.format("%Y-%m-%d %H:%M:%S")),
         f!(""),
+        f!("Files generated"),
+        f!("- {file_count}"),
+
     ]
         .join("\n")
     ;
@@ -137,29 +119,107 @@ fn write_generator_statistics(dev_vault: &Path) {
 
 // --- Generators
 
-fn generate_sample_vault_titles() -> HashSet<File> {
+fn generate_file(opts: &GeneratorOpts) {
 
-    (0..3000)
-        .into_iter()
-        .map      (|_| generate_title())
-        .collect  ()
-
-}
-
-fn generate_title() -> File {
-    match rand::random_range(0.0 .. 1.0) {
-        0.00 .. 0.25 => File { title: generate_title_noun(),   kind: FileType::Info},
-        0.25 .. 0.50 => File { title: generate_title_unique(), kind: FileType::Unnamed},
-        0.50 .. 0.75 => File { title: generate_title_info(),   kind: FileType::Info},
-        _            => File { title: generate_title_todo(),   kind: FileType::Todo},
+    match pick_file_type(opts) {
+        FileType::Actionable => generate_actionable(opts),
+        FileType::Info       => generate_info      (opts),
     }
 }
+
+fn pick_file_type(_opts: &GeneratorOpts) -> FileType {
+    match rand::random_range(0.0 .. 1.0) {
+        0.00 .. 0.75 => FileType::Info,
+        _            => FileType::Actionable,
+
+    }
+}
+
+
+fn generate_actionable(opts: &GeneratorOpts) {
+
+    let action = pick!(&[
+        FmAction::MaybeSomeday,
+        FmAction::Project,
+        FmAction::Todo,
+        FmAction::WaitingFor,
+    ])
+        .get_key()
+    ;
+
+    let fm = match rand::random_range(0.0 .. 1.0) {
+        0.00 .. 0.33 => format!(""),
+        0.33 .. 0.66 => format!("type: action"),
+        _            => format!(r#"
+            type: action
+            action: {action}
+        "#),
+
+    };
+
+    let fm: Option<Mapping> = yaml_serde::from_str(&fm).ok();
+
+    let fm = match fm {
+        None     => String::new(),
+        Some(fm) => format!("---\n{}\n---\n", yaml_serde::to_string(&fm).unwrap()),
+    };
+
+    let title = if random_bool(0.90) {
+        generate_title_todo()
+    }
+    else {
+        generate_title_unique()
+    };
+
+    let file = get_file_name(&opts.path, &title);
+
+    fs::write(file, fm).unwrap();
+}
+
+fn generate_info(opts: &GeneratorOpts) {
+
+    let is_named = random_bool(0.90);
+
+
+    let (title, body) = if is_named {(
+        generate_title_info(),
+        lorem_ipsum        (),
+    )}
+    else {(
+        generate_title_unique(),
+        if random_bool(0.50) {
+            lorem_ipsum()
+        }
+        else {
+            ""
+        }
+    )};
+
+    let fm = if random_bool(0.90) {
+        "type: info"
+    }
+    else {
+        ""
+    };
+
+    let fm: Option<Mapping> = yaml_serde::from_str(&fm).ok();
+
+    let fm = match fm {
+        None     => String::new(),
+        Some(fm) => format!("---\n{}\n---\n", yaml_serde::to_string(&fm).unwrap()),
+    };
+
+    let file = get_file_name(&opts.path, &title);
+
+    fs::write(file, &format!("{}{}", fm, body)).unwrap();
+}
+
 
 fn generate_title_todo() -> String {
     let date = utils::generate_random_date();
 
     let words = vec![
-        pick![VERBS],
+        pick![VERBS,],
         pick!(PARTICLES),
         pick!(NOUNS),
         pick!(PREPOSITIONS),
@@ -173,6 +233,11 @@ fn generate_title_todo() -> String {
 }
 
 fn generate_title_info() -> String {
+
+    if random_bool(0.50) {
+        return generate_title_noun();
+    }
+
     let date = utils::generate_random_date();
 
     let words = vec![
@@ -208,10 +273,10 @@ const VERBS: &[&'static str] = &[
     "Throngle",
     "Glorneate",
     "Desecrate",
-    "Cultivate",
     "Cast",
     "Ruminate",
     "Deliniate",
+    "Drove",
 ];
 
 const VERB_PREPS: &[&'static str] = &[
@@ -223,15 +288,12 @@ const VERB_PREPS: &[&'static str] = &[
 ];
 
 const NOUNS: &[&'static str] = &[
-    "Nascent Soul",
-    "Gold Core",
-    "County capital",
-    "senior apprentice brother",
     "Master Seventh",
     "Xu Qing",
-    "Meng Hao",
     "Kaladin",
     "Moash",
+    "the House",
+    "my Car",
 ];
 
 const PARTICLES: &[&'static str] = &[
@@ -263,29 +325,24 @@ const WHEN: &[&'static str] = &[
     "a moment ago",
 ];
 
-
-#[derive(Debug, PartialEq, Eq)]
-struct File {
-    title: String,
-    kind:  FileType,
+fn get_file_name(path: &Path, title: &str) -> PathBuf {
+    path.join(format!("{title}.md"))
 }
+
 
 #[derive(Debug, PartialEq, Eq)]
 enum FileType {
-    Todo,
+    Actionable,
     Info,
-    Unnamed,
 }
 
-impl Hash for File {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.title.hash(state);
-    }
-}
-
-
-impl File {
-    pub fn title(&self) -> String {
-        format!("{}.md", self.title)
-    }
+fn lorem_ipsum() -> &'static str {
+    r#"
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore
+eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt
+in culpa qui officia deserunt mollit anim id est laborum.
+    "#
 }
