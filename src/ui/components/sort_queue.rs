@@ -301,7 +301,7 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 
     let cmd = match queue {
         QueueType::Inbox       => |f: &MdFile| f.needs_sorting(),
-        QueueType::Actionables => |f: &MdFile| f.is_actionable(),
+        QueueType::Actionables => |f: &MdFile| f.needs_action_assigned(),
     };
 
 
@@ -321,64 +321,83 @@ impl TryInto<ModifyFileKind> for Command {
 
     fn try_into(self) -> Result<ModifyFileKind, Self::Error> {
         Ok(match self {
-            Command::SetTypeInfo           => ModifyFileKind::SetTypeInfo,
-            Command::SetActionTodo         => ModifyFileKind::SetActionTodo,
-            Command::SetActionBacklog      => ModifyFileKind::SetActionBacklog,
-            Command::SetActionMaybeSomeday => ModifyFileKind::SetActionMaybeSomeday,
-            Command::SetActionWaitingFor   => ModifyFileKind::SetActionWaitingFor,
-            Command::SetStatusComplete     => ModifyFileKind::SetStatusComplete,
-            Command::SetStatusArchived     => ModifyFileKind::SetStatusArchived,
-            Command::DeleteFile            => Err(())?,
+            Command::SetTypeInfo  => ModifyFileKind::SetTypeInfo,
+            Command::SetAction(a) => ModifyFileKind::SetAction(a),
+            Command::SetStatus(s) => ModifyFileKind::SetStatus(s),
+            Command::DeleteFile   => Err(())?,
         })
     }
 }
 
 macro_rules! table {
-    ($( ($command:ident, $code:literal, $name:literal) ),*$(,)? ) => {[
+    ($( ($command:expr, $code:literal, $name:literal) ),*$(,)? ) => {[
 
         $(
             MenuCommand {
                 code:    $code,
                 name:    $name,
-                command: Command::$command
+                command: $command
             },
         )*
     ]}
 }
 
+type Cm = Command;
+type Fa = FmAction;
+type Fs = FmStatus;
+
 // TODO: make sort queue command agnostic
 pub static COMMANDS: &'static [MenuCommand<Command>] = &table!(
-    (SetTypeInfo,           "i", "type    - info"),
-    (SetActionTodo,         "t", "action  - todo"),
-    (SetActionBacklog,      "b", "action  - backlog"),
-    (SetActionMaybeSomeday, "m", "action  - maybe someday"),
-    (SetActionWaitingFor,   "w", "action  - waiting for"),
-    (SetStatusComplete,     "c", "status  - complete"),
-    (SetStatusArchived,     "a", "status  - archived"),
-    (DeleteFile,            "d", "command - delete file"),
+    (Cm::SetTypeInfo,                  "i", "type    - info"),
+    (Cm::SetAction(Fa::Todo),          "t", "action  - todo"),
+    (Cm::SetAction(Fa::Backlog),       "b", "action  - backlog"),
+    (Cm::SetAction(Fa::Entertainment), "e", "action  - entertainment"),
+    (Cm::SetAction(Fa::MaybeSomeday),  "m", "action  - maybe someday"),
+    (Cm::SetAction(Fa::WaitingFor),    "w", "action  - waiting for"),
+    (Cm::SetStatus(Fs::Completed),     "c", "status  - complete"),
+    (Cm::SetStatus(Fs::Archived),      "a", "status  - archived"),
+    (Cm::DeleteFile,                   "d", "command - delete file"),
 );
 
 pub static ACTIONABLES_COMMANDS: &'static [MenuCommand<Command>] = &table!(
-    (SetActionTodo,         "t", "action - todo"),
-    (SetActionBacklog,      "b", "action - backlog"),
-    (SetActionMaybeSomeday, "m", "action - maybe someday"),
-    (SetActionWaitingFor,   "w", "action - waiting for"),
-    (SetStatusComplete,     "c", "status - complete"),
-    (SetStatusArchived,     "a", "status - archived"),
+    (Cm::SetAction(Fa::Todo),          "t", "action - todo"),
+    (Cm::SetAction(Fa::Backlog),       "b", "action - backlog"),
+    (Cm::SetAction(Fa::Entertainment), "e", "action - entertainment"),
+    (Cm::SetAction(Fa::MaybeSomeday),  "m", "action - maybe someday"),
+    (Cm::SetAction(Fa::WaitingFor),    "w", "action - waiting for"),
+    (Cm::SetStatus(Fs::Completed),     "c", "status - complete"),
+    (Cm::SetStatus(Fs::Archived),      "a", "status - archived"),
 );
 
 
 impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Command::SetTypeInfo           => write!(f, "Set Type Info"),
-            Command::SetActionTodo         => write!(f, "Set Action Todo"),
-            Command::SetActionBacklog      => write!(f, "Set Action Backlog"),
-            Command::SetActionMaybeSomeday => write!(f, "Set Action Maybe Someday"),
-            Command::SetActionWaitingFor   => write!(f, "Set Action Waiting For"),
-            Command::SetStatusComplete     => write!(f, "Set Status Complete"),
-            Command::SetStatusArchived     => write!(f, "Set Status Archived"),
-            Command::DeleteFile            => write!(f, "Delete File"),
+            Cm::SetTypeInfo  => write!(f, "Set Type Info"),
+            Cm::SetAction(a) => write!(f, "Set Action {a}"),
+            Cm::SetStatus(s) => write!(f, "Set Status {s}"),
+            Cm::DeleteFile   => write!(f, "Delete File"),
+        }
+    }
+}
+
+impl Display for FmAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FmAction::Todo          => write!(f, "Todo"),
+            FmAction::Backlog       => write!(f, "Backlog"),
+            FmAction::Entertainment => write!(f, "Entertainment"),
+            FmAction::MaybeSomeday  => write!(f, "Maybe Someday"),
+            FmAction::WaitingFor    => write!(f, "Waiting For"),
+        }
+    }
+}
+
+impl Display for FmStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FmStatus::Completed => write!(f, "Completed"),
+            FmStatus::Archived  => write!(f, "Archived"),
         }
     }
 }
@@ -386,12 +405,8 @@ impl Display for Command {
 #[derive(Debug, Clone, Copy)]
 pub enum Command {
     SetTypeInfo,
-    SetActionTodo,
-    SetActionBacklog,
-    SetActionMaybeSomeday,
-    SetActionWaitingFor,
-    SetStatusComplete,
-    SetStatusArchived,
+    SetAction(FmAction),
+    SetStatus(FmStatus),
     DeleteFile,
 }
 

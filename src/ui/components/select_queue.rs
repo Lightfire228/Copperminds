@@ -51,8 +51,8 @@ impl SelectQueue {
         container(
             column![
                 text!("Select queue type"),
-                text!("T - Inbox"),
-                text!("A - Actionables"),
+                text!("T - Sort Inbox"),
+                text!("A - Sort Actionables"),
                 // text!("N - Nuke Actionables"),
                 text!(""),
                 self.stats.view().map(Message::VaultStats),

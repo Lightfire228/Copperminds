@@ -206,12 +206,9 @@ impl Index {
             .changes
             .iter()
             .filter_map(|command| Some(match command {
-                ModifyFileKind::SetTypeInfo           => (FmProperty::Type, FmType::Info  .get_key()),
+                ModifyFileKind::SetTypeInfo  => (FmProperty::Type, FmType::Info  .get_key()),
 
-                ModifyFileKind::SetActionTodo         |
-                ModifyFileKind::SetActionBacklog      |
-                ModifyFileKind::SetActionWaitingFor   |
-                ModifyFileKind::SetActionMaybeSomeday => (FmProperty::Type, FmType::Action.get_key()),
+                ModifyFileKind::SetAction(_) => (FmProperty::Type, FmType::Action.get_key()),
                 _ => None?
             }))
             .for_each(|prop| file.set_property(prop.0, prop.1))
@@ -221,12 +218,8 @@ impl Index {
             .changes
             .iter()
             .filter_map(|command| Some(match command {
-                ModifyFileKind::SetActionTodo         => (FmProperty::Action, FmAction::Todo        .get_key()),
-                ModifyFileKind::SetActionBacklog      => (FmProperty::Action, FmAction::Backlog     .get_key()),
-                ModifyFileKind::SetActionMaybeSomeday => (FmProperty::Action, FmAction::MaybeSomeday.get_key()),
-                ModifyFileKind::SetActionWaitingFor   => (FmProperty::Action, FmAction::WaitingFor  .get_key()),
-                ModifyFileKind::SetStatusComplete     => (FmProperty::Status, FmStatus::Completed   .get_key()),
-                ModifyFileKind::SetStatusArchived     => (FmProperty::Status, FmStatus::Archived    .get_key()),
+                ModifyFileKind::SetAction(action) => (FmProperty::Action, action.get_key()),
+                ModifyFileKind::SetStatus(status) => (FmProperty::Status, status.get_key()),
                 _ => None?
             }))
             .for_each(|prop| file.set_property(prop.0, prop.1))
@@ -245,15 +238,9 @@ impl Index {
 
         for cmd in changes.iter() {
             match cmd {
-                ModifyFileKind::SetTypeInfo           => info.push(cmd),
-
-                ModifyFileKind::SetActionTodo         |
-                ModifyFileKind::SetActionBacklog      |
-                ModifyFileKind::SetActionMaybeSomeday |
-                ModifyFileKind::SetActionWaitingFor   => action.push(cmd),
-
-                ModifyFileKind::SetStatusComplete     |
-                ModifyFileKind::SetStatusArchived     => status.push(cmd),
+                ModifyFileKind::SetTypeInfo  => info  .push(cmd),
+                ModifyFileKind::SetAction(_) => action.push(cmd),
+                ModifyFileKind::SetStatus(_) => status.push(cmd),
             }
         }
 

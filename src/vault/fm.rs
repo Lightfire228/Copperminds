@@ -11,42 +11,37 @@ pub enum FmProperty {
     Action,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FmType {
     Info,
     Action,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FmAction {
     Todo,
     Backlog,
+    Entertainment,
     MaybeSomeday,
     WaitingFor,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FmStatus {
     Completed,
-    Complete,
     Archived,
-    Archive,
 }
 
 impl FmStatus {
     pub fn _is_completed(&self) -> bool {
         match self {
             FmStatus::Completed => true,
-            FmStatus::Complete  => true,
             FmStatus::Archived  => false,
-            FmStatus::Archive   => false,
         }
     }
 
     pub fn _is_archived(&self) -> bool {
         match self {
             FmStatus::Completed => false,
-            FmStatus::Complete  => false,
             FmStatus::Archived  => true,
-            FmStatus::Archive   => true,
         }
     }
 }
@@ -85,17 +80,16 @@ impl_get_key!(FmType,
 );
 
 impl_get_key!(FmAction,
-    WaitingFor   => "waiting_for",
-    Todo         => "todo",
-    Backlog      => "backlog",
-    MaybeSomeday => "maybe_someday",
+    WaitingFor    => "waiting_for",
+    Todo          => "todo",
+    Backlog       => "backlog",
+    Entertainment => "entertainment",
+    MaybeSomeday  => "maybe_someday",
 );
 
 impl_get_key!(FmStatus,
     Completed => "completed",
-    Complete  => "complete",
     Archived  => "archived",
-    Archive   => "archive",
 );
 
 impl GetKey for String {

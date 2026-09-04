@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use file_id::FileId;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::vault::{VaultStats, fm::FmProperty, md_file::{FileView, MdFile}};
+use crate::vault::{VaultStats, fm::{FmAction, FmProperty, FmStatus}, md_file::{FileView, MdFile}};
 
 // https://tokio.rs/tokio/tutorial/channels
 #[derive(Debug)]
@@ -96,12 +96,8 @@ pub enum VaultUpdate {
 #[derive(Debug, Clone, Copy)]
 pub enum ModifyFileKind {
     SetTypeInfo,
-    SetActionTodo,
-    SetActionBacklog,
-    SetActionMaybeSomeday,
-    SetActionWaitingFor,
-    SetStatusComplete,
-    SetStatusArchived,
+    SetAction(FmAction),
+    SetStatus(FmStatus),
 }
 
 

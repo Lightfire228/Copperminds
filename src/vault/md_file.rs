@@ -310,9 +310,9 @@ mod tests {
 
     #[test]
     fn test_status_sorting() {
-        let archive   = fm!(FmProperty::Status => FmStatus::Archive);
+        let archive   = fm!(FmProperty::Status => "archive");
         let archived  = fm!(FmProperty::Status => FmStatus::Archived);
-        let complete  = fm!(FmProperty::Status => FmStatus::Complete);
+        let complete  = fm!(FmProperty::Status => "complete");
         let completed = fm!(FmProperty::Status => FmStatus::Completed);
 
         assert_eq!(archive  .is_archived(), true);
