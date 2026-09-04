@@ -57,6 +57,8 @@ struct Settings {
 }
 
 
+const TARGET_GEN_FOLDER: &str = "01 Generated Vault";
+
 
 pub fn generate_sample_vault() {
     info!("Running generator");
@@ -64,7 +66,7 @@ pub fn generate_sample_vault() {
     let env = Env::Dev;
 
     let dev_vault = env.vault_path();
-    let folder    = dev_vault.join("01 Generated Vault");
+    let folder    = dev_vault.join(TARGET_GEN_FOLDER);
 
     clear_vault(env);
     fs::create_dir(&folder).unwrap();
@@ -74,7 +76,7 @@ pub fn generate_sample_vault() {
         path:       folder,
         file_count: 3000..4000,
         settings:   Settings {
-            gen_info:        true,
+            gen_info:        false,
             gen_actionables: true,
             gen_unsorted:    true,
 
@@ -98,15 +100,9 @@ pub fn generate_sample_vault() {
 fn clear_vault(env: Env) {
     assert_ne!(env, Env::Prod, "YOU FOOL");
 
-    let path = env.vault_path();
+    let path = env.vault_path().join(TARGET_GEN_FOLDER);
 
     fs::remove_dir_all(&path).unwrap();
-    fs::create_dir    (&path).unwrap();
-
-    let obsidian_template = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("generate/.obsidian");
-
-    fs_extra::copy_items(&[obsidian_template], path, &CopyOptions::new()).unwrap();
-
 }
 
 
