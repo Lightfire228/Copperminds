@@ -5,15 +5,18 @@ use std::path::Path;
 use std::{collections::HashSet, env, fs, path::PathBuf};
 use std::hash::Hash;
 
+use anyhow::Ok;
 use fs_extra::dir::CopyOptions;
 use rand::{self, random_bool, random_range};
 use yaml_serde::Mapping;
 use crate::prelude::*;
 
 use crate::vault::fm::{FmAction, GetKey};
+use crate::vault::generator::gen_info::generate_info;
 use crate::vault::{Env};
 
 mod utils;
+mod gen_info;
 
 macro_rules! pick {
     ($ident:expr) => {{
@@ -40,10 +43,19 @@ macro_rules! pick {
 }
 
 struct GeneratorOpts {
-    path:       PathBuf,
+    path:          PathBuf,
 
-    file_count: Range<usize>,
+    file_count:    Range<usize>,
+    settings:      Settings,
 }
+
+struct Settings {
+    gen_info:        bool,
+    gen_actionables: bool,
+    gen_unnamed:     bool,
+    gen_unsorted:    bool,
+}
+
 
 
 pub fn generate_sample_vault() {
@@ -60,16 +72,25 @@ pub fn generate_sample_vault() {
 
     let opts = GeneratorOpts {
         path:       folder,
-        file_count: 3000..4000
+        file_count: 3000..4000,
+        settings:   Settings {
+            gen_info:        true,
+            gen_actionables: true,
+            gen_unsorted:    true,
+
+            gen_unnamed:     false,
+        }
     };
 
-    let file_count = random_range(opts.file_count.clone());
+    let max_count = random_range(opts.file_count.clone());
 
-    for _ in 0..file_count {
-        generate_file(&opts);
-    }
+    let count = (0..max_count)
+        .into_iter ()
+        .filter_map(|_| generate_file(&opts))
+        .count     ()
+    ;
 
-    write_generator_statistics(&dev_vault, file_count);
+    write_generator_statistics(&dev_vault, count);
 }
 
 
@@ -103,6 +124,10 @@ fn write_generator_statistics(dev_vault: &Path, file_count: usize) {
 
     // MAYBE: can this be proc macroed like quote!{} ?
     let text = vec![
+        f!("---"),
+        f!("type: info"),
+        f!("---"),
+        f!(""),
         f!("Generated on"),
         f!("- {}", now.format("%Y-%m-%d %H:%M:%S")),
         f!(""),
@@ -119,7 +144,7 @@ fn write_generator_statistics(dev_vault: &Path, file_count: usize) {
 
 // --- Generators
 
-fn generate_file(opts: &GeneratorOpts) {
+fn generate_file(opts: &GeneratorOpts) -> Option<()> {
 
     match pick_file_type(opts) {
         FileType::Actionable => generate_actionable(opts),
@@ -136,21 +161,45 @@ fn pick_file_type(_opts: &GeneratorOpts) -> FileType {
 }
 
 
-fn generate_actionable(opts: &GeneratorOpts) {
+fn generate_actionable(opts: &GeneratorOpts) -> Option<()> {
+
+    if !opts.settings.gen_actionables {
+        return None;
+    }
+
+
+    enum ActionableState {
+        None,
+        Unsorted,
+        Sorted,
+    }
+
 
     let action = pick!(&[
-        FmAction::MaybeSomeday,
-        FmAction::Project,
         FmAction::Todo,
+        FmAction::Backlog,
         FmAction::WaitingFor,
+        FmAction::MaybeSomeday,
     ])
         .get_key()
     ;
 
-    let fm = match rand::random_range(0.0 .. 1.0) {
-        0.00 .. 0.33 => format!(""),
-        0.33 .. 0.66 => format!("type: action"),
-        _            => format!(r#"
+    let state = match rand::random_range(0.0 .. 1.0) {
+        0.00 .. 0.33 => ActionableState::None,
+        0.33 .. 0.66 => ActionableState::Unsorted,
+        _            => ActionableState::Sorted,
+    };
+
+    let is_sorted = matches!(state, ActionableState::Sorted);
+
+    if !(opts.settings.gen_unsorted || is_sorted) {
+        None?
+    }
+
+    let fm = match state {
+        ActionableState::None     => format!(""),
+        ActionableState::Unsorted => format!("type: action"),
+        ActionableState::Sorted   => format!(r#"
             type: action
             action: {action}
         "#),
@@ -167,53 +216,19 @@ fn generate_actionable(opts: &GeneratorOpts) {
     let title = if random_bool(0.90) {
         generate_title_todo()
     }
-    else {
+    else if opts.settings.gen_unnamed {
         generate_title_unique()
+    }
+    else {
+        None?
     };
 
     let file = get_file_name(&opts.path, &title);
 
     fs::write(file, fm).unwrap();
+
+    Some(())
 }
-
-fn generate_info(opts: &GeneratorOpts) {
-
-    let is_named = random_bool(0.90);
-
-
-    let (title, body) = if is_named {(
-        generate_title_info(),
-        lorem_ipsum        (),
-    )}
-    else {(
-        generate_title_unique(),
-        if random_bool(0.50) {
-            lorem_ipsum()
-        }
-        else {
-            ""
-        }
-    )};
-
-    let fm = if random_bool(0.90) {
-        "type: info"
-    }
-    else {
-        ""
-    };
-
-    let fm: Option<Mapping> = yaml_serde::from_str(&fm).ok();
-
-    let fm = match fm {
-        None     => String::new(),
-        Some(fm) => format!("---\n{}\n---\n", yaml_serde::to_string(&fm).unwrap()),
-    };
-
-    let file = get_file_name(&opts.path, &title);
-
-    fs::write(file, &format!("{}{}", fm, body)).unwrap();
-}
-
 
 fn generate_title_todo() -> String {
     let date = utils::generate_random_date();
