@@ -323,9 +323,9 @@ impl TryInto<ModifyFileKind> for Command {
         Ok(match self {
             Command::SetTypeInfo           => ModifyFileKind::SetTypeInfo,
             Command::SetActionTodo         => ModifyFileKind::SetActionTodo,
-            Command::SetActionWaitingFor   => ModifyFileKind::SetActionWaitingFor,
-            Command::SetActionProject      => ModifyFileKind::SetActionProject,
+            Command::SetActionBacklog      => ModifyFileKind::SetActionBacklog,
             Command::SetActionMaybeSomeday => ModifyFileKind::SetActionMaybeSomeday,
+            Command::SetActionWaitingFor   => ModifyFileKind::SetActionWaitingFor,
             Command::SetStatusComplete     => ModifyFileKind::SetStatusComplete,
             Command::SetStatusArchived     => ModifyFileKind::SetStatusArchived,
             Command::DeleteFile            => Err(())?,
@@ -350,23 +350,21 @@ macro_rules! table {
 pub static COMMANDS: &'static [MenuCommand<Command>] = &table!(
     (SetTypeInfo,           "i", "type    - info"),
     (SetActionTodo,         "t", "action  - todo"),
-    (SetActionWaitingFor,   "w", "action  - waiting for"),
-    (SetActionProject,      "p", "action  - project"),
+    (SetActionBacklog,      "b", "action  - backlog"),
     (SetActionMaybeSomeday, "m", "action  - maybe someday"),
+    (SetActionWaitingFor,   "w", "action  - waiting for"),
     (SetStatusComplete,     "c", "status  - complete"),
     (SetStatusArchived,     "a", "status  - archived"),
     (DeleteFile,            "d", "command - delete file"),
 );
 
 pub static ACTIONABLES_COMMANDS: &'static [MenuCommand<Command>] = &table!(
-    // (SetTypeInfo,           "i", "type    - info"),
-    // (SetActionTodo,         "t", "action  - todo"),
-    // (SetActionWaitingFor,   "w", "action  - waiting for"),
-    // (SetActionProject,      "p", "action  - project"),
-    // (SetActionMaybeSomeday, "m", "action  - maybe someday"),
-    // (SetStatusComplete,     "c", "status  - complete"),
-    // (SetStatusArchived,     "a", "status  - archived"),
-    // (DeleteFile,            "d", "command - delete file"),
+    (SetActionTodo,         "t", "action - todo"),
+    (SetActionBacklog,      "b", "action - backlog"),
+    (SetActionMaybeSomeday, "m", "action - maybe someday"),
+    (SetActionWaitingFor,   "w", "action - waiting for"),
+    (SetStatusComplete,     "c", "status - complete"),
+    (SetStatusArchived,     "a", "status - archived"),
 );
 
 
@@ -375,9 +373,9 @@ impl Display for Command {
         match self {
             Command::SetTypeInfo           => write!(f, "Set Type Info"),
             Command::SetActionTodo         => write!(f, "Set Action Todo"),
-            Command::SetActionWaitingFor   => write!(f, "Set Action Waiting For"),
-            Command::SetActionProject      => write!(f, "Set Action Project"),
+            Command::SetActionBacklog      => write!(f, "Set Action Backlog"),
             Command::SetActionMaybeSomeday => write!(f, "Set Action Maybe Someday"),
+            Command::SetActionWaitingFor   => write!(f, "Set Action Waiting For"),
             Command::SetStatusComplete     => write!(f, "Set Status Complete"),
             Command::SetStatusArchived     => write!(f, "Set Status Archived"),
             Command::DeleteFile            => write!(f, "Delete File"),
@@ -389,9 +387,9 @@ impl Display for Command {
 pub enum Command {
     SetTypeInfo,
     SetActionTodo,
-    SetActionWaitingFor,
-    SetActionProject,
+    SetActionBacklog,
     SetActionMaybeSomeday,
+    SetActionWaitingFor,
     SetStatusComplete,
     SetStatusArchived,
     DeleteFile,

@@ -209,8 +209,8 @@ impl Index {
                 ModifyFileKind::SetTypeInfo           => (FmProperty::Type, FmType::Info  .get_key()),
 
                 ModifyFileKind::SetActionTodo         |
+                ModifyFileKind::SetActionBacklog      |
                 ModifyFileKind::SetActionWaitingFor   |
-                ModifyFileKind::SetActionProject      |
                 ModifyFileKind::SetActionMaybeSomeday => (FmProperty::Type, FmType::Action.get_key()),
                 _ => None?
             }))
@@ -222,9 +222,9 @@ impl Index {
             .iter()
             .filter_map(|command| Some(match command {
                 ModifyFileKind::SetActionTodo         => (FmProperty::Action, FmAction::Todo        .get_key()),
-                ModifyFileKind::SetActionWaitingFor   => (FmProperty::Action, FmAction::WaitingFor  .get_key()),
-                ModifyFileKind::SetActionProject      => (FmProperty::Action, FmAction::Project     .get_key()),
+                ModifyFileKind::SetActionBacklog      => (FmProperty::Action, FmAction::Backlog     .get_key()),
                 ModifyFileKind::SetActionMaybeSomeday => (FmProperty::Action, FmAction::MaybeSomeday.get_key()),
+                ModifyFileKind::SetActionWaitingFor   => (FmProperty::Action, FmAction::WaitingFor  .get_key()),
                 ModifyFileKind::SetStatusComplete     => (FmProperty::Status, FmStatus::Completed   .get_key()),
                 ModifyFileKind::SetStatusArchived     => (FmProperty::Status, FmStatus::Archived    .get_key()),
                 _ => None?
@@ -248,9 +248,9 @@ impl Index {
                 ModifyFileKind::SetTypeInfo           => info.push(cmd),
 
                 ModifyFileKind::SetActionTodo         |
-                ModifyFileKind::SetActionWaitingFor   |
-                ModifyFileKind::SetActionProject      |
-                ModifyFileKind::SetActionMaybeSomeday => action.push(cmd),
+                ModifyFileKind::SetActionBacklog      |
+                ModifyFileKind::SetActionMaybeSomeday |
+                ModifyFileKind::SetActionWaitingFor   => action.push(cmd),
 
                 ModifyFileKind::SetStatusComplete     |
                 ModifyFileKind::SetStatusArchived     => status.push(cmd),

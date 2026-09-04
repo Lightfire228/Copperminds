@@ -97,9 +97,9 @@ pub enum VaultUpdate {
 pub enum ModifyFileKind {
     SetTypeInfo,
     SetActionTodo,
-    SetActionWaitingFor,
-    SetActionProject,
+    SetActionBacklog,
     SetActionMaybeSomeday,
+    SetActionWaitingFor,
     SetStatusComplete,
     SetStatusArchived,
 }

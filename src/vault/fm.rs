@@ -18,11 +18,10 @@ pub enum FmType {
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FmAction {
-    WaitingFor,
-    Calendar,
     Todo,
+    Backlog,
     MaybeSomeday,
-    Project,
+    WaitingFor,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FmStatus {
@@ -37,15 +36,17 @@ impl FmStatus {
         match self {
             FmStatus::Completed => true,
             FmStatus::Complete  => true,
-            _ => false,
+            FmStatus::Archived  => false,
+            FmStatus::Archive   => false,
         }
     }
 
     pub fn _is_archived(&self) -> bool {
         match self {
-            FmStatus::Archived => true,
-            FmStatus::Archive  => true,
-            _ => false,
+            FmStatus::Completed => false,
+            FmStatus::Complete  => false,
+            FmStatus::Archived  => true,
+            FmStatus::Archive   => true,
         }
     }
 }
@@ -85,10 +86,9 @@ impl_get_key!(FmType,
 
 impl_get_key!(FmAction,
     WaitingFor   => "waiting_for",
-    Calendar     => "calendar",
     Todo         => "todo",
+    Backlog      => "backlog",
     MaybeSomeday => "maybe_someday",
-    Project      => "maybe_someday",
 );
 
 impl_get_key!(FmStatus,
@@ -106,6 +106,6 @@ impl GetKey for String {
 
 impl GetKey for &str {
     fn get_key(&self) -> String {
-        (*self).to_owned()
+        self.to_string()
     }
 }
