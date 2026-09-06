@@ -23,7 +23,7 @@ use trash;
 use md_file::{MdFile};
 
 
-pub const ENV: Env = Env::Dev;
+pub const ENV: Env = Env::Prod;
 
 macro_rules! regex {
     ($i:ident = $r:expr) => {
@@ -478,6 +478,12 @@ pub struct VaultStats {
 
     pub needs_action:           usize,
     pub needs_sorted:           usize,
+
+    pub open_todo:              usize,
+    pub open_backlog:           usize,
+    pub open_entertainment:     usize,
+    pub open_maybe_someday:     usize,
+    pub open_waiting_for:       usize,
 }
 
 impl Index {
@@ -494,6 +500,12 @@ impl Index {
 
             needs_action:         self.count(|x| x.needs_action_assigned()),
             needs_sorted:         self.count(|x| x.needs_sorting()),
+
+            open_todo:            self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::Todo)),
+            open_backlog:         self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::Backlog)),
+            open_entertainment:   self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::Entertainment)),
+            open_maybe_someday:   self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::MaybeSomeday)),
+            open_waiting_for:     self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::WaitingFor)),
         }
 
     }

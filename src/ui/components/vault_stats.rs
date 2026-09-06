@@ -47,6 +47,14 @@ impl VaultStatsComponent {
             text!(""),
             text!("needs action           - {:>5}", self.stats.needs_action),
             text!("needs sorted           - {:>5}", self.stats.needs_sorted),
+            text!(""),
+            text!("Open Actionables"),
+            text!("==="),
+            text!("todo                   - {:>5}", self.stats.open_todo),
+            text!("backlog                - {:>5}", self.stats.open_backlog),
+            text!("entertainment          - {:>5}", self.stats.open_entertainment),
+            text!("maybe someday          - {:>5}", self.stats.open_maybe_someday),
+            text!("waiting for            - {:>5}", self.stats.open_waiting_for),
         ]
             .into()
     }

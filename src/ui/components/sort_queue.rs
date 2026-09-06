@@ -360,6 +360,7 @@ pub static COMMANDS: &'static [MenuCommand<Command>] = &table!(
 );
 
 pub static ACTIONABLES_COMMANDS: &'static [MenuCommand<Command>] = &table!(
+    (Cm::SetTypeInfo,                  "i", "type    - info"),
     (Cm::SetAction(Fa::Todo),          "t", "action - todo"),
     (Cm::SetAction(Fa::Backlog),       "b", "action - backlog"),
     (Cm::SetAction(Fa::Entertainment), "e", "action - entertainment"),
@@ -369,14 +370,13 @@ pub static ACTIONABLES_COMMANDS: &'static [MenuCommand<Command>] = &table!(
     (Cm::SetStatus(Fs::Archived),      "a", "status - archived"),
 );
 
-
 impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Cm::SetTypeInfo  => write!(f, "Set Type Info"),
-            Cm::SetAction(a) => write!(f, "Set Action {a}"),
-            Cm::SetStatus(s) => write!(f, "Set Status {s}"),
-            Cm::DeleteFile   => write!(f, "Delete File"),
+            Command::SetTypeInfo  => write!(f, "Set Type Info"),
+            Command::SetAction(a) => write!(f, "Set Action {a}"),
+            Command::SetStatus(s) => write!(f, "Set Status {s}"),
+            Command::DeleteFile   => write!(f, "Delete File"),
         }
     }
 }
