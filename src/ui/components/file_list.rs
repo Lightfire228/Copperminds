@@ -2,7 +2,8 @@ use std::usize;
 
 use file_id::FileId;
 use iced::Length::Fill;
-use iced::keyboard;
+use iced::{Alignment, keyboard};
+use iced::widget::table::{self, Table};
 use iced::widget::text_editor::KeyPress;
 use iced::widget::text_input::cursor;
 use iced::{Element, keyboard::Key, widget::container};
@@ -11,7 +12,7 @@ use iced::widget::{column, row, text};
 use crate::collections::Files;
 use crate::prelude::*;
 use crate::ui::key_event::KeyPressed;
-use crate::vault::md_file::FileView;
+use crate::vault::md_file::{FileView, MdFile};
 
 
 #[derive(Debug, Clone)]
@@ -45,35 +46,35 @@ impl FileList {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+        type T<'a> = (usize, &'a FileView);
 
-        let (cursors, files): (Vec<_>, Vec<_>) = self
+        let cursor = |(i, _): T|
+            if i == self.cursor {
+                "> "
+            }
+            else {
+                ""
+            }
+        ;
+
+        let file_name = |(_, f): T| text!("{}", f.name)
+            .wrapping(text::Wrapping::None)
+        ;
+
+        let files = self
             .files
             .iter     ()
             .enumerate()
-            .map      (|(i, f)| {
-                let x = if i == self.cursor { "> " } else { "" };
-
-                (
-                    text!("{}", x)     .into(),
-                    text!("{}", f.name)
-                        .wrapping(text::Wrapping::None)
-                        .into()
-                    ,
-                )
-            })
-            .unzip()
         ;
 
-        row![
-            container(column(cursors))
-                .padding([10, 0])
-            ,
-            container(
-                column(files)
-            )
-                .width  (Fill)
-                .padding([10, 0])
-        ]
+
+        let cols = [
+            table::column("", cursor).align_x(Alignment::Start),
+            table::column("", file_name),
+        ];
+
+        Table::new(cols, files)
+            .padding_x(10)
             .into()
 
     }

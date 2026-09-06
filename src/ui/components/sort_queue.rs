@@ -4,10 +4,11 @@ use std::fmt::Display;
 use file_id::FileId;
 use iced::Length::{self, Fill};
 use iced::keyboard;
+use iced::widget::table::Table;
 use tokio::fs::File;
 use tokio::sync::mpsc::Sender;
 use iced::{Element, Task, keyboard::Key, widget::container};
-use iced::widget::{Space, column, row, space, text};
+use iced::widget::{Space, column, row, space, table, text};
 
 use crate::collections::Files;
 use crate::ui::components::file_list::{self, FileList};
@@ -329,7 +330,7 @@ impl TryInto<ModifyFileKind> for Command {
     }
 }
 
-macro_rules! table {
+macro_rules! cmd_table {
     ($( ($command:expr, $code:literal, $name:literal) ),*$(,)? ) => {[
 
         $(
@@ -347,7 +348,7 @@ type Fa = FmAction;
 type Fs = FmStatus;
 
 // TODO: make sort queue command agnostic
-pub static COMMANDS: &'static [MenuCommand<Command>] = &table!(
+pub static COMMANDS: &'static [MenuCommand<Command>] = &cmd_table!(
     (Cm::SetTypeInfo,                  "i", "type    - info"),
     (Cm::SetAction(Fa::Todo),          "t", "action  - todo"),
     (Cm::SetAction(Fa::Backlog),       "b", "action  - backlog"),
@@ -359,8 +360,8 @@ pub static COMMANDS: &'static [MenuCommand<Command>] = &table!(
     (Cm::DeleteFile,                   "d", "command - delete file"),
 );
 
-pub static ACTIONABLES_COMMANDS: &'static [MenuCommand<Command>] = &table!(
-    (Cm::SetTypeInfo,                  "i", "type    - info"),
+pub static ACTIONABLES_COMMANDS: &'static [MenuCommand<Command>] = &cmd_table!(
+    (Cm::SetTypeInfo,                  "i", "type   - info"),
     (Cm::SetAction(Fa::Todo),          "t", "action - todo"),
     (Cm::SetAction(Fa::Backlog),       "b", "action - backlog"),
     (Cm::SetAction(Fa::Entertainment), "e", "action - entertainment"),
@@ -381,26 +382,6 @@ impl Display for Command {
     }
 }
 
-impl Display for FmAction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FmAction::Todo          => write!(f, "Todo"),
-            FmAction::Backlog       => write!(f, "Backlog"),
-            FmAction::Entertainment => write!(f, "Entertainment"),
-            FmAction::MaybeSomeday  => write!(f, "Maybe Someday"),
-            FmAction::WaitingFor    => write!(f, "Waiting For"),
-        }
-    }
-}
-
-impl Display for FmStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FmStatus::Completed => write!(f, "Completed"),
-            FmStatus::Archived  => write!(f, "Archived"),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Command {

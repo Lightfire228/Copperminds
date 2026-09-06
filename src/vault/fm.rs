@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::fmt::Display;
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -101,5 +103,27 @@ impl GetKey for String {
 impl GetKey for &str {
     fn get_key(&self) -> String {
         self.to_string()
+    }
+}
+
+
+impl Display for FmAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FmAction::Todo          => write!(f, "Todo"),
+            FmAction::Backlog       => write!(f, "Backlog"),
+            FmAction::Entertainment => write!(f, "Entertainment"),
+            FmAction::MaybeSomeday  => write!(f, "Maybe Someday"),
+            FmAction::WaitingFor    => write!(f, "Waiting For"),
+        }
+    }
+}
+
+impl Display for FmStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FmStatus::Completed => write!(f, "Completed"),
+            FmStatus::Archived  => write!(f, "Archived"),
+        }
     }
 }

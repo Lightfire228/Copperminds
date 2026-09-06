@@ -76,11 +76,11 @@ pub fn generate_sample_vault() {
         path:       folder,
         file_count: 3000..4000,
         settings:   Settings {
-            gen_info:        false,
+            gen_info:        true,
             gen_actionables: true,
             gen_unsorted:    true,
 
-            gen_unnamed:     false,
+            gen_unnamed:     true,
         }
     };
 
@@ -102,7 +102,9 @@ fn clear_vault(env: Env) {
 
     let path = env.vault_path().join(TARGET_GEN_FOLDER);
 
-    fs::remove_dir_all(&path).unwrap();
+    if fs::exists(&path).unwrap() {
+        fs::remove_dir_all(&path).unwrap();
+    }
 }
 
 
