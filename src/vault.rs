@@ -6,6 +6,7 @@ pub mod command;
 mod file_utilities;
 mod watch;
 mod generator;
+mod ecs;
 
 
 use crate::{obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}, md_file::FileView, watch::FileData}};

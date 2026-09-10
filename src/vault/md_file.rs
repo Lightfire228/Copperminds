@@ -3,7 +3,7 @@ use std::{fs, path::{Path, PathBuf}};
 
 use file_id::FileId;
 
-use crate::vault::{file_utilities::RawFile, fm::{FmProperty, FmType, GetKey}, watch::FileData};
+use crate::{file_shit, vault::{file_utilities::RawFile, fm::{FmProperty, FmType, GetKey}, watch::FileData}};
 
 use super::regex;
 
@@ -27,11 +27,11 @@ pub struct FileView {
 impl MdFile {
 
     pub fn new(data: FileData) -> Self {
-        let text = fs::read_to_string(&data.name).unwrap();
+        let text = file_shit::get_file_name(&data.name);
 
         Self {
             id:        data.id,
-            file_name: data.name.file_name().unwrap().to_str().unwrap().to_owned(),
+            file_name: file_shit::get_file_name(&data.name),
             path:      data.name,
             raw_file:  RawFile::new(text),
         }

@@ -19,7 +19,7 @@ pub struct RawFile {
     pub is_empty_raw:     bool,
 
     /// this is for debug purposes
-    og_text: String,
+    pub og_text: String,
 }
 
 impl RawFile {

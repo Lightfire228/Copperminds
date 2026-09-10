@@ -7,3 +7,4 @@ pub mod obsidian;
 pub mod prelude;
 pub mod ui;
 pub mod vault;
+pub mod file_shit;
