@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display, mem::take, sync::LazyLock};
+
+use enum_iterator::{Sequence, all};
+use iced::wgpu::naga::MathFunction::Fma;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,7 +21,7 @@ pub enum FmType {
     Info,
     Action,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Sequence)]
 pub enum FmAction {
     Todo,
     Backlog,
@@ -26,7 +29,7 @@ pub enum FmAction {
     MaybeSomeday,
     WaitingFor,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Sequence)]
 pub enum FmStatus {
     Completed,
     Archived,
@@ -127,3 +130,35 @@ impl Display for FmStatus {
         }
     }
 }
+
+impl TryFrom<&str> for FmType {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<FmType, Self::Error> {
+        Ok(match value {
+            "action" => FmType::Action,
+            "info"   => FmType::Info,
+            _        => Err(())?
+        })
+    }
+}
+
+macro_rules! try_from_get_key {
+    ($name:ident) => {
+
+        impl TryFrom<&str> for $name {
+            type Error = ();
+
+            fn try_from(value: &str) -> Result<$name, Self::Error> {
+
+                static TABLE: LazyLock<HashMap<String, $name>> = LazyLock::new(|| all::<$name>().map(|x| (x.get_key(), x)).collect());
+
+                TABLE.get(value).cloned().ok_or(())
+            }
+        }
+
+    };
+}
+
+try_from_get_key!(FmStatus);
+try_from_get_key!(FmAction);
