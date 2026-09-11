@@ -160,5 +160,19 @@ macro_rules! try_from_get_key {
     };
 }
 
-try_from_get_key!(FmStatus);
 try_from_get_key!(FmAction);
+
+impl TryFrom<&str> for FmStatus {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<FmStatus, Self::Error> {
+
+        Ok(match value {
+            "complete"  |
+            "completed" => FmStatus::Completed,
+            "archive"   |
+            "archived"  => FmStatus::Archived,
+            _           => Err(())?
+        })
+    }
+}

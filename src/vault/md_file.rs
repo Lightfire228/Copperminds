@@ -27,7 +27,7 @@ pub struct FileView {
 impl MdFile {
 
     pub fn new(data: FileData) -> Self {
-        let text = file_shit::get_file_name(&data.name);
+        let text = file_shit::get_file_text(&data.name);
 
         Self {
             id:        data.id,

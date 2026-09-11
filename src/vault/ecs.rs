@@ -1,15 +1,16 @@
-mod components;
+mod systems;
 
 use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
 
-use file_id::FileId;
-use log::warn;
+use log::{debug, warn};
 use yaml_serde::Mapping;
 
 use crate::{file_shit, vault::{file_utilities::RawFile, fm::{FmAction, FmProperty, FmStatus, FmType}, md_file::MdFile}};
 
+type FileId = file_id::FileId;
+
 #[derive(Default)]
-pub struct ECS {
+pub struct Ecs {
 
     file:    HashMap<FileId, File>,
     fm:      HashMap<FileId, FmComponent>,
@@ -19,49 +20,70 @@ pub struct ECS {
     empty:   HashSet<FileId>,
 
     // fm properties
+    type_:   HashMap<FileId, TypeComponent>,
     info:    HashSet<FileId>,
     action:  HashMap<FileId, ActionComponent>,
     status:  HashMap<FileId, StatusComponent>,
 
 }
 
+#[derive(Debug)]
 pub struct File {
-    pub name:    String,
-    pub unnamed: bool,
+    pub name:     String,
+    pub unnamed:  bool,
 
     /// is the absolute file path to the file
-    pub path:    PathBuf,
+    pub path:     PathBuf,
 
     /// this is for debugging purposes
     /// mainly to confirm there haven't been any untracked changes since the last vault scan
-    pub og_text: String,
+    pub raw_text: String,
 }
 
+#[derive(Debug)]
 pub struct FmComponent {
     pub fm: Mapping,
 }
 
+#[derive(Debug)]
 pub struct MdTextComponent {
     pub text: String,
 }
 
+#[derive(Debug)]
 pub struct TypeComponent {
     pub type_: FmType,
 }
 
+#[derive(Debug)]
 pub struct ActionComponent {
     pub action: FmAction,
 }
 
+#[derive(Debug)]
 pub struct StatusComponent {
     pub status: FmStatus,
 }
 
-pub struct NewFile {
-    pub id:      FileId,
 
-    pub path:    PathBuf,
-    pub og_text: String,
+pub struct NewFile {
+    pub id:       FileId,
+
+    pub path:     PathBuf,
+    pub raw_text: String,
+    pub name:     String,
+}
+
+#[derive(Debug)]
+pub struct FileView<'a> {
+    pub file:     &'a File,
+    pub fm:       Option<&'a FmComponent>,
+    pub md_text:  Option<&'a MdTextComponent>,
+    pub is_empty: bool,
+    pub type_:    Option<&'a TypeComponent>,
+    pub info:     bool,
+    pub action:   Option<&'a ActionComponent>,
+    pub status:   Option<&'a StatusComponent>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -69,6 +91,7 @@ pub enum ComponentKind {
     Frontmatter,
     MdText,
     Empty,
+    Type,
     Info,
     Action,
     Status,
@@ -92,7 +115,7 @@ pub enum ComponentValueIter<'a> {
     Status     (Box<dyn Iterator<Item = (FileId, &'a StatusComponent )> + 'a>),
 }
 
-impl ECS {
+impl Ecs {
     #[allow(unused)]
     pub fn new() -> Self {
         Default::default()
@@ -105,13 +128,13 @@ impl ECS {
         let moqup = MdFile {
             id:        FileId::Inode { device_id: 0, inode_number: 0 },
             path:      PathBuf::new(),
-            raw_file:  RawFile::new(file.og_text.clone()),
+            raw_file:  RawFile::new(file.raw_text.clone()),
             file_name: "".to_owned(),
         };
 
         self.file.insert(file.id, File {
-            name:    file_shit::get_file_name(&file.path),
-            og_text: file_shit::get_file_text(&file.path),
+            name:    file.name,
+            raw_text: file.raw_text,
             unnamed: moqup.is_unnamed(),
             path:    file.path,
         });
@@ -123,6 +146,7 @@ impl ECS {
         // - action
 
 
+        self.add_type  (&moqup, file.id);
         self.add_info  (&moqup, file.id);
         self.add_status(&moqup, file.id);
         self.add_action(&moqup, file.id);
@@ -135,6 +159,19 @@ impl ECS {
         self.add_md(md, file.id);
     }
 
+    fn add_type(&mut self, moqup: &MdFile, id: FileId) {
+        let Some(type_) = moqup.get_property(FmProperty::Type) else {
+            return;
+        };
+
+        let Ok  (type_) = type_.as_str().try_into() else {
+            warn!("unknown type prop: {type_}");
+            return;
+        };
+
+        self.type_.insert(id, TypeComponent { type_ });
+    }
+
     fn add_info(&mut self, moqup: &MdFile, id: FileId) {
         if !moqup.is_type_info() {
             return;
@@ -144,6 +181,7 @@ impl ECS {
     }
 
     fn add_status(&mut self, moqup: &MdFile, id: FileId) {
+
         let Some(status) = moqup.get_property(FmProperty::Status) else {
             return;
         };
@@ -157,10 +195,6 @@ impl ECS {
     }
 
     fn add_action(&mut self, moqup: &MdFile, id: FileId) {
-
-        if !moqup.is_type_action() {
-            return;
-        }
 
         let Some(action) = moqup.get_property(FmProperty::Action) else {
             return;
@@ -194,52 +228,98 @@ impl ECS {
     }
 
 
-    pub fn get_by_component<'a>(&'a self, comp: ComponentKind) -> ComponentValueIter<'a> {
+    pub fn get_all(&self) -> impl Iterator<Item = FileView<'_>> {
+        self.file.iter().map(|x| self.get(*x.0).unwrap())
+    }
+
+    pub fn get(&self, id: FileId) -> Option<FileView<'_>> {
+        self.file.get(&id).map(|x| self.to_file_view(id, x))
+    }
+
+
+    fn to_file_view<'a>(&'a self, id: FileId, x: &'a File) -> FileView<'a> {
+        FileView {
+            file:     x,
+            fm:       self.get_fm_component    (id),
+            md_text:  self.get_md_component    (id),
+            is_empty: self.is_empty            (id),
+            type_:    self.get_type_component  (id),
+            info:     self.has_info_component  (id),
+            action:   self.get_action_component(id),
+            status:   self.get_status_component(id),
+        }
+    }
+
+    pub fn get_by_component<'a>(&'a self, comp: ComponentKind) -> Box<dyn Iterator<Item = FileId> + 'a> {
+
+        debug!("len info: {}", self.info.len());
+        type Kind   = ComponentKind;
+        match comp {
+            Kind::Frontmatter => Box::new(self.fm     .keys().copied()) as _,
+            Kind::MdText      => Box::new(self.md_text.keys().copied()) as _,
+            Kind::Empty       => Box::new(self.empty  .iter().copied()) as _,
+            Kind::Type        => Box::new(self.type_  .keys().copied()) as _,
+            Kind::Info        => Box::new(self.info   .iter().copied()) as _,
+            Kind::Action      => Box::new(self.action .keys().copied()) as _,
+            Kind::Status      => Box::new(self.status .keys().copied()) as _,
+        }
+    }
+
+    pub fn get_component_counts<'a>(&'a self, comp: ComponentKind) -> usize {
 
         type Kind   = ComponentKind;
-        type Ci<'b> = ComponentValueIter<'b>;
         match comp {
-            Kind::Frontmatter => Ci::Frontmatter(Box::new(self.fm     .iter().map(|x| (*x.0, x.1) ))),
-            Kind::MdText      => Ci::MdText     (Box::new(self.md_text.iter().map(|x| (*x.0, x.1) ))),
-            Kind::Empty       => Ci::Empty      (Box::new(self.empty  .iter().map(|x| (*x,   () ) ))),
-            Kind::Info        => Ci::Info       (Box::new(self.info   .iter().map(|x| (*x,   () ) ))),
-            Kind::Action      => Ci::Action     (Box::new(self.action .iter().map(|x| (*x.0, x.1) ))),
-            Kind::Status      => Ci::Status     (Box::new(self.status .iter().map(|x| (*x.0, x.1) ))),
+            Kind::Frontmatter => self.fm     .len(),
+            Kind::MdText      => self.md_text.len(),
+            Kind::Empty       => self.empty  .len(),
+            Kind::Type        => self.type_  .len(),
+            Kind::Info        => self.info   .len(),
+            Kind::Action      => self.action .len(),
+            Kind::Status      => self.status .len(),
         }
     }
 
-    pub fn get_has_all_components<'a>(&'a self, comp: &[ComponentKind]) -> Vec<FileId> {
+    // pub fn get_component(&self, id: FileId, comp: ComponentKind) -> Option<ComponentValue> {
+    //     match comp {
+    //         ComponentKind::Frontmatter => self.fm     .get(&id).map(|x| (id, x).into()),
+    //         ComponentKind::MdText      => self.md_text.get(&id).map(|x| (id, x).into()),
+    //         ComponentKind::Empty       => self.empty  .get(&id).map(|_| ComponentValue::Empty(id)),
+    //         ComponentKind::Info        => self.info   .get(&id).map(|_| ComponentValue::Info (id)),
+    //         ComponentKind::Action      => self.action .get(&id).map(|x| (id, x).into()),
+    //         ComponentKind::Status      => self.status .get(&id).map(|x| (id, x).into()),
+    //     }
+    // }
 
-        self
-            .file
-            .iter  ()
-            .filter_map(|f| {
-                comp
-                    .iter()
-                    .map (|c| self.get_component(*f.0, *c))
-                    .all (|f| f.is_some())
-                    .then_some(*f.0)
-            })
-            .collect()
+
+    pub fn get_file_component(&self, id: FileId) -> &File {
+        self.file.get(&id).unwrap()
     }
-
-    pub fn get_component(&self, id: FileId, comp: ComponentKind) -> Option<ComponentValue> {
-        match comp {
-            ComponentKind::Frontmatter => self.fm     .get(&id).map(|x| (id, x).into()),
-            ComponentKind::MdText      => self.md_text.get(&id).map(|x| (id, x).into()),
-            ComponentKind::Empty       => self.empty  .get(&id).map(|_| ComponentValue::Empty(id)),
-            ComponentKind::Info        => self.info   .get(&id).map(|_| ComponentValue::Info (id)),
-            ComponentKind::Action      => self.action .get(&id).map(|x| (id, x).into()),
-            ComponentKind::Status      => self.status .get(&id).map(|x| (id, x).into()),
-        }
+    pub fn get_fm_component(&self, id: FileId) -> Option<&FmComponent> {
+        self.fm.get(&id)
     }
-
-
+    pub fn get_md_component(&self, id: FileId) -> Option<&MdTextComponent> {
+        self.md_text.get(&id)
+    }
+    pub fn is_empty(&self, id: FileId) -> bool {
+        self.empty.get(&id).is_some()
+    }
+    pub fn get_type_component(&self, id: FileId) -> Option<&TypeComponent> {
+        self.type_.get(&id)
+    }
+    pub fn has_info_component(&self, id: FileId) -> bool {
+        self.info.get(&id).is_some()
+    }
+    pub fn get_action_component(&self, id: FileId) -> Option<&ActionComponent> {
+        self.action.get(&id)
+    }
+    pub fn get_status_component(&self, id: FileId) -> Option<&StatusComponent> {
+        self.status.get(&id)
+    }
     // fn query_component()
 }
 
 
-macro_rules! impl_into {
+macro_rules! impl_into_compvalue {
     ($( ($ident:ident, $comp:ty)),+ $(,)?) => {$(
         impl<'a> From<(FileId, &'a $comp)> for ComponentValue<'a> {
             fn from((id, value): (FileId, &'a $comp)) -> ComponentValue<'a> {
@@ -250,22 +330,202 @@ macro_rules! impl_into {
 }
 
 
-impl_into!(
+impl_into_compvalue!(
     (Frontmatter, FmComponent),
     (MdText,      MdTextComponent),
     (Action,      ActionComponent),
     (Status,      StatusComponent),
 );
 
+impl<'a> FileView<'a> {
+    pub fn status_eq(&'a self, status: FmStatus) -> bool {
+        self.status.is_some_and(|s| s.status == status)
+    }
+    pub fn action_eq(&'a self, action: FmAction) -> bool {
+        self.action.is_some_and(|a| a.action == action)
+    }
+    pub fn type_eq(&'a self, type_: FmType) -> bool {
+        self.type_.is_some_and(|t| t.type_ == type_)
+    }
 
+    // TODO: remove the type prop and just infer the type from it's top level props
+    // - info
+    // - action
+    pub fn is_actionable(&'a self) -> bool {
+        self.type_eq(FmType::Action) && self.action.is_some()
+    }
 
+    pub fn is_open(&'a self) -> bool {
+        self.status.is_none_or(|s| {
+               s.status != FmStatus::Archived
+            && s.status != FmStatus::Completed
+        })
+    }
+
+    pub fn needs_type(&'a self) -> bool {
+        self.type_.is_none()
+    }
+
+    pub fn needs_action_assigned(&'a self) -> bool {
+        self.type_eq(FmType::Action) && self.action.is_none()
+    }
+
+    pub fn is_archived(&'a self) -> bool {
+        self.status_eq(FmStatus::Archived)
+    }
+
+    pub fn is_completed(&'a self) -> bool {
+        self.status_eq(FmStatus::Completed)
+    }
+}
 
 #[cfg(test)]
 mod tests {
+
+    use std::sync::{Arc, Mutex};
+
+    use yaml_serde::{Mapping, Value};
+
+    use crate::vault::{file_utilities::PropertyError, fm::{FmAction, FmStatus, FmType, GetKey}};
+
     use super::*;
 
+    static COUNTER: Mutex<u64> = Mutex::new(0);
+
+
+    fn mapping_to_str(fm: Mapping) -> String {
+        format!("---\n{}---\n", yaml_serde::to_string(&fm).unwrap())
+    }
+
+    fn id() -> FileId {
+        let mut id = COUNTER.lock().unwrap();
+
+        *id += 1;
+
+        FileId::Inode {
+            device_id:    *id -1,
+            inode_number: *id -1,
+        }
+    }
+
+
+    macro_rules! fm {
+        ($ecs:ident, $($key:expr => $value:expr),*$(,)? ) => {{
+            #[allow(unused_mut)]
+            let mut fm = Mapping::new();
+
+            $(
+                fm.insert(Value::String($key.get_key()), Value::String($value.get_key()));
+            )*
+
+            let id = id();
+
+            $ecs.new_file(NewFile {
+                id,
+                path:     PathBuf::new(),
+                raw_text: mapping_to_str(fm),
+                name:     String::new(),
+            });
+
+            id
+            // MdFile::test_parse(id(), String::new(), mapping_to_str(fm))
+        }};
+    }
+
+    fn from_yaml(ecs: &mut Ecs, text: &str) {
+        let yaml: Mapping = yaml_serde::from_str(text).unwrap();
+
+        let text = mapping_to_str(yaml);
+        ecs.new_file(NewFile {
+            id:       id(),
+            path:     PathBuf::new(),
+            raw_text: text,
+            name:     String::new(),
+        });
+    }
+
     #[test]
-    fn test_ecs_to_string() {
+    fn test_type_sorting() {
+
+        let mut ecs = Ecs::new();
+
+        let untyped = fm!(ecs, );
+        let info    = fm!(ecs, FmProperty::Type => FmType::Info);
+        let action  = fm!(ecs, FmProperty::Type => FmType::Action);
+
+
+        let untyped = ecs.get(untyped).unwrap();
+        let info    = ecs.get(info)   .unwrap();
+        let action  = ecs.get(action) .unwrap();
+
+        assert_eq!(untyped.needs_type(), true , "untyped");
+        assert_eq!(info   .needs_type(), false, "info");
+        assert_eq!(action .needs_type(), false, "action");
+
+        assert!(info  .info);
+        assert!(info  .type_eq(FmType::Info));
+        assert!(action.type_eq(FmType::Action));
+    }
+
+    #[test]
+    fn test_action_sorting() {
+
+        let mut ecs = Ecs::new();
+
+        let no_action_info     = fm!(ecs, FmProperty::Type => FmType::Info);
+        let no_action          = fm!(ecs,                                     FmProperty::Action => FmAction::Todo);
+        let needs_action       = fm!(ecs, FmProperty::Type => FmType::Action);
+        let action_todo        = fm!(ecs, FmProperty::Type => FmType::Action, FmProperty::Action => FmAction::Todo);
+        let action_waiting_for = fm!(ecs, FmProperty::Type => FmType::Action, FmProperty::Action => FmAction::WaitingFor);
+
+
+        let no_action_info     = ecs.get(no_action_info)    .unwrap();
+        let no_action          = ecs.get(no_action)         .unwrap();
+        let needs_action       = ecs.get(needs_action)      .unwrap();
+        let action_todo        = ecs.get(action_todo)       .unwrap();
+        let action_waiting_for = ecs.get(action_waiting_for).unwrap();
+
+        assert_eq!(no_action_info    .needs_action_assigned(), false, "no_action_info     needs_action_assigned");
+        assert_eq!(no_action         .needs_action_assigned(), false, "no_action          needs_action_assigned");
+        assert_eq!(needs_action      .needs_action_assigned(), true,  "needs_action       needs_action_assigned");
+        assert_eq!(action_todo       .needs_action_assigned(), false, "action_todo        needs_action_assigned");
+        assert_eq!(action_waiting_for.needs_action_assigned(), false, "action_waiting_for needs_action_assigned");
+
+        assert_eq!(no_action_info    .is_actionable(),         false, "no_action_info     is_actionable");
+        assert_eq!(no_action         .is_actionable(),         false, "no_action          is_actionable");
+        assert_eq!(needs_action      .is_actionable(),         false, "needs_action       is_actionable");
+        assert_eq!(action_todo       .is_actionable(),         true,  "action_todo        is_actionable");
+        assert_eq!(action_waiting_for.is_actionable(),         true,  "action_waiting_for is_actionable");
+    }
+
+    #[test]
+    fn test_status_sorting() {
+        let mut ecs = Ecs::new();
+
+        let archive   = fm!(ecs, FmProperty::Status => "archive");
+        let archived  = fm!(ecs, FmProperty::Status => FmStatus::Archived);
+        let complete  = fm!(ecs, FmProperty::Status => "complete");
+        let completed = fm!(ecs, FmProperty::Status => FmStatus::Completed);
+
+        let archive   = ecs.get(archive  ).unwrap();
+        let archived  = ecs.get(archived ).unwrap();
+        let complete  = ecs.get(complete ).unwrap();
+        let completed = ecs.get(completed).unwrap();
+
+        assert_eq!(archive  .is_archived(),  true,  "archive   is_archived");
+        assert_eq!(archived .is_archived(),  true,  "archived  is_archived");
+        assert_eq!(complete .is_archived(),  false, "complete  is_archived");
+        assert_eq!(completed.is_archived(),  false, "completed is_archived");
+
+        assert_eq!(archive  .is_completed(), false, "archive   is_completed");
+        assert_eq!(archived .is_completed(), false, "archived  is_completed");
+        assert_eq!(complete .is_completed(), true,  "complete  is_completed");
+        assert_eq!(completed.is_completed(), true,  "completed is_completed");
+    }
+
+    #[test]
+    #[ignore = "todo"]
+    fn test_property_coercion() {
         todo!()
     }
 

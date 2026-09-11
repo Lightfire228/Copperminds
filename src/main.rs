@@ -11,8 +11,8 @@ use crate::{cli::{MenuOption}, vault::ENV};
 #[tokio::main]
 async fn main() {
 
-    let log_level = log::LevelFilter::Info;
-    // let log_level = log::LevelFilter::Trace;
+    // let log_level = log::LevelFilter::Info;
+    let log_level = log::LevelFilter::Trace;
 
     formatted_timed_builder()
         .filter_module("",            log::LevelFilter::Warn)

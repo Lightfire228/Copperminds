@@ -9,7 +9,7 @@ mod generator;
 mod ecs;
 
 
-use crate::{obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}, md_file::FileView, watch::FileData}};
+use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{ComponentKind, Ecs, NewFile}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}, md_file::FileView, watch::FileData}};
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};
@@ -24,7 +24,7 @@ use trash;
 use md_file::{MdFile};
 
 
-pub const ENV: Env = Env::Prod;
+pub const ENV: Env = Env::Dev;
 
 macro_rules! regex {
     ($i:ident = $r:expr) => {
@@ -39,7 +39,6 @@ macro_rules! regex {
 pub(crate) use regex;
 
 
-#[derive(Debug)]
 // TODO: restructure this like an ECS
 pub struct Index {
     md_files:    HashMap<FileId, MdFile>,
@@ -48,17 +47,28 @@ pub struct Index {
 
     #[allow(unused)]
     path:        PathBuf,
+
+    ecs: Ecs,
 }
 
 impl Index {
     pub fn build() -> Self {
         let files    = scan_vault();
 
-        let md_files = files
+        let mut ecs  = Ecs::new();
+
+        let md_files: HashMap<FileId, MdFile> = files
             .filter   (|f| ends_with(f, ".md"))
             .map      (|f| {
                 let path = f.path().to_path_buf();
                 let id   = file_id::get_file_id(&path).unwrap();
+
+                ecs.new_file(NewFile {
+                    id,
+                    path:     path.clone(),
+                    raw_text: file_shit::get_file_text(&path),
+                    name:     file_shit::get_file_name(&path),
+                });
 
                 (id, MdFile::new(FileData {
                     id,
@@ -68,10 +78,20 @@ impl Index {
             .collect()
         ;
 
+        for (id, f) in md_files.iter() {
+            let e = ecs.get(*id).unwrap();
+
+            // dbg!(f);
+            // dbg!(&e);
+
+            assert_eq!(f.is_actionable(), e.is_actionable());
+        }
+
         Self {
             md_files,
             path:        ENV.vault_path(),
             subscribers: vec![],
+            ecs,
         }
     }
 
@@ -178,7 +198,7 @@ impl Index {
             VaultCommand::Register       (_,    resp) => send!(resp => self.handle_register        ()),
             VaultCommand::ModifyFile     (opts, resp) => send!(resp => self.handle_modify_file     (opts)),
             VaultCommand::DeleteFile     (opts, resp) => send!(resp => self.delete_file            (opts.id)),
-            VaultCommand::GetVaultStats  (_,    resp) => send!(resp => self.calc_vault_stats       ()),
+            VaultCommand::GetVaultStats  (_,    resp) => send!(resp => self.calc_vault_stats_ecs   ()),
             VaultCommand::NukeActionables(_,    resp) => send!(resp => self.nuke_action_property   ()),
         }
     }
@@ -489,9 +509,8 @@ pub struct VaultStats {
 
 impl Index {
     pub fn calc_vault_stats(&self) -> VaultStats {
-
         VaultStats {
-            info_total:           self.count(|x| x.is_type_info  ()                   ),
+            info_total:           self.count(|x| x.is_type_info()                     ),
             info_archived:        self.count(|x| x.is_type_info  () && x.is_archived()),
             info_complete:        self.count(|x| x.is_type_info  () && x.is_complete()),
             actionables_total:    self.count(|x| x.is_type_action()                   ),
@@ -508,6 +527,38 @@ impl Index {
             open_maybe_someday:   self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::MaybeSomeday)),
             open_waiting_for:     self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::WaitingFor)),
         }
+
+    }
+
+    pub fn calc_vault_stats_ecs(&self) -> VaultStats {
+
+        let info   = ComponentKind::Info;
+        let action = ComponentKind::Action;
+
+        VaultStats {
+            info_total:           self.ecs.get_component_counts(info),
+            info_archived:        self.ecs.get_all().filter(|x| x.info && x.status_eq(FmStatus::Archived ))            .count(),
+            info_complete:        self.ecs.get_all().filter(|x| x.info && x.status_eq(FmStatus::Completed))            .count(),
+            actionables_total:    self.ecs.get_component_counts(action),
+            actionables_open:     self.ecs.get_all().filter(|x| x.action.is_some() && x.is_open())                     .count(),
+            actionables_complete: self.ecs.get_all().filter(|x| x.action.is_some() && x.status_eq(FmStatus::Completed)).count(),
+            actionables_archived: self.ecs.get_all().filter(|x| x.action.is_some() && x.status_eq(FmStatus::Archived)) .count(),
+
+
+            needs_action:         self.count(|x| x.needs_action_assigned()),
+            needs_sorted:         self.count(|x| x.needs_sorting()),
+
+            open_todo:            self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Todo))             .count(),
+            open_backlog:         self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Backlog))          .count(),
+            open_entertainment:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Entertainment))    .count(),
+            open_maybe_someday:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::MaybeSomeday))     .count(),
+            open_waiting_for:     self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::WaitingFor))       .count(),
+        }
+
+    }
+
+    pub fn compare_vault_stats(&self) {
+        todo!()
 
     }
 
@@ -640,6 +691,7 @@ mod tests {
             md_files:    files,
             subscribers: vec![],
             path:        PathBuf::new(),
+            ecs:         Ecs::new(),
         };
 
         let empty_unamed: Vec<_> = vault.get_empty_unnamed_files().collect();
