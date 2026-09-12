@@ -24,7 +24,7 @@ use trash;
 use md_file::{MdFile};
 
 
-pub const ENV: Env = Env::Dev;
+pub const ENV: Env = Env::Prod;
 
 macro_rules! regex {
     ($i:ident = $r:expr) => {
@@ -78,15 +78,7 @@ impl Index {
             .collect()
         ;
 
-        for (id, f) in md_files.iter() {
-            let e = ecs.get(*id).unwrap();
-
-            // dbg!(f);
-            // dbg!(&e);
-
-            assert_eq!(f.is_actionable(), e.is_actionable());
-        }
-
+        
         Self {
             md_files,
             path:        ENV.vault_path(),
@@ -198,8 +190,12 @@ impl Index {
             VaultCommand::Register       (_,    resp) => send!(resp => self.handle_register        ()),
             VaultCommand::ModifyFile     (opts, resp) => send!(resp => self.handle_modify_file     (opts)),
             VaultCommand::DeleteFile     (opts, resp) => send!(resp => self.delete_file            (opts.id)),
-            VaultCommand::GetVaultStats  (_,    resp) => send!(resp => self.calc_vault_stats_ecs   ()),
             VaultCommand::NukeActionables(_,    resp) => send!(resp => self.nuke_action_property   ()),
+            VaultCommand::GetVaultStats  (opts, resp) => send!(resp => if opts.ecs {
+                self.calc_vault_stats_ecs()
+            } else {
+                self.calc_vault_stats    ()
+            }),
         }
     }
 
@@ -513,10 +509,10 @@ impl Index {
             info_total:           self.count(|x| x.is_type_info()                     ),
             info_archived:        self.count(|x| x.is_type_info  () && x.is_archived()),
             info_complete:        self.count(|x| x.is_type_info  () && x.is_complete()),
-            actionables_total:    self.count(|x| x.is_type_action()                   ),
-            actionables_open:     self.count(|x| x.is_type_action() && x.is_open()    ),
-            actionables_complete: self.count(|x| x.is_type_action() && x.is_complete()),
-            actionables_archived: self.count(|x| x.is_type_action() && x.is_archived()),
+            actionables_total:    self.count(|x| x.is_actionable()                   ),
+            actionables_open:     self.count(|x| x.is_actionable() && x.is_open()    ),
+            actionables_complete: self.count(|x| x.is_actionable() && x.is_complete()),
+            actionables_archived: self.count(|x| x.is_actionable() && x.is_archived()),
 
             needs_action:         self.count(|x| x.needs_action_assigned()),
             needs_sorted:         self.count(|x| x.needs_sorting()),
@@ -540,19 +536,19 @@ impl Index {
             info_archived:        self.ecs.get_all().filter(|x| x.info && x.status_eq(FmStatus::Archived ))            .count(),
             info_complete:        self.ecs.get_all().filter(|x| x.info && x.status_eq(FmStatus::Completed))            .count(),
             actionables_total:    self.ecs.get_component_counts(action),
-            actionables_open:     self.ecs.get_all().filter(|x| x.action.is_some() && x.is_open())                     .count(),
-            actionables_complete: self.ecs.get_all().filter(|x| x.action.is_some() && x.status_eq(FmStatus::Completed)).count(),
-            actionables_archived: self.ecs.get_all().filter(|x| x.action.is_some() && x.status_eq(FmStatus::Archived)) .count(),
+            actionables_open:     self.ecs.get_all().filter(|x| x.is_actionable() && x.is_open())                      .count(),
+            actionables_complete: self.ecs.get_all().filter(|x| x.is_actionable() && x.status_eq(FmStatus::Completed)) .count(),
+            actionables_archived: self.ecs.get_all().filter(|x| x.is_actionable() && x.status_eq(FmStatus::Archived))  .count(),
 
 
-            needs_action:         self.count(|x| x.needs_action_assigned()),
-            needs_sorted:         self.count(|x| x.needs_sorting()),
+            needs_action:         self.ecs.get_all().filter(|x| x.needs_action_assigned())                             .count(),
+            needs_sorted:         self.ecs.get_all().filter(|x| x.needs_sorting())                                     .count(),
 
-            open_todo:            self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Todo))             .count(),
-            open_backlog:         self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Backlog))          .count(),
-            open_entertainment:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Entertainment))    .count(),
-            open_maybe_someday:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::MaybeSomeday))     .count(),
-            open_waiting_for:     self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::WaitingFor))       .count(),
+            open_todo:            self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Todo))            .count(),
+            open_backlog:         self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Backlog))         .count(),
+            open_entertainment:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Entertainment))   .count(),
+            open_maybe_someday:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::MaybeSomeday))    .count(),
+            open_waiting_for:     self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::WaitingFor))      .count(),
         }
 
     }

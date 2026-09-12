@@ -12,6 +12,7 @@ use crate::vault::command::{GetVaultStats, VaultCommand, VaultUpdate};
 pub struct VaultStatsComponent {
     stats: VaultStats,
     vault: Sender<VaultCommand>,
+    ecs:   bool,
 }
 
 type Task = iced::Task<Message>;
@@ -24,9 +25,12 @@ impl VaultStatsComponent {
             Self {
                 stats: VaultStats::default(),
                 vault,
+                ecs: false,
             },
             Task::future(async move {
-                let stats = send_vault_cmd(&tx, GetVaultStats {}).await;
+                let stats = send_vault_cmd(&tx, GetVaultStats {
+                    ecs: false,
+                }).await;
 
                 Message::VaultStats(stats)
             })
@@ -35,7 +39,7 @@ impl VaultStatsComponent {
 
     pub fn view(&self) -> Element<'_, Message> {
         column![
-            text!("Vault Stats"),
+            text!("Vault Stats {}", if self.ecs { "(ECS)" } else {"-"}),
             text!("==="),
             text!("info        | total    - {:>5}", self.stats.info_total),
             text!("info        | archived - {:>5}", self.stats.info_archived),
@@ -67,15 +71,43 @@ impl VaultStatsComponent {
             },
             Message::VaultUpdate(_) => {
 
-                let tx = self.vault.clone();
+                let tx  = self.vault.clone();
+                let ecs = self.ecs;
 
                 Action::Run(Task::future(async move {
-                    let stats = send_vault_cmd(&tx, GetVaultStats {}).await;
+                    let stats = send_vault_cmd(&tx, GetVaultStats {
+                        ecs,
+                    }).await;
 
                     Message::VaultStats(stats)
                 }))
             }
         })
+    }
+
+
+    pub fn handle_key_event(&mut self, key: &KeyPressed) -> Option<Action> {
+
+        type Named = iced::keyboard::key::Named;
+
+        if matches!(key.key, Key::Named(Named::Enter)) {
+            self.ecs = !self.ecs;
+
+
+            let tx  = self.vault.clone();
+            let ecs = self.ecs;
+
+            return Some(Action::Run(Task::future(async move {
+                let stats = send_vault_cmd(&tx, GetVaultStats {
+                    ecs,
+                }).await;
+
+                Message::VaultStats(stats)
+            })))
+
+        }
+
+        None
     }
 }
 

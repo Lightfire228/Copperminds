@@ -9,6 +9,8 @@ use crate::{file_shit, vault::{file_utilities::RawFile, fm::{FmAction, FmPropert
 
 type FileId = file_id::FileId;
 
+use super::regex;
+
 #[derive(Default)]
 pub struct Ecs {
 
@@ -351,6 +353,7 @@ impl<'a> FileView<'a> {
     // TODO: remove the type prop and just infer the type from it's top level props
     // - info
     // - action
+    /// Does not account for status prop
     pub fn is_actionable(&'a self) -> bool {
         self.type_eq(FmType::Action) && self.action.is_some()
     }
@@ -364,6 +367,27 @@ impl<'a> FileView<'a> {
 
     pub fn needs_type(&'a self) -> bool {
         self.type_.is_none()
+        && !self.file.path
+            .ancestors()
+            // TODO: move this to a config
+            .any      (|p| p.ends_with("03 Data"))
+    }
+
+    pub fn needs_sorting(&'a self) -> bool {
+        [
+            self.needs_type(),
+            self.needs_action_assigned(),
+            self.is_unnamed(),
+        ]
+            .iter()
+            .any(|f| *f)
+    }
+
+    pub fn is_unnamed(&'a self) -> bool {
+        // (?i) - sets case insensitivity
+        regex!(RE = r"(?i)^([\d \-_]*|Untitled(\s.*?)?)\.md$");
+
+        RE.is_match(&self.file.name)
     }
 
     pub fn needs_action_assigned(&'a self) -> bool {

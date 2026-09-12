@@ -51,7 +51,9 @@ pub struct OpenInObsidian {
 pub struct Register {}
 
 #[derive(Debug)]
-pub struct GetVaultStats {}
+pub struct GetVaultStats {
+    pub ecs: bool,
+}
 
 #[derive(Debug)]
 pub struct NukeActionables {}

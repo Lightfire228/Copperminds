@@ -78,6 +78,11 @@ impl SelectQueue {
     }
 
     pub fn handle_key_event(&mut self, key: &KeyPressed) -> Option<Action> {
+
+        if let Some(a) = self.stats.handle_key_event(key) {
+            return Some(a.into());
+        }
+
         let Key::Character(key) = &key.key else {
             return None;
         };
@@ -105,7 +110,6 @@ impl SelectQueue {
 
         Some(Action::QueueSelected(queue))
     }
-
 }
 
 impl From<SelectQueue> for UIMode {
