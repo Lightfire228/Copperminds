@@ -2,6 +2,7 @@ mod systems;
 
 use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
 
+use enum_iterator::{Sequence, all};
 use log::{debug, warn};
 use yaml_serde::Mapping;
 
@@ -30,6 +31,7 @@ pub struct Ecs {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct File {
     pub name:     String,
     pub unnamed:  bool,
@@ -43,11 +45,13 @@ pub struct File {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct FmComponent {
     pub fm: Mapping,
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct MdTextComponent {
     pub text: String,
 }
@@ -77,7 +81,9 @@ pub struct NewFile {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct FileView<'a> {
+    pub id:       FileId,
     pub file:     &'a File,
     pub fm:       Option<&'a FmComponent>,
     pub md_text:  Option<&'a MdTextComponent>,
@@ -88,7 +94,8 @@ pub struct FileView<'a> {
     pub status:   Option<&'a StatusComponent>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Sequence)]
+#[allow(unused)]
 pub enum ComponentKind {
     Frontmatter,
     MdText,
@@ -99,22 +106,26 @@ pub enum ComponentKind {
     Status,
 }
 
-pub enum ComponentValue<'a> {
-    Frontmatter(FileId, &'a FmComponent),
-    MdText     (FileId, &'a MdTextComponent),
-    Empty      (FileId),
-    Info       (FileId),
-    Action     (FileId, &'a ActionComponent),
-    Status     (FileId, &'a StatusComponent),
+#[allow(unused)]
+pub enum ComponentQuery<'a> {
+    Frontmatter(Option<&'a FmComponent>),
+    MdText     (Option<&'a MdTextComponent>),
+    Empty      (bool),
+    Type       (Option<&'a TypeComponent>),
+    Info       (bool),
+    Action     (Option<&'a ActionComponent>),
+    Status     (Option<&'a StatusComponent>),
 }
 
-pub enum ComponentValueIter<'a> {
-    Frontmatter(Box<dyn Iterator<Item = (FileId, &'a FmComponent     )> + 'a>),
-    MdText     (Box<dyn Iterator<Item = (FileId, &'a MdTextComponent )> + 'a>),
-    Empty      (Box<dyn Iterator<Item = (FileId, ()                  )> + 'a>),
-    Info       (Box<dyn Iterator<Item = (FileId, ()                  )> + 'a>),
-    Action     (Box<dyn Iterator<Item = (FileId, &'a ActionComponent )> + 'a>),
-    Status     (Box<dyn Iterator<Item = (FileId, &'a StatusComponent )> + 'a>),
+#[allow(unused)]
+pub enum ComponentQueryIter<'a> {
+    Frontmatter(Box<dyn Iterator<Item = (&'a FileId, &'a FmComponent    )> + 'a>),
+    MdText     (Box<dyn Iterator<Item = (&'a FileId, &'a MdTextComponent)> + 'a>),
+    Empty      (Box<dyn Iterator<Item =  &'a FileId                      > + 'a>),
+    Type       (Box<dyn Iterator<Item = (&'a FileId, &'a TypeComponent  )> + 'a>),
+    Info       (Box<dyn Iterator<Item =  &'a FileId                      > + 'a>),
+    Action     (Box<dyn Iterator<Item = (&'a FileId, &'a ActionComponent)> + 'a>),
+    Status     (Box<dyn Iterator<Item = (&'a FileId, &'a StatusComponent)> + 'a>),
 }
 
 impl Ecs {
@@ -229,6 +240,7 @@ impl Ecs {
         self.md_text.insert(id, MdTextComponent { text: md });
     }
 
+    // --- queries
 
     pub fn get_all(&self) -> impl Iterator<Item = FileView<'_>> {
         self.file.iter().map(|x| self.get(*x.0).unwrap())
@@ -239,9 +251,10 @@ impl Ecs {
     }
 
 
-    fn to_file_view<'a>(&'a self, id: FileId, x: &'a File) -> FileView<'a> {
+    fn to_file_view<'a>(&'a self, id: FileId, file: &'a File) -> FileView<'a> {
         FileView {
-            file:     x,
+            id,
+            file,
             fm:       self.get_fm_component    (id),
             md_text:  self.get_md_component    (id),
             is_empty: self.is_empty            (id),
@@ -249,21 +262,6 @@ impl Ecs {
             info:     self.has_info_component  (id),
             action:   self.get_action_component(id),
             status:   self.get_status_component(id),
-        }
-    }
-
-    pub fn get_by_component<'a>(&'a self, comp: ComponentKind) -> Box<dyn Iterator<Item = FileId> + 'a> {
-
-        debug!("len info: {}", self.info.len());
-        type Kind   = ComponentKind;
-        match comp {
-            Kind::Frontmatter => Box::new(self.fm     .keys().copied()) as _,
-            Kind::MdText      => Box::new(self.md_text.keys().copied()) as _,
-            Kind::Empty       => Box::new(self.empty  .iter().copied()) as _,
-            Kind::Type        => Box::new(self.type_  .keys().copied()) as _,
-            Kind::Info        => Box::new(self.info   .iter().copied()) as _,
-            Kind::Action      => Box::new(self.action .keys().copied()) as _,
-            Kind::Status      => Box::new(self.status .keys().copied()) as _,
         }
     }
 
@@ -281,21 +279,7 @@ impl Ecs {
         }
     }
 
-    // pub fn get_component(&self, id: FileId, comp: ComponentKind) -> Option<ComponentValue> {
-    //     match comp {
-    //         ComponentKind::Frontmatter => self.fm     .get(&id).map(|x| (id, x).into()),
-    //         ComponentKind::MdText      => self.md_text.get(&id).map(|x| (id, x).into()),
-    //         ComponentKind::Empty       => self.empty  .get(&id).map(|_| ComponentValue::Empty(id)),
-    //         ComponentKind::Info        => self.info   .get(&id).map(|_| ComponentValue::Info (id)),
-    //         ComponentKind::Action      => self.action .get(&id).map(|x| (id, x).into()),
-    //         ComponentKind::Status      => self.status .get(&id).map(|x| (id, x).into()),
-    //     }
-    // }
 
-
-    pub fn get_file_component(&self, id: FileId) -> &File {
-        self.file.get(&id).unwrap()
-    }
     pub fn get_fm_component(&self, id: FileId) -> Option<&FmComponent> {
         self.fm.get(&id)
     }
@@ -317,27 +301,56 @@ impl Ecs {
     pub fn get_status_component(&self, id: FileId) -> Option<&StatusComponent> {
         self.status.get(&id)
     }
-    // fn query_component()
-}
 
+    #[allow(unused)]
+    pub fn query_component(&self, id: FileId, comp: ComponentKind) -> ComponentQuery<'_> {
+        match comp {
+            ComponentKind::Frontmatter => ComponentQuery::Frontmatter(self.get_fm_component    (id)),
+            ComponentKind::MdText      => ComponentQuery::MdText     (self.get_md_component    (id)),
+            ComponentKind::Empty       => ComponentQuery::Empty      (self.is_empty            (id)),
+            ComponentKind::Type        => ComponentQuery::Type       (self.get_type_component  (id)),
+            ComponentKind::Info        => ComponentQuery::Info       (self.has_info_component  (id)),
+            ComponentKind::Action      => ComponentQuery::Action     (self.get_action_component(id)),
+            ComponentKind::Status      => ComponentQuery::Status     (self.get_status_component(id)),
+        }
+    }
 
-macro_rules! impl_into_compvalue {
-    ($( ($ident:ident, $comp:ty)),+ $(,)?) => {$(
-        impl<'a> From<(FileId, &'a $comp)> for ComponentValue<'a> {
-            fn from((id, value): (FileId, &'a $comp)) -> ComponentValue<'a> {
-                ComponentValue::$ident(id, value)
+    #[allow(unused)]
+    pub fn query_component_all(&self, comp: ComponentKind) -> ComponentQueryIter<'_> {
+        match comp {
+            ComponentKind::Frontmatter => ComponentQueryIter::Frontmatter(Box::new(self.fm     .iter())),
+            ComponentKind::MdText      => ComponentQueryIter::MdText     (Box::new(self.md_text.iter())),
+            ComponentKind::Empty       => ComponentQueryIter::Empty      (Box::new(self.empty  .iter())),
+            ComponentKind::Type        => ComponentQueryIter::Type       (Box::new(self.type_  .iter())),
+            ComponentKind::Info        => ComponentQueryIter::Info       (Box::new(self.info   .iter())),
+            ComponentKind::Action      => ComponentQueryIter::Action     (Box::new(self.action .iter())),
+            ComponentKind::Status      => ComponentQueryIter::Status     (Box::new(self.status .iter())),
+        }
+    }
+
+    // --- writes
+
+    pub fn remove_file(&mut self, id: FileId) -> File {
+
+        let components = all::<ComponentKind>();
+
+        for cmp in components {
+            match cmp {
+                ComponentKind::Frontmatter => { self.fm     .remove(&id); },
+                ComponentKind::MdText      => { self.md_text.remove(&id); },
+                ComponentKind::Empty       => { self.empty  .remove(&id); },
+                ComponentKind::Type        => { self.type_  .remove(&id); },
+                ComponentKind::Info        => { self.info   .remove(&id); },
+                ComponentKind::Action      => { self.action .remove(&id); },
+                ComponentKind::Status      => { self.status .remove(&id); },
             }
-        })*
-    };
+        }
+
+        self.file.remove(&id).unwrap()
+    }
 }
 
 
-impl_into_compvalue!(
-    (Frontmatter, FmComponent),
-    (MdText,      MdTextComponent),
-    (Action,      ActionComponent),
-    (Status,      StatusComponent),
-);
 
 impl<'a> FileView<'a> {
     pub fn status_eq(&'a self, status: FmStatus) -> bool {
@@ -394,10 +407,12 @@ impl<'a> FileView<'a> {
         self.type_eq(FmType::Action) && self.action.is_none()
     }
 
+    #[allow(unused)]
     pub fn is_archived(&'a self) -> bool {
         self.status_eq(FmStatus::Archived)
     }
 
+    #[allow(unused)]
     pub fn is_completed(&'a self) -> bool {
         self.status_eq(FmStatus::Completed)
     }
@@ -452,10 +467,10 @@ mod tests {
             });
 
             id
-            // MdFile::test_parse(id(), String::new(), mapping_to_str(fm))
         }};
     }
 
+    #[allow(unused)]
     fn from_yaml(ecs: &mut Ecs, text: &str) {
         let yaml: Mapping = yaml_serde::from_str(text).unwrap();
 

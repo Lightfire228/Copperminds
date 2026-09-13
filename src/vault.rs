@@ -24,7 +24,7 @@ use trash;
 use md_file::{MdFile};
 
 
-pub const ENV: Env = Env::Prod;
+pub const ENV: Env = Env::Dev;
 
 macro_rules! regex {
     ($i:ident = $r:expr) => {
@@ -78,7 +78,7 @@ impl Index {
             .collect()
         ;
 
-        
+
         Self {
             md_files,
             path:        ENV.vault_path(),
@@ -191,11 +191,7 @@ impl Index {
             VaultCommand::ModifyFile     (opts, resp) => send!(resp => self.handle_modify_file     (opts)),
             VaultCommand::DeleteFile     (opts, resp) => send!(resp => self.delete_file            (opts.id)),
             VaultCommand::NukeActionables(_,    resp) => send!(resp => self.nuke_action_property   ()),
-            VaultCommand::GetVaultStats  (opts, resp) => send!(resp => if opts.ecs {
-                self.calc_vault_stats_ecs()
-            } else {
-                self.calc_vault_stats    ()
-            }),
+            VaultCommand::GetVaultStats  (_,    resp) => send!(resp => self.calc_vault_stats_ecs   ()),
         }
     }
 
@@ -504,27 +500,6 @@ pub struct VaultStats {
 }
 
 impl Index {
-    pub fn calc_vault_stats(&self) -> VaultStats {
-        VaultStats {
-            info_total:           self.count(|x| x.is_type_info()                     ),
-            info_archived:        self.count(|x| x.is_type_info  () && x.is_archived()),
-            info_complete:        self.count(|x| x.is_type_info  () && x.is_complete()),
-            actionables_total:    self.count(|x| x.is_actionable()                   ),
-            actionables_open:     self.count(|x| x.is_actionable() && x.is_open()    ),
-            actionables_complete: self.count(|x| x.is_actionable() && x.is_complete()),
-            actionables_archived: self.count(|x| x.is_actionable() && x.is_archived()),
-
-            needs_action:         self.count(|x| x.needs_action_assigned()),
-            needs_sorted:         self.count(|x| x.needs_sorting()),
-
-            open_todo:            self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::Todo)),
-            open_backlog:         self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::Backlog)),
-            open_entertainment:   self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::Entertainment)),
-            open_maybe_someday:   self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::MaybeSomeday)),
-            open_waiting_for:     self.count(|x| x.is_open() && x.is_actionable() && x.is_property(FmProperty::Action, FmAction::WaitingFor)),
-        }
-
-    }
 
     pub fn calc_vault_stats_ecs(&self) -> VaultStats {
 
@@ -556,16 +531,6 @@ impl Index {
     pub fn compare_vault_stats(&self) {
         todo!()
 
-    }
-
-    fn count<T>(&self, x: T) -> usize
-    where
-        T: FnMut(&&MdFile) -> bool
-    {
-        self
-            .iter_files()
-            .filter    (x)
-            .count     ()
     }
 }
 
