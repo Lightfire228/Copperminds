@@ -3,7 +3,8 @@ use std::fmt::Debug;
 use file_id::FileId;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::vault::{VaultStats, fm::{FmAction, FmProperty, FmStatus}, md_file::{FileView, MdFile}};
+use crate::vault::{EcsFileView, VaultStats, fm::{FmAction, FmProperty, FmStatus}, md_file::{FileView, MdFile}};
+
 
 // https://tokio.rs/tokio/tutorial/channels
 #[derive(Debug)]
@@ -24,7 +25,7 @@ pub type Responder <T> = oneshot::Sender<T>;
 pub type Subscriber<T> = mpsc   ::Receiver<T>;
 
 // pub type Predicate = Box<dyn Fn(&MdFile) -> bool + Send>;
-pub type Predicate = fn(&MdFile) -> bool;
+pub type Predicate = fn(&EcsFileView) -> bool;
 
 
 pub struct IterFilesWith {

@@ -1,4 +1,4 @@
-mod systems;
+mod delete_empty_unnamed;
 
 use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
 
@@ -332,7 +332,7 @@ impl Ecs {
 
     pub fn remove_file(&mut self, id: FileId) -> File {
 
-        let components = all::<ComponentKind>();
+        let components = ComponentKind::all();
 
         for cmp in components {
             match cmp {
@@ -415,6 +415,12 @@ impl<'a> FileView<'a> {
     #[allow(unused)]
     pub fn is_completed(&'a self) -> bool {
         self.status_eq(FmStatus::Completed)
+    }
+}
+
+impl ComponentKind {
+    fn all() -> Vec<Self> {
+        all::<ComponentKind>().collect()
     }
 }
 

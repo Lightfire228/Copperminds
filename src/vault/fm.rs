@@ -151,7 +151,7 @@ macro_rules! try_from_get_key {
 
             fn try_from(value: &str) -> Result<$name, Self::Error> {
 
-                static TABLE: LazyLock<HashMap<String, $name>> = LazyLock::new(|| all::<$name>().map(|x| (x.get_key(), x)).collect());
+                static TABLE: LazyLock<HashMap<String, $name>> = LazyLock::new(|| $name::all().into_iter().map(|x| (x.get_key(), x)).collect());
 
                 TABLE.get(value).cloned().ok_or(())
             }
@@ -174,5 +174,12 @@ impl TryFrom<&str> for FmStatus {
             "archived"  => FmStatus::Archived,
             _           => Err(())?
         })
+    }
+}
+
+
+impl FmAction {
+    fn all() -> Vec<Self> {
+        all::<FmAction>().collect()
     }
 }

@@ -15,6 +15,7 @@ use crate::ui::components::file_list::{self, FileList};
 use crate::ui::components::prompt::{self, MenuCommand, Prompt};
 use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
+use crate::vault::EcsFileView;
 use crate::vault::command::{Cmd, DeleteFile, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
 use crate::vault::md_file::{FileView, MdFile};
@@ -301,8 +302,8 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 
 
     let cmd = match queue {
-        QueueType::Inbox       => |f: &MdFile| f.needs_sorting(),
-        QueueType::Actionables => |f: &MdFile| f.needs_action_assigned(),
+        QueueType::Inbox       => |f: &EcsFileView| f.needs_sorting(),
+        QueueType::Actionables => |f: &EcsFileView| f.needs_action_assigned(),
     };
 
 

@@ -3,7 +3,7 @@ use std::{fs, path::{Path, PathBuf}};
 
 use file_id::FileId;
 
-use crate::{file_shit, vault::{file_utilities::RawFile, fm::{FmProperty, FmType, GetKey}, watch::FileData}};
+use crate::{file_shit, vault::{EcsFileView, file_utilities::RawFile, fm::{FmProperty, FmType, GetKey}, watch::FileData}};
 
 use super::regex;
 
@@ -185,6 +185,15 @@ impl Eq for MdFile {}
 impl PartialEq for FileView {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
+    }
+}
+
+impl<'a> From<EcsFileView<'a>> for FileView {
+    fn from(value: EcsFileView) -> Self {
+        FileView {
+            id:   value.id,
+            name: value.file.name.clone(),
+        }
     }
 }
 

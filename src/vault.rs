@@ -2,11 +2,11 @@
 pub mod md_file;
 pub mod fm;
 pub mod command;
+pub mod ecs;
 
 mod file_utilities;
 mod watch;
 mod generator;
-mod ecs;
 
 
 use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{ComponentKind, Ecs, NewFile}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}, md_file::FileView, watch::FileData}};
@@ -18,11 +18,14 @@ use crate::prelude::*;
 
 use tokio::{select, sync::{mpsc::{self, Sender, Receiver, channel}}};
 use walkdir::{DirEntry, WalkDir};
+
+
 use trash;
 
 
 use md_file::{MdFile};
 
+pub use ecs::FileView as EcsFileView;
 
 pub const ENV: Env = Env::Dev;
 
@@ -99,18 +102,7 @@ impl Index {
 
         debug!("Deleting empty unnamed files");
 
-        let files: Vec<_> = self
-            .get_empty_unnamed_files()
-            .cloned ()
-            .collect()
-        ;
-
-        for id in files.iter() {
-            let path = &self.md_files[id].path;
-
-            trash::delete(path).unwrap();
-            self.md_files.remove(id);
-        }
+        self.ecs.delete_empty_unnamed_files();
     }
 
     pub fn delete_file(&mut self, id: FileId) {
@@ -125,44 +117,38 @@ impl Index {
         self.md_files.remove(&id);
     }
 
-    fn get_empty_unnamed_files(&self) -> impl Iterator<Item = &FileId> {
-        self
-            .iter_files()
-            .filter(|f| f.is_empty_raw() && f.is_unnamed())
-            .map   (|f| &f.id)
+    // fn iter_files(&self) -> impl Iterator<Item = &MdFile> {
+    //     self
+    //         .md_files
+    //         .iter()
+    //         .map (|f| f.1)
+    // }
 
-    }
-
-    fn iter_files(&self) -> impl Iterator<Item = &MdFile> {
-        self
-            .md_files
-            .iter()
-            .map (|f| f.1)
-    }
-
-    fn iter_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
-        self
-            .md_files
-            .iter_mut()
-            .map (|f| f.1)
-    }
+    // fn iter_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
+    //     self
+    //         .md_files
+    //         .iter_mut()
+    //         .map (|f| f.1)
+    // }
 
     pub fn iter_files_with<P>(&self, mut predicate: P) -> impl Iterator<Item = FileId>
     where
-        P: FnMut(&MdFile) -> bool,
+        P: FnMut(&EcsFileView) -> bool,
     {
         self
-            .iter_files()
+            .ecs
+            .get_all   ()
             .filter    (move |f| predicate(f))
             .map       (|f| f.id)
     }
 
     fn iter_files_with_cmd<P>(&self, mut predicate: P) -> Vec<FileView>
     where
-        P: FnMut(&MdFile) -> bool,
+        P: FnMut(&EcsFileView) -> bool,
     {
         self
-            .iter_files()
+            .ecs
+            .get_all   ()
             .filter    (|f| predicate(f))
             .map       (FileView::from)
             .collect()
@@ -281,20 +267,25 @@ impl Index {
     fn nuke_action_property(&mut self) {
         debug!("Nuking action property");
 
-        self
-            .iter_files_mut()
-            .filter        (|f| f.is_type_action())
-            .for_each      (|f| {
-                f.remove_property(FmProperty::Action);
-                f.remove_property(FmProperty::Status);
+        todo!()
+        // self
+        //     .iter_files_mut()
+        //     .filter        (|f| f.is_type_action())
+        //     .for_each      (|f| {
+        //         f.remove_property(FmProperty::Action);
+        //         f.remove_property(FmProperty::Status);
 
-                f.write_file();
-            })
-        ;
+        //         f.write_file();
+        //     })
+        // ;
+    }
 
+    pub fn ecs(&self) -> &Ecs {
+        &self.ecs
+    }
 
-
-
+    pub fn ecs_mut(&mut self) -> &mut Ecs {
+        &mut self.ecs
     }
 }
 
@@ -532,140 +523,4 @@ impl Index {
         todo!()
 
     }
-}
-
-
-
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn id(i: usize) -> FileId {
-        FileId::Inode {
-            device_id:    0,
-            inode_number: i as u64,
-        }
-    }
-
-    fn build_empty_unnamed_test_cases(
-        empty_titles:     &[String],
-        non_empty_titles: &[String],
-        non_empty_bodies: &[&str],
-    )
-        -> Vec<Test>
-    {
-
-        let mut i = 0;
-
-        macro_rules! test {
-            ($n:expr, $b:expr, $e:expr) => {{
-                i += 1;
-                Test {
-                    id:            id(i),
-                    file_name:     $n.to_owned(),
-                    file_body:     $b.to_owned(),
-                    empty_unnamed: $e,
-                }
-            }};
-        }
-
-        let mut test_cases = vec![];
-
-        for empty_title in empty_titles.iter() {
-            test_cases.push(test!(empty_title, "",      true));
-            test_cases.push(test!(empty_title, " \t\n", true));
-
-            for body in non_empty_bodies.iter() {
-                test_cases.push(test!(empty_title, *body, false));
-            }
-        }
-
-        for non_empty_title in non_empty_titles.iter() {
-            test_cases.push(test!(non_empty_title, "",      false));
-            test_cases.push(test!(non_empty_title, " \t\n", false));
-
-            for body in non_empty_bodies.iter() {
-                test_cases.push(test!(non_empty_title, *body, false));
-            }
-        }
-
-        test_cases
-    }
-
-
-
-
-    #[derive(Debug)]
-    struct Test {
-        id:            FileId,
-        file_name:     String,
-        file_body:     String,
-        empty_unnamed: bool,
-    }
-
-    #[test]
-    fn test_empty_unnamed_files() {
-        let empty_titles = [
-            "Untitled",
-            "untitled",
-            "Untitled - 1",
-            "Untitled (2)",
-            "2026-01-01",
-            "2026-01-01 ",
-            "2026-01-01 - 00_00_00",
-            "2026-01-01 - 00",
-            "2026",
-            "1",
-            "___ ---",
-        ]
-            .map(|f| format!("{f}.md"))
-        ;
-
-        let non_empty_titles = [
-            "Untitledtropolis",
-            "Untitled-thingy",
-            "2026-01-01 - 00_00_00 - titled",
-            "2026-01-01 - titled",
-            "2026-01-01 titled",
-            "2026-01 there are rats in my basement",
-            "dorktastic",
-        ]
-            .map(|f| format!("{f}.md"))
-        ;
-
-        let non_empty_bodies = [
-            "---\n\n---\n",
-            ".",
-        ];
-
-        let test_cases = build_empty_unnamed_test_cases(&empty_titles, &non_empty_titles, &non_empty_bodies);
-
-        let files: HashMap<FileId, MdFile> = test_cases
-            .iter()
-            .map      (|t| (t.id.clone(), MdFile::test_parse(t.id.clone(), t.file_name.clone(), t.file_body.clone())))
-            .collect  ()
-        ;
-
-        let vault = Index {
-            md_files:    files,
-            subscribers: vec![],
-            path:        PathBuf::new(),
-            ecs:         Ecs::new(),
-        };
-
-        let empty_unamed: Vec<_> = vault.get_empty_unnamed_files().collect();
-
-        println!("{empty_unamed:?}");
-
-        for file in test_cases {
-
-            println!("{file:?}");
-
-            assert_eq!(empty_unamed.contains(&&file.id), file.empty_unnamed)
-        }
-
-    }
-
 }
