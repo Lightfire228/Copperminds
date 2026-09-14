@@ -31,7 +31,6 @@ pub struct Ecs {
 }
 
 #[derive(Debug)]
-#[allow(unused)]
 pub struct File {
     pub name:     String,
     pub unnamed:  bool,
@@ -45,13 +44,11 @@ pub struct File {
 }
 
 #[derive(Debug)]
-#[allow(unused)]
 pub struct FmComponent {
     pub fm: Mapping,
 }
 
 #[derive(Debug)]
-#[allow(unused)]
 pub struct MdTextComponent {
     pub text: String,
 }
@@ -81,7 +78,6 @@ pub struct NewFile {
 }
 
 #[derive(Debug)]
-#[allow(unused)]
 pub struct FileView<'a> {
     pub id:       FileId,
     pub file:     &'a File,
@@ -95,7 +91,6 @@ pub struct FileView<'a> {
 }
 
 #[derive(Debug, Clone, Copy, Sequence)]
-#[allow(unused)]
 pub enum ComponentKind {
     Frontmatter,
     MdText,
@@ -106,7 +101,6 @@ pub enum ComponentKind {
     Status,
 }
 
-#[allow(unused)]
 pub enum ComponentQuery<'a> {
     Frontmatter(Option<&'a FmComponent>),
     MdText     (Option<&'a MdTextComponent>),
@@ -117,7 +111,6 @@ pub enum ComponentQuery<'a> {
     Status     (Option<&'a StatusComponent>),
 }
 
-#[allow(unused)]
 pub enum ComponentQueryIter<'a> {
     Frontmatter(Box<dyn Iterator<Item = (&'a FileId, &'a FmComponent    )> + 'a>),
     MdText     (Box<dyn Iterator<Item = (&'a FileId, &'a MdTextComponent)> + 'a>),
@@ -129,12 +122,10 @@ pub enum ComponentQueryIter<'a> {
 }
 
 impl Ecs {
-    #[allow(unused)]
     pub fn new() -> Self {
         Default::default()
     }
 
-    #[allow(unused)]
     pub fn new_file(&mut self, file: NewFile) {
 
         // TODO: not this
@@ -302,7 +293,6 @@ impl Ecs {
         self.status.get(&id)
     }
 
-    #[allow(unused)]
     pub fn query_component(&self, id: FileId, comp: ComponentKind) -> ComponentQuery<'_> {
         match comp {
             ComponentKind::Frontmatter => ComponentQuery::Frontmatter(self.get_fm_component    (id)),
@@ -315,7 +305,6 @@ impl Ecs {
         }
     }
 
-    #[allow(unused)]
     pub fn query_component_all(&self, comp: ComponentKind) -> ComponentQueryIter<'_> {
         match comp {
             ComponentKind::Frontmatter => ComponentQueryIter::Frontmatter(Box::new(self.fm     .iter())),
@@ -330,6 +319,8 @@ impl Ecs {
 
     // --- writes
 
+    /// Removes file from all components.
+    /// NOTE: does not delete file from disk
     pub fn remove_file(&mut self, id: FileId) -> File {
 
         let components = ComponentKind::all();
@@ -407,12 +398,10 @@ impl<'a> FileView<'a> {
         self.type_eq(FmType::Action) && self.action.is_none()
     }
 
-    #[allow(unused)]
     pub fn is_archived(&'a self) -> bool {
         self.status_eq(FmStatus::Archived)
     }
 
-    #[allow(unused)]
     pub fn is_completed(&'a self) -> bool {
         self.status_eq(FmStatus::Completed)
     }
@@ -456,7 +445,7 @@ mod tests {
 
     macro_rules! fm {
         ($ecs:ident, $($key:expr => $value:expr),*$(,)? ) => {{
-            #[allow(unused_mut)]
+            #[allow(unused_mut)] // reason: ignore warning for empty fm creation
             let mut fm = Mapping::new();
 
             $(
@@ -476,8 +465,7 @@ mod tests {
         }};
     }
 
-    #[allow(unused)]
-    fn from_yaml(ecs: &mut Ecs, text: &str) {
+    fn _from_yaml(ecs: &mut Ecs, text: &str) {
         let yaml: Mapping = yaml_serde::from_str(text).unwrap();
 
         let text = mapping_to_str(yaml);

@@ -44,12 +44,11 @@ pub(crate) use regex;
 
 // TODO: restructure this like an ECS
 pub struct Index {
-    md_files:    HashMap<FileId, MdFile>,
+    // md_files:    HashMap<FileId, MdFile>,
 
     subscribers: Vec<Sender<VaultUpdate>>,
 
-    #[allow(unused)]
-    path:        PathBuf,
+    _path:       PathBuf,
 
     ecs: Ecs,
 }
@@ -83,8 +82,8 @@ impl Index {
 
 
         Self {
-            md_files,
-            path:        ENV.vault_path(),
+            // md_files,
+            _path:       ENV.vault_path(),
             subscribers: vec![],
             ecs,
         }
@@ -107,39 +106,13 @@ impl Index {
 
     pub fn delete_file(&mut self, id: FileId) {
 
-        let file = self.get_file(id);
+        let file = self.ecs.get(id).expect("file did not exist");
 
-        warn!("Deleting file: {}", file.file_name);
+        warn!("Deleting file: {}", file.file.name);
 
-        let path = &self.md_files[&id].path;
+        let file = self.ecs.remove_file(id);
 
-        trash::delete(path).unwrap();
-        self.md_files.remove(&id);
-    }
-
-    // fn iter_files(&self) -> impl Iterator<Item = &MdFile> {
-    //     self
-    //         .md_files
-    //         .iter()
-    //         .map (|f| f.1)
-    // }
-
-    // fn iter_files_mut(&mut self) -> impl Iterator<Item = &mut MdFile> {
-    //     self
-    //         .md_files
-    //         .iter_mut()
-    //         .map (|f| f.1)
-    // }
-
-    pub fn iter_files_with<P>(&self, mut predicate: P) -> impl Iterator<Item = FileId>
-    where
-        P: FnMut(&EcsFileView) -> bool,
-    {
-        self
-            .ecs
-            .get_all   ()
-            .filter    (move |f| predicate(f))
-            .map       (|f| f.id)
+        file_shit::delete_from_disk(&file.path);
     }
 
     fn iter_files_with_cmd<P>(&self, mut predicate: P) -> Vec<FileView>
@@ -152,14 +125,6 @@ impl Index {
             .filter    (|f| predicate(f))
             .map       (FileView::from)
             .collect()
-    }
-
-    pub fn get_file(&self, id: FileId) -> &MdFile {
-        &self.md_files[&id]
-    }
-
-    pub fn get_file_mut(&mut self, id: FileId) -> &mut MdFile {
-        self.md_files.get_mut(&id).unwrap()
     }
 
     pub fn handle_command(&mut self, command: VaultCommand) {
@@ -182,9 +147,9 @@ impl Index {
     }
 
     fn handle_open_in_obsidian(&self, opts: OpenInObsidian) {
-        let file = &self.md_files[&opts.id];
+        let file = self.ecs.get(opts.id).unwrap();
 
-        obsidian::open_in_obsidian(file);
+        obsidian::open_in_obsidian(&file.file.name);
     }
 
     fn handle_register(&mut self) -> Receiver<VaultUpdate> {
@@ -197,34 +162,35 @@ impl Index {
 
     fn handle_modify_file(&mut self, opts: ModifyFile) -> Result<(), String> {
 
-        self.validate_modify_commands(&opts.changes)?;
+        todo!();
+        // self.validate_modify_commands(&opts.changes)?;
 
-        let file = self.get_file_mut(opts.id);
+        // let file = self.get_file_mut(opts.id);
 
-        opts
-            .changes
-            .iter()
-            .filter_map(|command| Some(match command {
-                ModifyFileKind::SetTypeInfo  => (FmProperty::Type, FmType::Info  .get_key()),
+        // opts
+        //     .changes
+        //     .iter()
+        //     .filter_map(|command| Some(match command {
+        //         ModifyFileKind::SetTypeInfo  => (FmProperty::Type, FmType::Info  .get_key()),
 
-                ModifyFileKind::SetAction(_) => (FmProperty::Type, FmType::Action.get_key()),
-                _ => None?
-            }))
-            .for_each(|prop| file.set_property(prop.0, prop.1))
-        ;
+        //         ModifyFileKind::SetAction(_) => (FmProperty::Type, FmType::Action.get_key()),
+        //         _ => None?
+        //     }))
+        //     .for_each(|prop| file.set_property(prop.0, prop.1))
+        // ;
 
-        opts
-            .changes
-            .iter()
-            .filter_map(|command| Some(match command {
-                ModifyFileKind::SetAction(action) => (FmProperty::Action, action.get_key()),
-                ModifyFileKind::SetStatus(status) => (FmProperty::Status, status.get_key()),
-                _ => None?
-            }))
-            .for_each(|prop| file.set_property(prop.0, prop.1))
-        ;
+        // opts
+        //     .changes
+        //     .iter()
+        //     .filter_map(|command| Some(match command {
+        //         ModifyFileKind::SetAction(action) => (FmProperty::Action, action.get_key()),
+        //         ModifyFileKind::SetStatus(status) => (FmProperty::Status, status.get_key()),
+        //         _ => None?
+        //     }))
+        //     .for_each(|prop| file.set_property(prop.0, prop.1))
+        // ;
 
-        file.write_file();
+        // file.write_file();
 
         Ok(())
     }
@@ -378,23 +344,6 @@ impl Index {
         VaultUpdate::Rescan
     }
 
-    fn _find_file_id_by_name(&self, file: &Path) -> FileId {
-        let name = file.to_str().unwrap();
-
-        let Some(id) = self.md_files
-            .iter  ()
-            .filter(|f| f.1.file_name == name)
-            .map   (|f| f.0)
-
-            .next  ()
-            .copied()
-        else {
-            panic!("file not found: {name}");
-        };
-
-        id
-    }
-
     async fn send_notifications(&mut self, event: VaultUpdate) {
 
         let futures = self.subscribers
@@ -431,7 +380,7 @@ pub fn generate_vault() {
 }
 
 
-#[allow(dead_code)]
+#[allow(dead_code)] // reason: prod select via static const
 #[derive(Debug, PartialEq, Eq)]
 pub enum Env {
     Prod,
@@ -516,11 +465,6 @@ impl Index {
             open_maybe_someday:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::MaybeSomeday))    .count(),
             open_waiting_for:     self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::WaitingFor))      .count(),
         }
-
-    }
-
-    pub fn compare_vault_stats(&self) {
-        todo!()
 
     }
 }

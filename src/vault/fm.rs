@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::{collections::HashMap, fmt::Display, mem::take, sync::LazyLock};
 
 use enum_iterator::{Sequence, all};
@@ -7,7 +5,6 @@ use iced::wgpu::naga::MathFunction::Fma;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum FmProperty {
     Inbox,
     Category,

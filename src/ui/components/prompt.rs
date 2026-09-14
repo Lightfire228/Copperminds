@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -19,7 +18,6 @@ use crate::ui::key_event::KeyPressed;
 
 #[derive(Debug)]
 pub enum Message {
-    None,
     Clear,
 }
 
@@ -37,7 +35,7 @@ pub struct Prompt<T: Copy> {
     commands: HashMap<&'static str, T>,
 }
 
-type Task = iced::Task<Message>;
+type _Task = iced::Task<Message>;
 
 
 impl<T: Copy> Prompt<T> {
@@ -62,8 +60,6 @@ impl<T: Copy> Prompt<T> {
     pub fn update(&mut self, message: Message) -> Option<Action<T>> {
 
         match message {
-            Message::None => None,
-
             Message::Clear => {
                 self.clear();
 

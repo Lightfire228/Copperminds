@@ -2,9 +2,9 @@ use iced::keyboard::{Key, Location, Modifiers, key};
 use smol_str::SmolStr;
 
 
-#[allow(unused)]
-#[derive(Debug)]
 /// This is a copy of `iced::keyboard::Event::KeyPressed {}`
+#[allow(dead_code)] // reason: copy of iced struct
+#[derive(Debug)]
 pub struct KeyPressed {
     /// The key pressed.
     pub key: Key,

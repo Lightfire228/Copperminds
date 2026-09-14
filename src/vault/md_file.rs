@@ -262,7 +262,7 @@ mod tests {
 
     macro_rules! fm {
         ( $($key:expr => $value:expr),*$(,)? ) => {{
-            #[allow(unused_mut)]
+            #[allow(unused_mut)] // reason: ignore warning for empty fm creation
             let mut fm = Mapping::new();
 
             $(

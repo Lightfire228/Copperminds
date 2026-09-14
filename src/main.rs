@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 use copperminds::*;
 
 use pretty_env_logger::{formatted_builder, formatted_timed_builder};
@@ -46,7 +44,7 @@ async fn main() {
 }
 
 
-#[allow(unused)]
+#[allow(unused)] // reason: main menu toggle
 fn menu() -> Menu {
 
     let opts = [
@@ -72,12 +70,4 @@ fn menu() -> Menu {
 enum Menu {
     GenerateVault,
     IcedUI,
-}
-
-
-#[allow(unused)]
-fn __() {
-    use std::path::{PathBuf};
-
-    backup::backup(&PathBuf::from(""));
 }

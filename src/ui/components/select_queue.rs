@@ -10,18 +10,15 @@ use crate::prelude::*;
 
 
 #[derive(Debug)]
-#[allow(unused)]
 pub struct SelectQueue {
-    vault: Sender<VaultCommand>,
-    stats: VaultStatsComponent,
+    _vault: Sender<VaultCommand>,
+    stats:  VaultStatsComponent,
 }
 
 type Task = iced::Task<Message>;
 
 #[derive(Debug)]
-#[allow(unused)]
 pub enum Message {
-    None,
     VaultUpdate(VaultUpdate),
     VaultStats (vault_stats::Message)
 }
@@ -41,7 +38,7 @@ impl SelectQueue {
         (
             Self {
                 stats,
-                vault,
+                _vault: vault,
             },
             task.map(Message::VaultStats)
         )
@@ -64,7 +61,6 @@ impl SelectQueue {
 
     pub fn update(&mut self, message: Message) -> Option<Action> {
         Some(match message {
-            Message::None                 => None?,
             Message::VaultUpdate(message) => self.vault_update(message)?,
             Message::VaultStats (message) => self.stats.update(message)?.into(),
         })
@@ -86,19 +82,6 @@ impl SelectQueue {
         let Key::Character(key) = &key.key else {
             return None;
         };
-
-        // match key.as_str() {
-        //     "n" => {
-        //         let tx = self.vault.clone();
-
-        //         return Some(Action::Run(Task::future(async move {
-        //             send_vault_cmd(&tx, NukeActionables {}).await;
-
-        //             Message::None
-        //         })))
-        //     }
-        //     _ => {}
-        // }
 
         let queue = match key.as_str() {
             "t" => QueueType::Inbox,

@@ -27,8 +27,7 @@ pub struct FileData {
 }
 
 pub struct Watcher {
-    #[allow(dead_code)]
-    watcher: INotifyWatcher,
+    _watcher: INotifyWatcher,
 
     rx:      Receiver<notify::Result<Event>>,
     count:   usize,
@@ -58,7 +57,7 @@ impl Watcher {
         ;
 
         Ok(Watcher {
-            watcher,
+            _watcher: watcher,
             rx,
             count: 0,
         })

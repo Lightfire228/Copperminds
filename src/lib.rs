@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 pub mod backup;
 pub mod cli;
 pub mod collections;
