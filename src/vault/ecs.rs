@@ -1,4 +1,5 @@
 mod delete_empty_unnamed;
+mod parse;
 
 use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
 
@@ -6,11 +7,11 @@ use enum_iterator::{Sequence, all};
 use log::{debug, warn};
 use yaml_serde::Mapping;
 
-use crate::{file_shit, vault::{file_utilities::RawFile, fm::{FmAction, FmProperty, FmStatus, FmType}, md_file::MdFile}};
+use crate::{file_shit, vault::{ecs::parse::{Parsed, parse_md_file}, file_utilities::RawFile, fm::{FmAction, FmProperty, FmStatus, FmType}}};
 
 type FileId = file_id::FileId;
 
-use super::regex;
+use super::build_regex;
 
 #[derive(Default)]
 pub struct Ecs {
@@ -124,111 +125,6 @@ pub enum ComponentQueryIter<'a> {
 impl Ecs {
     pub fn new() -> Self {
         Default::default()
-    }
-
-    pub fn new_file(&mut self, file: NewFile) {
-
-        // TODO: not this
-        let moqup = MdFile {
-            id:        FileId::Inode { device_id: 0, inode_number: 0 },
-            path:      PathBuf::new(),
-            raw_file:  RawFile::new(file.raw_text.clone()),
-            file_name: "".to_owned(),
-        };
-
-        self.file.insert(file.id, File {
-            name:    file.name,
-            raw_text: file.raw_text,
-            unnamed: moqup.is_unnamed(),
-            path:    file.path,
-        });
-
-        // TODO: get rid of the type property
-        // it can be inferred from the other top level properties
-        // - info
-        //   - TODO: move the info from 'type' to a dedicated prop
-        // - action
-
-
-        self.add_type  (&moqup, file.id);
-        self.add_info  (&moqup, file.id);
-        self.add_status(&moqup, file.id);
-        self.add_action(&moqup, file.id);
-        self.add_empty (&moqup, file.id);
-
-        let fm = moqup.raw_file.frontmatter;
-        let md = moqup.raw_file.md_text;
-
-        self.add_fm(fm, file.id);
-        self.add_md(md, file.id);
-    }
-
-    fn add_type(&mut self, moqup: &MdFile, id: FileId) {
-        let Some(type_) = moqup.get_property(FmProperty::Type) else {
-            return;
-        };
-
-        let Ok  (type_) = type_.as_str().try_into() else {
-            warn!("unknown type prop: {type_}");
-            return;
-        };
-
-        self.type_.insert(id, TypeComponent { type_ });
-    }
-
-    fn add_info(&mut self, moqup: &MdFile, id: FileId) {
-        if !moqup.is_type_info() {
-            return;
-        }
-
-        self.info.insert(id);
-    }
-
-    fn add_status(&mut self, moqup: &MdFile, id: FileId) {
-
-        let Some(status) = moqup.get_property(FmProperty::Status) else {
-            return;
-        };
-
-        let Ok  (status) = status.as_str().try_into() else {
-            warn!("unknown status prop: {status}");
-            return;
-        };
-
-        self.status.insert(id, StatusComponent { status });
-    }
-
-    fn add_action(&mut self, moqup: &MdFile, id: FileId) {
-
-        let Some(action) = moqup.get_property(FmProperty::Action) else {
-            return;
-        };
-
-        let Ok  (action) = action.as_str().try_into() else {
-            warn!("unknown action prop: {action}");
-            return;
-        };
-
-        self.action.insert(id, ActionComponent { action });
-    }
-
-    fn add_empty(&mut self, moqup: &MdFile, id: FileId) {
-        if !moqup.is_empty_raw() {
-            return;
-        }
-        self.empty.insert(id);
-    }
-
-    fn add_fm(&mut self, fm: Option<Mapping>, id: FileId) {
-        let Some(fm) = fm else {
-            return;
-        };
-
-        self.fm.insert(id, FmComponent { fm });
-    }
-
-    fn add_md(&mut self, md: String, id: FileId) {
-        self.md_text.insert(id, MdTextComponent { text: md });
     }
 
     // --- queries
@@ -389,7 +285,7 @@ impl<'a> FileView<'a> {
 
     pub fn is_unnamed(&'a self) -> bool {
         // (?i) - sets case insensitivity
-        regex!(RE = r"(?i)^([\d \-_]*|Untitled(\s.*?)?)\.md$");
+        build_regex!(RE = r"(?i)^([\d \-_]*|Untitled(\s.*?)?)\.md$");
 
         RE.is_match(&self.file.name)
     }

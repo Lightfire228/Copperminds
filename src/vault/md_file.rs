@@ -5,7 +5,7 @@ use file_id::FileId;
 
 use crate::{file_shit, vault::{EcsFileView, file_utilities::RawFile, fm::{FmProperty, FmType, GetKey}, watch::FileData}};
 
-use super::regex;
+use super::build_regex;
 
 #[derive(Debug)]
 pub struct MdFile {
@@ -53,7 +53,7 @@ impl MdFile {
 
     pub fn is_unnamed(&self) -> bool {
         // (?i) - sets case insensitivity
-        regex!(RE = r"(?i)^([\d \-_]*|Untitled(\s.*?)?)\.md$");
+        build_regex!(RE = r"(?i)^([\d \-_]*|Untitled(\s.*?)?)\.md$");
 
         RE.is_match(&self.file_name)
     }

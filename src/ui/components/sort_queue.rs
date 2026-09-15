@@ -18,7 +18,7 @@ use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::EcsFileView;
 use crate::vault::command::{Cmd, DeleteFile, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
 use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
-use crate::vault::md_file::{FileView, MdFile};
+use crate::vault::md_file::{FileView};
 
 use crate::prelude::*;
 

@@ -1,7 +1,7 @@
 
 use std::{fs, path::Path};
 
-use super::regex;
+use super::build_regex;
 use yaml_serde::{Mapping, Value};
 
 const RE_EMPTY: &str = r"^\s*$";
@@ -114,7 +114,7 @@ impl RawFile {
 }
 
 fn parse_md_file(text: String) -> RawFile {
-    regex!(RE = RE_EMPTY);
+    build_regex!(RE = RE_EMPTY);
 
 
     let is_empty = RE.is_match(&text);
@@ -159,7 +159,7 @@ fn get_frontmatter_text(text: String) -> Parsed {
     // - obsidian doesn't consider spaces after a --- fence to be a valid frontmatter section
     //   and \n matches crlf
     // - obsidian *does* consider an empty fm to be valid
-    regex!(RE = r"^(?ms)---\n(.*?)\n---\n(.*)");
+    build_regex!(RE = r"^(?ms)---\n(.*?)\n---\n(.*)");
 
     let Some(captures) = RE.captures(&text) else {
         return Parsed::None(text);
@@ -260,7 +260,7 @@ fn fm_to_text(fm: &Mapping) -> String {
 }
 
 fn is_empty(text: &str) -> bool {
-    regex!(RE = RE_EMPTY);
+    build_regex!(RE = RE_EMPTY);
 
     RE.is_match(text)
 }

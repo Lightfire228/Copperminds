@@ -23,13 +23,11 @@ use walkdir::{DirEntry, WalkDir};
 use trash;
 
 
-use md_file::{MdFile};
-
 pub use ecs::FileView as EcsFileView;
 
 pub const ENV: Env = Env::Dev;
 
-macro_rules! regex {
+macro_rules! build_regex {
     ($i:ident = $r:expr) => {
         use regex::Regex;
         use std::sync::LazyLock;
@@ -39,13 +37,11 @@ macro_rules! regex {
     };
 }
 
-pub(crate) use regex;
+pub(crate) use build_regex;
 
 
 // TODO: restructure this like an ECS
 pub struct Index {
-    // md_files:    HashMap<FileId, MdFile>,
-
     subscribers: Vec<Sender<VaultUpdate>>,
 
     _path:       PathBuf,
@@ -55,34 +51,25 @@ pub struct Index {
 
 impl Index {
     pub fn build() -> Self {
-        let files    = scan_vault();
+        let mut ecs = Ecs::new();
 
-        let mut ecs  = Ecs::new();
-
-        let md_files: HashMap<FileId, MdFile> = files
+        let files = scan_vault()
             .filter   (|f| ends_with(f, ".md"))
-            .map      (|f| {
-                let path = f.path().to_path_buf();
-                let id   = file_id::get_file_id(&path).unwrap();
-
-                ecs.new_file(NewFile {
-                    id,
-                    path:     path.clone(),
-                    raw_text: file_shit::get_file_text(&path),
-                    name:     file_shit::get_file_name(&path),
-                });
-
-                (id, MdFile::new(FileData {
-                    id,
-                    name: path,
-                }))
-            })
-            .collect()
         ;
 
+        for file in files {
+            let path = file.path().to_path_buf();
+            let id   = file_id::get_file_id(&path).unwrap();
+
+            ecs.new_file(NewFile {
+                id,
+                path:     path.clone(),
+                raw_text: file_shit::get_file_text(&path),
+                name:     file_shit::get_file_name(&path),
+            });
+        }
 
         Self {
-            // md_files,
             _path:       ENV.vault_path(),
             subscribers: vec![],
             ecs,
@@ -162,10 +149,10 @@ impl Index {
 
     fn handle_modify_file(&mut self, opts: ModifyFile) -> Result<(), String> {
 
-        todo!();
-        // self.validate_modify_commands(&opts.changes)?;
+        self.validate_modify_commands(&opts.changes)?;
 
-        // let file = self.get_file_mut(opts.id);
+        todo!();
+        // let file = self.md_files.get_mut(&opts.id).unwrap();
 
         // opts
         //     .changes

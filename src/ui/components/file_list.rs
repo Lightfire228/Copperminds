@@ -12,7 +12,7 @@ use iced::widget::{column, row, text};
 use crate::collections::Files;
 use crate::prelude::*;
 use crate::ui::key_event::KeyPressed;
-use crate::vault::md_file::{FileView, MdFile};
+use crate::vault::md_file::{FileView};
 
 
 #[derive(Debug, Clone)]
