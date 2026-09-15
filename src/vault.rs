@@ -1,15 +1,13 @@
 
-pub mod md_file;
 pub mod fm;
 pub mod command;
 pub mod ecs;
 
-mod file_utilities;
 mod watch;
 mod generator;
 
 
-use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{ComponentKind, Ecs, NewFile}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}, watch::FileData}};
+use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{ComponentKind, Ecs, NewFile}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}}};
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};

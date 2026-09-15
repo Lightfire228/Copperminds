@@ -20,11 +20,11 @@ pub enum ModificationType {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
-pub struct FileData {
-    pub id:   FileId,
-    pub name: PathBuf,
-}
+// #[derive(Debug, Clone)]
+// pub struct FileData {
+//     pub id:   FileId,
+//     pub name: PathBuf,
+// }
 
 pub struct Watcher {
     _watcher: INotifyWatcher,

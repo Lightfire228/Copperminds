@@ -343,7 +343,7 @@ mod tests {
 
     use yaml_serde::{Mapping, Value};
 
-    use crate::vault::{file_utilities::PropertyError, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+    use crate::vault::{fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
 
     use super::*;
 
@@ -478,11 +478,4 @@ mod tests {
         assert_eq!(complete .is_completed(), true,  "complete  is_completed");
         assert_eq!(completed.is_completed(), true,  "completed is_completed");
     }
-
-    #[test]
-    #[ignore = "todo"]
-    fn test_property_coercion() {
-        todo!()
-    }
-
 }
