@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
-use crate::vault::md_file::FileView;
+use crate::vault::FileView;
+
 
 /// this just reduces logging noise for message events
 #[repr(transparent)]

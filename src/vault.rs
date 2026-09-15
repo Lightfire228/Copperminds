@@ -9,7 +9,7 @@ mod watch;
 mod generator;
 
 
-use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{ComponentKind, Ecs, NewFile}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}, md_file::FileView, watch::FileData}};
+use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{ComponentKind, Ecs, NewFile}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}, watch::FileData}};
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};
@@ -48,6 +48,13 @@ pub struct Index {
 
     ecs: Ecs,
 }
+
+#[derive(Debug, Clone, Eq)]
+pub struct FileView {
+    pub id:   FileId,
+    pub name: String,
+}
+
 
 impl Index {
     pub fn build() -> Self {
@@ -151,33 +158,16 @@ impl Index {
 
         self.validate_modify_commands(&opts.changes)?;
 
-        todo!();
-        // let file = self.md_files.get_mut(&opts.id).unwrap();
+        for change in &opts.changes {
+            match change {
+                ModifyFileKind::SetTypeInfo  => self.ecs.set_info  (opts.id),
+                ModifyFileKind::SetAction(a) => self.ecs.set_action(opts.id, *a),
+                ModifyFileKind::SetStatus(s) => self.ecs.set_status(opts.id, *s),
+            }
+        }
 
-        // opts
-        //     .changes
-        //     .iter()
-        //     .filter_map(|command| Some(match command {
-        //         ModifyFileKind::SetTypeInfo  => (FmProperty::Type, FmType::Info  .get_key()),
 
-        //         ModifyFileKind::SetAction(_) => (FmProperty::Type, FmType::Action.get_key()),
-        //         _ => None?
-        //     }))
-        //     .for_each(|prop| file.set_property(prop.0, prop.1))
-        // ;
-
-        // opts
-        //     .changes
-        //     .iter()
-        //     .filter_map(|command| Some(match command {
-        //         ModifyFileKind::SetAction(action) => (FmProperty::Action, action.get_key()),
-        //         ModifyFileKind::SetStatus(status) => (FmProperty::Status, status.get_key()),
-        //         _ => None?
-        //     }))
-        //     .for_each(|prop| file.set_property(prop.0, prop.1))
-        // ;
-
-        // file.write_file();
+        self.ecs.write_to_disk(opts.id);
 
         Ok(())
     }
@@ -453,5 +443,23 @@ impl Index {
             open_waiting_for:     self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::WaitingFor))      .count(),
         }
 
+    }
+}
+
+
+
+impl PartialEq for FileView {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+
+impl<'a> From<EcsFileView<'a>> for FileView {
+    fn from(value: EcsFileView) -> Self {
+        FileView {
+            id:   value.id,
+            name: value.file.name.clone(),
+        }
     }
 }

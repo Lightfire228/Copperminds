@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use file_id::FileId;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::vault::{EcsFileView, VaultStats, fm::{FmAction, FmProperty, FmStatus}, md_file::{FileView}};
+use crate::vault::{EcsFileView, FileView, VaultStats, fm::{FmAction, FmProperty, FmStatus}};
 
 
 // https://tokio.rs/tokio/tutorial/channels
@@ -24,7 +24,7 @@ pub enum VaultCommand {
 pub type Responder <T> = oneshot::Sender<T>;
 pub type Subscriber<T> = mpsc   ::Receiver<T>;
 
-// pub type Predicate = Box<dyn Fn(&MdFile) -> bool + Send>;
+// pub type Predicate = Box<dyn Fn(&EcsFileView) -> bool + Send>;
 pub type Predicate = fn(&EcsFileView) -> bool;
 
 

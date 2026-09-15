@@ -1,5 +1,7 @@
 mod delete_empty_unnamed;
 mod parse;
+mod mut_props;
+mod to_text;
 
 use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
 
@@ -7,9 +9,10 @@ use enum_iterator::{Sequence, all};
 use log::{debug, warn};
 use yaml_serde::Mapping;
 
-use crate::{file_shit, vault::{ecs::parse::{Parsed, parse_md_file}, file_utilities::RawFile, fm::{FmAction, FmProperty, FmStatus, FmType}}};
 
 type FileId = file_id::FileId;
+
+use crate::vault::fm::{FmAction, FmStatus, FmType};
 
 use super::build_regex;
 
@@ -130,13 +133,12 @@ impl Ecs {
     // --- queries
 
     pub fn get_all(&self) -> impl Iterator<Item = FileView<'_>> {
-        self.file.iter().map(|x| self.get(*x.0).unwrap())
+        self.file.iter().map(|x| self.to_file_view(*x.0, x.1))
     }
 
     pub fn get(&self, id: FileId) -> Option<FileView<'_>> {
         self.file.get(&id).map(|x| self.to_file_view(id, x))
     }
-
 
     fn to_file_view<'a>(&'a self, id: FileId, file: &'a File) -> FileView<'a> {
         FileView {
@@ -301,7 +303,32 @@ impl<'a> FileView<'a> {
     pub fn is_completed(&'a self) -> bool {
         self.status_eq(FmStatus::Completed)
     }
+
+    pub fn to_file_text(&self) -> String {
+        let md = self.get_md_text();
+
+        let Some(FmComponent { fm }) = self.fm else {
+            return md;
+        };
+
+
+        format!("---\n{}---\n{}", fm_to_text(&fm), md)
+    }
+
+
+    fn get_md_text(&self) -> String {
+        return self
+            .md_text
+            .map(|x| x.text.to_string())
+            .unwrap_or_default()
+        ;
+    }
 }
+
+fn fm_to_text(fm: &Mapping) -> String {
+    yaml_serde::to_string(fm).unwrap()
+}
+
 
 impl ComponentKind {
     fn all() -> Vec<Self> {
@@ -316,7 +343,7 @@ mod tests {
 
     use yaml_serde::{Mapping, Value};
 
-    use crate::vault::{file_utilities::PropertyError, fm::{FmAction, FmStatus, FmType, GetKey}};
+    use crate::vault::{file_utilities::PropertyError, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
 
     use super::*;
 
