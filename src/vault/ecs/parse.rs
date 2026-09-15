@@ -279,29 +279,10 @@ mod tests {
 
     use file_id::FileId;
 
+    use crate::test_utils::{id, load_file};
+
     use super::*;
 
-
-    static COUNTER: Mutex<u64> = Mutex::new(0);
-
-
-    fn id() -> FileId {
-        let mut id = COUNTER.lock().unwrap();
-
-        *id += 1;
-
-        FileId::Inode {
-            device_id:    *id -1,
-            inode_number: *id -1,
-        }
-    }
-
-    fn load_file(name: &str) -> String {
-        let dir  = format!("{}/test_files/{name}", env!("CARGO_MANIFEST_DIR"));
-        let path = Path::new(&dir);
-
-        fs::read_to_string(path).unwrap()
-    }
 
     fn load_test_bodies() -> Vec<String> {
         vec![

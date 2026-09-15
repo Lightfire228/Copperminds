@@ -343,28 +343,9 @@ mod tests {
 
     use yaml_serde::{Mapping, Value};
 
-    use crate::vault::{fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+    use crate::{test_utils::{id, mapping_to_str}, vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
 
     use super::*;
-
-    static COUNTER: Mutex<u64> = Mutex::new(0);
-
-
-    fn mapping_to_str(fm: Mapping) -> String {
-        format!("---\n{}---\n", yaml_serde::to_string(&fm).unwrap())
-    }
-
-    fn id() -> FileId {
-        let mut id = COUNTER.lock().unwrap();
-
-        *id += 1;
-
-        FileId::Inode {
-            device_id:    *id -1,
-            inode_number: *id -1,
-        }
-    }
-
 
     macro_rules! fm {
         ($ecs:ident, $($key:expr => $value:expr),*$(,)? ) => {{
@@ -386,18 +367,6 @@ mod tests {
 
             id
         }};
-    }
-
-    fn _from_yaml(ecs: &mut Ecs, text: &str) {
-        let yaml: Mapping = yaml_serde::from_str(text).unwrap();
-
-        let text = mapping_to_str(yaml);
-        ecs.new_file(NewFile {
-            id:       id(),
-            path:     PathBuf::new(),
-            raw_text: text,
-            name:     String::new(),
-        });
     }
 
     #[test]

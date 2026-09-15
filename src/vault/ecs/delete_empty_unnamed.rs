@@ -33,23 +33,9 @@ impl Ecs {
 mod tests {
     use std::{path::PathBuf, sync::Mutex};
 
-    use crate::vault::ecs::NewFile;
+    use crate::{test_utils::id, vault::ecs::NewFile};
 
     use super::*;
-
-    static COUNTER: Mutex<u64> = Mutex::new(0);
-
-    fn id() -> FileId {
-        let mut id = COUNTER.lock().unwrap();
-
-        *id += 1;
-
-        FileId::Inode {
-            device_id:    *id -1,
-            inode_number: *id -1,
-        }
-    }
-
 
     fn build_empty_unnamed_test_cases(
         empty_titles:     &[String],
