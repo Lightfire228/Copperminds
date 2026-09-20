@@ -7,7 +7,6 @@ pub mod components;
 
 use std::{any::{Any, TypeId}, collections::{HashMap}, path::{PathBuf}};
 
-use enum_iterator::{Sequence};
 use yaml_serde::Mapping;
 
 
@@ -65,18 +64,6 @@ where
 type ComponentMap<T> = HashMap<FileId, T>;
 
 
-
-#[derive(Debug, Clone, Copy, Sequence)]
-pub enum ComponentKind {
-    Frontmatter,
-    MdText,
-    Empty,
-    Type,
-    Info,
-    Action,
-    Status,
-    Project,
-}
 
 impl Ecs {
     pub fn new() -> Self {

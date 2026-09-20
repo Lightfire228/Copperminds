@@ -1,4 +1,4 @@
-use crate::vault::{ecs::{Ecs, EcsFileView}};
+use crate::{file_shit, vault::ecs::{Ecs, EcsFileView}};
 
 
 impl Ecs {
@@ -16,7 +16,7 @@ impl Ecs {
         for id in files {
             let file = self.remove_file(id);
 
-            trash::delete(file.path).unwrap();
+            file_shit::delete_from_disk(&file.path);
         }
     }
 

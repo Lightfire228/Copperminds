@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 default-run = "copperminds"
 
-# [lints.rust]
-# unused_imports = "allow"
+[lints.rust]
+unused_imports = "allow"
 
 [dependencies]
 anyhow = "1.0.102"

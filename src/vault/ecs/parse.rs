@@ -1,6 +1,6 @@
 use yaml_serde::{Mapping, Value};
 
-use crate::vault::{ecs::{ActionComponent, Ecs, File, FileId, FmComponent, MdTextComponent, NewFile, ProjectComponent, StatusComponent, TypeComponent, components::{EmptyComponent, InfoComponent}}, fm::{FmProperty, FmType, GetKey}};
+use crate::vault::{ecs::{ActionComponent, Ecs, File, FileId, FmComponent, MdTextComponent, NewFile, ProjectComponent, StatusComponent, TypeComponent, components::{EmptyComponent, InfoComponent}}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
 
 use super::super::build_regex;
 use crate::prelude::*;
@@ -32,6 +32,21 @@ pub enum _PropertyListError {
     PropertyNotFound,
 }
 
+macro_rules! parse_prop {
+    ($fm:expr, $kind:expr) => { (|| {
+        let Ok(x) = fm_get_property($fm, $kind) else {
+            None?
+        };
+
+        #[allow(irrefutable_let_patterns)]
+        let Ok  (x) = x.as_str().try_into() else {
+            warn!("unknown {} prop: {x}", $kind.get_key());
+            None?
+        };
+
+        Some(x)
+    })()};
+}
 
 
 impl Ecs {
@@ -59,41 +74,27 @@ impl Ecs {
 
         if let Some(fm) = fm {
 
-            if let Some(type_) = self.parse_type(&fm, file.id) {
+            if let Some(type_) = parse_prop!(&fm, FmProperty::Type) {
                 self.parse_info(type_, file.id);
+
+                self.add_component(file.id, TypeComponent { type_ });
             }
 
-            self.parse_action (&fm, file.id);
-            self.parse_status (&fm, file.id);
-            self.parse_project(&fm, file.id);
+            self.add_action (&fm, file.id);
+            self.add_status (&fm, file.id);
+            self.add_project(&fm, file.id);
 
 
-            self.add_fm(fm, file.id);
+            self.add_component(file.id, FmComponent { fm });
         }
 
         if is_empty {
-            self.add_empty(file.id);
+            self.add_component(file.id, EmptyComponent);
         }
 
-        self.add_md(md, file.id);
+        self.add_component(file.id, MdTextComponent { text: md });
     }
 
-
-    // TODO: refactor and dedupe these add funcs
-    fn parse_type(&mut self, fm: &Mapping, id: FileId) -> Option<FmType> {
-        let Ok(type_) = fm_get_property(fm, FmProperty::Type) else {
-            None?
-        };
-
-        let Ok  (type_) = type_.as_str().try_into() else {
-            warn!("unknown type prop: {type_}");
-            None?
-        };
-
-        self.add_component(id, TypeComponent { type_ });
-
-        Some(type_)
-    }
 
     fn parse_info(&mut self, type_: FmType, id: FileId) {
         if !matches!(type_, FmType::Info) {
@@ -104,57 +105,39 @@ impl Ecs {
     }
 }
 
-macro_rules! parse {
-    ($prop:ty, $ident:ident) => {
-        concat_idents!(fn_name = parse_, $prop {
-            fn fn_name(&mut self, fm: &Mapping, id: FileId) {
-                let Ok(x) = fm_get_property(fm, FmProperty::$ident) else {
-                    return;
-                };
 
-                #[allow(irrefutable_let_patterns)]
-                let Ok  (x) = x.as_str().try_into() else {
-                    warn!("unknown {} prop: {x}", stringify!($prop));
+macro_rules! add {
+    ($thing:ident, $kind:ident) => {
+        concat_idents!(fn_name = add_, $thing {
+
+            fn fn_name(&mut self, fm: &Mapping, id: FileId) {
+                let Some(x) =
+                    parse_prop!(fm, FmProperty::$kind)
+                else {
                     return;
                 };
 
                 self.add_component(
                     id,
-                    concat_idents!(Comp = $ident, Component {
+                    concat_idents!(Comp = $kind, Component {
                         Comp {
-                            $prop: x,
+                            $thing: x,
                         }
-                    }));
+                    })
+                );
             }
-
         });
-
-
     };
 }
 
 impl Ecs {
 
-    parse!(action,   Action);
-    parse!(status,   Status);
-    parse!(project, Project);
-
-
-    fn add_empty(&mut self, id: FileId) {
-        self.add_component(id, EmptyComponent);
-    }
-
-    fn add_fm(&mut self, fm: Mapping, id: FileId) {
-        self.add_component(id, FmComponent { fm });
-    }
-
-    fn add_md(&mut self, md: String, id: FileId) {
-        self.add_component(id, MdTextComponent { text: md });
-    }
-
-
+    add!(action,  Action);
+    add!(status,  Status);
+    add!(project, Project);
 
 }
+
 
 pub fn parse_md_file(text: &str) -> Parsed {
 
