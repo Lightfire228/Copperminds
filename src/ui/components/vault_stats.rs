@@ -1,9 +1,9 @@
-use iced::{Element, keyboard::Key, widget::container};
+use iced::{Element};
 use iced::widget::{column, text};
 use tokio::sync::mpsc::Sender;
 
 use crate::ui::key_event::KeyPressed;
-use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
+use crate::ui::{send_vault_cmd};
 use crate::vault::VaultStats;
 use crate::vault::command::{GetVaultStats, VaultCommand, VaultUpdate};
 

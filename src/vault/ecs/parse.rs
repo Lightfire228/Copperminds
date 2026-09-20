@@ -291,9 +291,7 @@ pub fn is_empty(file_name: &str) -> bool {
 /// Nothing should change the file in any way other than the intended effect
 #[cfg(test)]
 mod tests {
-    use std::{env, fs, path::{Path, PathBuf}, sync::Mutex, vec};
-
-    use file_id::FileId;
+    use std::{path::{PathBuf}, vec};
 
     use crate::test_utils::{id, load_file};
 

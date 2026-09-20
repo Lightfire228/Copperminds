@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use file_id::FileId;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::vault::{EcsFileView, FileView, VaultStats, fm::{FmAction, FmProperty, FmStatus}};
+use crate::vault::{EcsFileView, FileView, VaultStats, fm::*};
 
 
 // https://tokio.rs/tokio/tutorial/channels

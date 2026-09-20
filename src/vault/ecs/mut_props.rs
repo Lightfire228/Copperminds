@@ -1,7 +1,6 @@
-use tokio::io::Empty;
 use yaml_serde::{Mapping, Value};
 
-use crate::vault::{ecs::{ActionComponent, Ecs, FileId, FmComponent, StatusComponent, TypeComponent, components::{EmptyComponent, InfoComponent}}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+use crate::vault::{ecs::{ActionComponent, Ecs, FileId, components::*}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
 
 
 impl Ecs {
@@ -71,13 +70,9 @@ fn set_property(fm: &mut Mapping, property: String, value: String) {
 /// Nothing should change the file in any way other than the intended effect
 #[cfg(test)]
 mod tests {
-    use std::{env, fs, path::{Path, PathBuf}, sync::Mutex, vec};
-
-    use file_id::FileId;
+    use std::{vec};
 
     use crate::test_utils::load_file;
-
-    use super::*;
 
 
     fn _load_test_bodies() -> Vec<String> {

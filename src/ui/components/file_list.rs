@@ -1,16 +1,12 @@
 use std::usize;
 
 use file_id::FileId;
-use iced::Length::Fill;
 use iced::{Alignment, keyboard};
 use iced::widget::table::{self, Table};
-use iced::widget::text_editor::KeyPress;
-use iced::widget::text_input::cursor;
-use iced::{Element, keyboard::Key, widget::container};
-use iced::widget::{column, row, text};
+use iced::{Element, keyboard::Key};
+use iced::widget::{text};
 
 use crate::collections::Files;
-use crate::prelude::*;
 use crate::ui::key_event::KeyPressed;
 use crate::vault::FileView;
 

@@ -15,10 +15,8 @@ use crate::ui::components::select_queue::{self, SelectQueue};
 use crate::ui::components::sort_queue::{self, SortQueue};
 use crate::ui::key_event::KeyPressed;
 use crate::vault::{ENV};
-use crate::vault::command::{Cmd, NukeActionables, VaultCommand, VaultUpdate};
+use crate::vault::command::{Cmd, VaultCommand, VaultUpdate};
 use crate::prelude::*;
-
-use std::mem;
 
 
 type Task = iced::Task<Message>;
@@ -138,8 +136,6 @@ impl App {
 
             Message::VaultUpdate(message) => {
                 debug!("vault update event {message:?}");
-
-                use sort_queue::Message::VaultUpdate;
 
                 return self.update(match &self.ui_mode {
                     UIMode::SelectQueue(_) => Message::SelectQueue(select_queue::Message::VaultUpdate(message)),

@@ -2,22 +2,20 @@
 use std::fmt::Display;
 
 use file_id::FileId;
-use iced::Length::{self, Fill};
+use iced::Length::{Fill};
 use iced::keyboard;
-use iced::widget::table::Table;
-use tokio::fs::File;
 use tokio::sync::mpsc::Sender;
 use iced::{Element, Task, keyboard::Key, widget::container};
-use iced::widget::{Space, column, row, space, table, text};
+use iced::widget::{Space, column, row, text};
 
 use crate::collections::Files;
 use crate::ui::components::file_list::{self, FileList};
 use crate::ui::components::prompt::{self, MenuCommand, Prompt};
 use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
-use crate::vault::command::{Cmd, DeleteFile, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
+use crate::vault::command::{DeleteFile, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
 use crate::vault::ecs::components::EcsFileView;
-use crate::vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey};
+use crate::vault::fm::*;
 
 use crate::prelude::*;
 

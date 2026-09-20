@@ -4,9 +4,8 @@ use tokio::sync::mpsc::Sender;
 
 use crate::ui::components::vault_stats::{self, VaultStatsComponent};
 use crate::ui::key_event::KeyPressed;
-use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
-use crate::vault::command::{GetVaultStats, NukeActionables, VaultCommand, VaultUpdate};
-use crate::prelude::*;
+use crate::ui::{QueueType, UIMode};
+use crate::vault::command::{VaultCommand, VaultUpdate};
 
 
 #[derive(Debug)]

@@ -7,19 +7,15 @@ mod watch;
 mod generator;
 
 
-use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{ComponentKind, Ecs, NewFile, components::{ActionComponent, EcsFileView, InfoComponent}}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}}};
+use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{Ecs, NewFile, components::*}, fm::*}};
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};
-use std::{collections::HashMap, env, mem, path::{Path, PathBuf}, usize};
+use std::{env, mem, path::{PathBuf}, usize};
 use crate::prelude::*;
 
 use tokio::{select, sync::{mpsc::{self, Sender, Receiver, channel}}};
 use walkdir::{DirEntry, WalkDir};
-
-
-use trash;
-
 
 pub const ENV: Env = Env::Dev;
 

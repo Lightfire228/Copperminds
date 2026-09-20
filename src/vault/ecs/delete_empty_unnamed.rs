@@ -1,7 +1,3 @@
-use std::path::Path;
-
-use file_id::FileId;
-
 use crate::vault::{ecs::{Ecs, EcsFileView}};
 
 
@@ -31,9 +27,9 @@ impl Ecs {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::PathBuf, sync::Mutex};
+    use std::{path::PathBuf};
 
-    use crate::{test_utils::id, vault::ecs::NewFile};
+    use crate::{test_utils::id, vault::ecs::{FileId, NewFile}};
 
     use super::*;
 

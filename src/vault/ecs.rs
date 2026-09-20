@@ -5,10 +5,9 @@ mod to_text;
 
 pub mod components;
 
-use std::{any::{Any, TypeId}, collections::{HashMap, HashSet}, ops::Deref, path::{Path, PathBuf}};
+use std::{any::{Any, TypeId}, collections::{HashMap}, path::{PathBuf}};
 
-use enum_iterator::{Sequence, all};
-use log::{debug, warn};
+use enum_iterator::{Sequence};
 use yaml_serde::Mapping;
 
 
@@ -100,6 +99,14 @@ impl Ecs {
         self.file.get(&id).map(|x| self.to_file_view(id, x))
     }
 
+    pub fn iter_components<T: Component>(&self) -> impl Iterator<Item = (&FileId, &T)> {
+        self.get_comp_list().unwrap().iter()
+    }
+
+    pub fn iter_components_mut<T: Component>(&mut self) -> impl Iterator<Item = (&FileId, &mut T)> {
+        self.get_comp_list_mut().unwrap().iter_mut()
+    }
+
 
     pub fn get_component<T: Component>(&self, comp_id: FileId) -> Result<&T, ComponentError> {
         type Er = ComponentError;
@@ -165,31 +172,8 @@ impl Ecs {
     }
 
     pub fn get_component_counts<'a, T: Component>(&'a self) -> usize {
-        type Kind   = ComponentKind;
-
         self.get_comp_list::<T>().map_or_else(|| 0, |x| x.len())
-
     }
-
-    pub fn iter_component<T: Component>(&self) -> impl Iterator<Item = (&FileId, &T)> {
-
-
-        type Map<T> = HashMap<FileId, T>;
-        let type_id = map_id::<T>();
-
-        let list: &dyn Any = self
-            .components
-            .get(&type_id)
-            .unwrap()
-        ;
-
-        list
-            .downcast_ref::<Map<T>>()
-            .expect("the types done got all fucked up")
-            .iter()
-    }
-
-
 
     // --- writes
 
@@ -238,11 +222,7 @@ impl Ecs {
         let list = self
             .components
             .entry(type_id)
-            .or_insert_with(|| {
-                let x = HashMap::<FileId, T>::new();
-
-                Box::new(x)
-            })
+            .or_insert_with(|| Box::new(HashMap::<FileId, T>::new()))
             .as_mut()
         ;
 
@@ -373,8 +353,6 @@ pub enum ComponentError {
 
 #[cfg(test)]
 mod tests {
-
-    use std::sync::{Arc, Mutex};
 
     use yaml_serde::{Mapping, Value};
 

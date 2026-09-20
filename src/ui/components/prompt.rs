@@ -1,16 +1,9 @@
 
 use std::collections::HashMap;
-use std::fmt::Display;
-use std::marker::PhantomData;
 
-use anyhow::Ok as _;
-
-use file_id::FileId;
-use iced::Length::Fill;
 use iced::keyboard;
 use iced::{Element, keyboard::Key, widget::container};
-use iced::widget::{column, row, text};
-use smol_str::SmolStr;
+use iced::widget::{text};
 
 use crate::prelude::*;
 use crate::ui::key_event::KeyPressed;

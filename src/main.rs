@@ -1,6 +1,6 @@
 use copperminds::*;
 
-use pretty_env_logger::{formatted_builder, formatted_timed_builder};
+use pretty_env_logger::{formatted_timed_builder};
 
 use crate::{cli::{MenuOption}, vault::ENV};
 
@@ -44,9 +44,9 @@ async fn main() {
 }
 
 
-#[allow(unused)] // reason: main menu toggle
 fn menu() -> Menu {
 
+    #[allow(unused)] // reason: main menu toggle
     let opts = [
         MenuOption {
             code:  "g",
@@ -63,7 +63,6 @@ fn menu() -> Menu {
     // cli::choose("Sorting method", &opts)
     Menu::IcedUI
     // Menu::GenerateVault
-
 }
 
 #[derive(Debug, Clone, Copy)]
