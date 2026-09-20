@@ -53,7 +53,7 @@ pub struct Register {}
 
 #[derive(Debug)]
 pub struct GetVaultStats {
-    pub ecs: bool,
+    // pub ecs: bool,
 }
 
 #[derive(Debug)]

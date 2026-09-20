@@ -15,6 +15,7 @@ impl Ecs {
         let text = file.to_file_text();
         let file = file.file;
 
+        // MAYBE: lock the file before writing to it?
         file.assert_unmodified();
         fs::write(&file.path, &text).unwrap();
     }

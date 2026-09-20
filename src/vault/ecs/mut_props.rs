@@ -1,6 +1,7 @@
+use tokio::io::Empty;
 use yaml_serde::{Mapping, Value};
 
-use crate::vault::{ecs::{ActionComponent, Ecs, FileId, FmComponent, StatusComponent, TypeComponent}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+use crate::vault::{ecs::{ActionComponent, Ecs, FileId, FmComponent, StatusComponent, TypeComponent, components::{EmptyComponent, InfoComponent}}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
 
 
 impl Ecs {
@@ -8,23 +9,18 @@ impl Ecs {
     pub fn set_info(&mut self, id: FileId) {
         self.set_type(id, FmType::Info);
 
-        self.info.insert(id);
-        self.empty.remove(&id);
+        self.add_component(id, InfoComponent);
+        self.remove_empty (id);
     }
 
     pub fn set_action(&mut self, id: FileId, action: FmAction) {
         let fm = self.set_type(id, FmType::Action);
         set_property(fm, FmProperty::Action.get_key(), action.get_key());
 
-        self
-            .action
-            .entry         (id)
-            .and_modify    (|a| a.action = action)
-            .or_insert_with(|| ActionComponent {
-                action,
-            })
-        ;
-        self.empty.remove(&id);
+        self.get_component_or_insert(id, || ActionComponent {
+            action,
+        });
+        self.remove_empty (id);
     }
 
     pub fn set_status(&mut self, id: FileId, status: FmStatus) {
@@ -32,15 +28,10 @@ impl Ecs {
         let fm = self.get_fm_mut(id);
         set_property(fm, FmProperty::Status.get_key(), status.get_key());
 
-        self
-            .status
-            .entry         (id)
-            .and_modify    (|s| s.status = status)
-            .or_insert_with(|| StatusComponent {
-                status,
-            })
-        ;
-        self.empty.remove(&id);
+        self.get_component_or_insert(id, || StatusComponent {
+            status,
+        });
+        self.remove_empty(id);
     }
 
     fn set_type(&mut self, id: FileId, type_: FmType) -> &mut Mapping {
@@ -52,13 +43,14 @@ impl Ecs {
     }
 
     fn get_fm_mut(&mut self, id: FileId) -> &mut Mapping {
-        &mut self
+        &mut self.get_component_or_insert(id, || FmComponent {
+            fm: Mapping::new()
+        })
             .fm
-            .entry(id)
-            .or_insert_with(|| FmComponent {
-                fm: Mapping::new()
-            })
-            .fm
+    }
+
+    fn remove_empty(&mut self, id: FileId) {
+        _ = self.remove_component::<EmptyComponent>(id);
     }
 }
 
@@ -88,7 +80,7 @@ mod tests {
     use super::*;
 
 
-    fn load_test_bodies() -> Vec<String> {
+    fn _load_test_bodies() -> Vec<String> {
         vec![
             load_file("parsing/test_body_01.md"),
             load_file("parsing/test_body_02.md"),

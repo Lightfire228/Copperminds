@@ -11,6 +11,7 @@ pub enum FmProperty {
     Status,
     Type,
     Action,
+    Project,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,6 +32,8 @@ pub enum FmStatus {
     Completed,
     Archived,
 }
+
+
 
 impl FmStatus {
     pub fn _is_completed(&self) -> bool {
@@ -74,6 +77,7 @@ impl_get_key!(FmProperty,
     Status   => "status",
     Type     => "type",
     Action   => "action",
+    Project  => "project",
 );
 
 impl_get_key!(FmType,

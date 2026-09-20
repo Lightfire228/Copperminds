@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use crate::vault::{ENV, EcsFileView};
+use crate::vault::{ENV};
 
 pub fn open_in_obsidian(file_name: &str) {
 

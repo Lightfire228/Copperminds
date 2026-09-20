@@ -2,15 +2,15 @@ use std::path::Path;
 
 use file_id::FileId;
 
-use crate::vault::{ecs::{Ecs, FileView}};
+use crate::vault::{ecs::{Ecs, EcsFileView}};
 
 
 impl Ecs {
 
-    pub fn get_empty_unnamed_files(&self) -> impl Iterator<Item = FileView<'_>> {
+    pub fn get_empty_unnamed_files(&self) -> impl Iterator<Item = EcsFileView<'_>> {
         self
             .get_all()
-            .filter(|f| f.is_empty && f.is_unnamed())
+            .filter(|f| f.is_empty() && f.is_unnamed())
     }
 
     pub fn delete_empty_unnamed_files(&mut self) {

@@ -1,9 +1,11 @@
 use yaml_serde::{Mapping, Value};
 
-use crate::vault::{ecs::{ActionComponent, Ecs, File, FileId, FmComponent, MdTextComponent, NewFile, StatusComponent, TypeComponent}, fm::{FmProperty, FmType, GetKey}};
+use crate::vault::{ecs::{ActionComponent, Ecs, File, FileId, FmComponent, MdTextComponent, NewFile, ProjectComponent, StatusComponent, TypeComponent, components::{EmptyComponent, InfoComponent}}, fm::{FmProperty, FmType, GetKey}};
 
 use super::super::build_regex;
 use crate::prelude::*;
+
+use concat_idents::concat_idents;
 
 const RE_EMPTY: &str = r"^\s*$";
 
@@ -61,9 +63,12 @@ impl Ecs {
                 self.parse_info(type_, file.id);
             }
 
-            self.parse_action(&fm, file.id);
-            self.parse_status(&fm, file.id);
-            self.add_fm    ( fm, file.id);
+            self.parse_action (&fm, file.id);
+            self.parse_status (&fm, file.id);
+            self.parse_project(&fm, file.id);
+
+
+            self.add_fm(fm, file.id);
         }
 
         if is_empty {
@@ -85,7 +90,7 @@ impl Ecs {
             None?
         };
 
-        self.type_.insert(id, TypeComponent { type_ });
+        self.add_component(id, TypeComponent { type_ });
 
         Some(type_)
     }
@@ -95,45 +100,56 @@ impl Ecs {
             return;
         }
 
-        self.info.insert(id);
+        self.add_component(id, InfoComponent);
     }
+}
 
-    fn parse_action(&mut self, fm: &Mapping, id: FileId) {
-        let Ok(action) = fm_get_property(fm, FmProperty::Action) else {
-            return;
-        };
+macro_rules! parse {
+    ($prop:ty, $ident:ident) => {
+        concat_idents!(fn_name = parse_, $prop {
+            fn fn_name(&mut self, fm: &Mapping, id: FileId) {
+                let Ok(x) = fm_get_property(fm, FmProperty::$ident) else {
+                    return;
+                };
 
-        let Ok  (action) = action.as_str().try_into() else {
-            warn!("unknown action prop: {action}");
-            return;
-        };
+                #[allow(irrefutable_let_patterns)]
+                let Ok  (x) = x.as_str().try_into() else {
+                    warn!("unknown {} prop: {x}", stringify!($prop));
+                    return;
+                };
 
-        self.action.insert(id, ActionComponent { action });
-    }
+                self.add_component(
+                    id,
+                    concat_idents!(Comp = $ident, Component {
+                        Comp {
+                            $prop: x,
+                        }
+                    }));
+            }
 
-    fn parse_status(&mut self, fm: &Mapping, id: FileId) {
-        let Ok(status) = fm_get_property(fm, FmProperty::Status) else {
-            return;
-        };
+        });
 
-        let Ok  (status) = status.as_str().try_into() else {
-            warn!("unknown status prop: {status}");
-            return;
-        };
 
-        self.status.insert(id, StatusComponent { status });
-    }
+    };
+}
+
+impl Ecs {
+
+    parse!(action,   Action);
+    parse!(status,   Status);
+    parse!(project, Project);
+
 
     fn add_empty(&mut self, id: FileId) {
-        self.empty.insert(id);
+        self.add_component(id, EmptyComponent);
     }
 
     fn add_fm(&mut self, fm: Mapping, id: FileId) {
-        self.fm.insert(id, FmComponent { fm });
+        self.add_component(id, FmComponent { fm });
     }
 
     fn add_md(&mut self, md: String, id: FileId) {
-        self.md_text.insert(id, MdTextComponent { text: md });
+        self.add_component(id, MdTextComponent { text: md });
     }
 
 
@@ -401,8 +417,14 @@ mod tests {
 
             let file = ecs.get(id).unwrap();
 
-            assert_eq!(file.is_empty, val);
+            assert_eq!(file.is_empty(), val);
         }
+    }
+
+    #[test]
+    #[ignore = "TODO"]
+    fn test_parsing_project() {
+        todo!()
     }
 
     fn from_yaml(text: &str) -> Mapping {

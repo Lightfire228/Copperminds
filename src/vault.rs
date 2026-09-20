@@ -7,7 +7,7 @@ mod watch;
 mod generator;
 
 
-use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{ComponentKind, Ecs, NewFile}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}}};
+use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{ComponentKind, Ecs, NewFile, components::{ActionComponent, EcsFileView, InfoComponent}}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}}};
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};
@@ -20,8 +20,6 @@ use walkdir::{DirEntry, WalkDir};
 
 use trash;
 
-
-pub use ecs::FileView as EcsFileView;
 
 pub const ENV: Env = Env::Dev;
 
@@ -418,14 +416,11 @@ impl Index {
 
     pub fn calc_vault_stats_ecs(&self) -> VaultStats {
 
-        let info   = ComponentKind::Info;
-        let action = ComponentKind::Action;
-
         VaultStats {
-            info_total:           self.ecs.get_component_counts(info),
-            info_archived:        self.ecs.get_all().filter(|x| x.info && x.status_eq(FmStatus::Archived ))            .count(),
-            info_complete:        self.ecs.get_all().filter(|x| x.info && x.status_eq(FmStatus::Completed))            .count(),
-            actionables_total:    self.ecs.get_component_counts(action),
+            info_total:           self.ecs.get_component_counts::<InfoComponent>(),
+            info_archived:        self.ecs.get_all().filter(|x| x.is_info() && x.status_eq(FmStatus::Archived ))       .count(),
+            info_complete:        self.ecs.get_all().filter(|x| x.is_info() && x.status_eq(FmStatus::Completed))       .count(),
+            actionables_total:    self.ecs.get_component_counts::<ActionComponent>(),
             actionables_open:     self.ecs.get_all().filter(|x| x.is_actionable() && x.is_open())                      .count(),
             actionables_complete: self.ecs.get_all().filter(|x| x.is_actionable() && x.status_eq(FmStatus::Completed)) .count(),
             actionables_archived: self.ecs.get_all().filter(|x| x.is_actionable() && x.status_eq(FmStatus::Archived))  .count(),

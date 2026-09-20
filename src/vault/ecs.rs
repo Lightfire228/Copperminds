@@ -3,7 +3,9 @@ mod parse;
 mod mut_props;
 mod to_text;
 
-use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
+pub mod components;
+
+use std::{any::{Any, TypeId}, collections::{HashMap, HashSet}, ops::Deref, path::{Path, PathBuf}};
 
 use enum_iterator::{Sequence, all};
 use log::{debug, warn};
@@ -12,26 +14,18 @@ use yaml_serde::Mapping;
 
 type FileId = file_id::FileId;
 
-use crate::vault::fm::{FmAction, FmStatus, FmType};
+use crate::vault::{ecs::components::*, fm::{FmAction, FmStatus, FmType}};
 
 use super::build_regex;
+
+static CAST_ERR: &str = "the types done got all fucked up";
 
 #[derive(Default)]
 pub struct Ecs {
 
-    file:    HashMap<FileId, File>,
-    fm:      HashMap<FileId, FmComponent>,
-    md_text: HashMap<FileId, MdTextComponent>,
+    file:       HashMap<FileId, File>,
 
-    /// `/\s*/`
-    empty:   HashSet<FileId>,
-
-    // fm properties
-    type_:   HashMap<FileId, TypeComponent>,
-    info:    HashSet<FileId>,
-    action:  HashMap<FileId, ActionComponent>,
-    status:  HashMap<FileId, StatusComponent>,
-
+    components: HashMap<TypeId, Box<dyn ComponentList>>,
 }
 
 #[derive(Debug)]
@@ -47,31 +41,6 @@ pub struct File {
     pub raw_text: String,
 }
 
-#[derive(Debug)]
-pub struct FmComponent {
-    pub fm: Mapping,
-}
-
-#[derive(Debug)]
-pub struct MdTextComponent {
-    pub text: String,
-}
-
-#[derive(Debug)]
-pub struct TypeComponent {
-    pub type_: FmType,
-}
-
-#[derive(Debug)]
-pub struct ActionComponent {
-    pub action: FmAction,
-}
-
-#[derive(Debug)]
-pub struct StatusComponent {
-    pub status: FmStatus,
-}
-
 
 pub struct NewFile {
     pub id:       FileId,
@@ -81,18 +50,22 @@ pub struct NewFile {
     pub name:     String,
 }
 
-#[derive(Debug)]
-pub struct FileView<'a> {
-    pub id:       FileId,
-    pub file:     &'a File,
-    pub fm:       Option<&'a FmComponent>,
-    pub md_text:  Option<&'a MdTextComponent>,
-    pub is_empty: bool,
-    pub type_:    Option<&'a TypeComponent>,
-    pub info:     bool,
-    pub action:   Option<&'a ActionComponent>,
-    pub status:   Option<&'a StatusComponent>,
+trait ComponentList: Any + Send + 'static {
+    fn remove(&mut self, id: &FileId);
 }
+
+impl<'a, T> ComponentList for HashMap<FileId, T>
+where
+    T: Component + Any,
+{
+    fn remove(&mut self, id: &FileId) {
+        self.remove(id);
+    }
+}
+
+type ComponentMap<T> = HashMap<FileId, T>;
+
+
 
 #[derive(Debug, Clone, Copy, Sequence)]
 pub enum ComponentKind {
@@ -103,26 +76,7 @@ pub enum ComponentKind {
     Info,
     Action,
     Status,
-}
-
-pub enum ComponentQuery<'a> {
-    Frontmatter(Option<&'a FmComponent>),
-    MdText     (Option<&'a MdTextComponent>),
-    Empty      (bool),
-    Type       (Option<&'a TypeComponent>),
-    Info       (bool),
-    Action     (Option<&'a ActionComponent>),
-    Status     (Option<&'a StatusComponent>),
-}
-
-pub enum ComponentQueryIter<'a> {
-    Frontmatter(Box<dyn Iterator<Item = (&'a FileId, &'a FmComponent    )> + 'a>),
-    MdText     (Box<dyn Iterator<Item = (&'a FileId, &'a MdTextComponent)> + 'a>),
-    Empty      (Box<dyn Iterator<Item =  &'a FileId                      > + 'a>),
-    Type       (Box<dyn Iterator<Item = (&'a FileId, &'a TypeComponent  )> + 'a>),
-    Info       (Box<dyn Iterator<Item =  &'a FileId                      > + 'a>),
-    Action     (Box<dyn Iterator<Item = (&'a FileId, &'a ActionComponent)> + 'a>),
-    Status     (Box<dyn Iterator<Item = (&'a FileId, &'a StatusComponent)> + 'a>),
+    Project,
 }
 
 impl Ecs {
@@ -130,118 +84,179 @@ impl Ecs {
         Default::default()
     }
 
+    pub fn add_component<T: Component>(&mut self, comp_id: FileId, value: T) {
+        let list = self.get_comp_list_or_insert();
+
+        list.insert(comp_id, value);
+    }
+
     // --- queries
 
-    pub fn get_all(&self) -> impl Iterator<Item = FileView<'_>> {
+    pub fn get_all(&self) -> impl Iterator<Item = EcsFileView<'_>> {
         self.file.iter().map(|x| self.to_file_view(*x.0, x.1))
     }
 
-    pub fn get(&self, id: FileId) -> Option<FileView<'_>> {
+    pub fn get(&self, id: FileId) -> Option<EcsFileView<'_>> {
         self.file.get(&id).map(|x| self.to_file_view(id, x))
     }
 
-    fn to_file_view<'a>(&'a self, id: FileId, file: &'a File) -> FileView<'a> {
-        FileView {
+
+    pub fn get_component<T: Component>(&self, comp_id: FileId) -> Result<&T, ComponentError> {
+        type Er = ComponentError;
+
+        let list = self
+            .get_comp_list()
+            .ok_or(Er::NoComponentsOfThatType)?;
+
+        Ok(list
+            .get(&comp_id)
+            .ok_or(Er::ComponentNotFound)?
+        )
+    }
+
+    pub fn get_component_mut<T: Component>(&mut self, comp_id: FileId) -> Result<&mut T, ComponentError> {
+        type Er = ComponentError;
+
+        let list = self
+            .get_comp_list_mut()
+            .ok_or(Er::NoComponentsOfThatType)?;
+
+        Ok(list
+            .get_mut(&comp_id)
+            .ok_or(Er::ComponentNotFound)?
+        )
+    }
+
+    pub fn get_component_or_insert<T, F>(&mut self, comp_id: FileId, func: F) -> &mut T
+    where
+        T: Component,
+        F: Fn() -> T
+    {
+
+        self
+            .get_comp_list_or_insert()
+
+            .entry         (comp_id)
+            .or_insert_with(func)
+
+    }
+
+    pub fn remove_component<T: Component>(&mut self, comp_id: FileId) -> Result<T, ComponentError> {
+        let list = self.get_comp_list_mut().ok_or(ComponentError::NoComponentsOfThatType)?;
+
+        list.remove(&comp_id).ok_or(ComponentError::ComponentNotFound)
+
+
+    }
+
+    fn to_file_view<'a>(&'a self, id: FileId, file: &'a File) -> EcsFileView<'a> {
+        EcsFileView {
             id,
             file,
-            fm:       self.get_fm_component    (id),
-            md_text:  self.get_md_component    (id),
-            is_empty: self.is_empty            (id),
-            type_:    self.get_type_component  (id),
-            info:     self.has_info_component  (id),
-            action:   self.get_action_component(id),
-            status:   self.get_status_component(id),
+            fm:       self.get_component(id).ok(),
+            md_text:  self.get_component(id).ok(),
+            empty:    self.get_component(id).ok(),
+            type_:    self.get_component(id).ok(),
+            info:     self.get_component(id).ok(),
+            action:   self.get_component(id).ok(),
+            status:   self.get_component(id).ok(),
+            project:  self.get_component(id).ok(),
         }
     }
 
-    pub fn get_component_counts<'a>(&'a self, comp: ComponentKind) -> usize {
-
+    pub fn get_component_counts<'a, T: Component>(&'a self) -> usize {
         type Kind   = ComponentKind;
-        match comp {
-            Kind::Frontmatter => self.fm     .len(),
-            Kind::MdText      => self.md_text.len(),
-            Kind::Empty       => self.empty  .len(),
-            Kind::Type        => self.type_  .len(),
-            Kind::Info        => self.info   .len(),
-            Kind::Action      => self.action .len(),
-            Kind::Status      => self.status .len(),
-        }
+
+        self.get_comp_list::<T>().map_or_else(|| 0, |x| x.len())
+
+    }
+
+    pub fn iter_component<T: Component>(&self) -> impl Iterator<Item = (&FileId, &T)> {
+
+
+        type Map<T> = HashMap<FileId, T>;
+        let type_id = map_id::<T>();
+
+        let list: &dyn Any = self
+            .components
+            .get(&type_id)
+            .unwrap()
+        ;
+
+        list
+            .downcast_ref::<Map<T>>()
+            .expect("the types done got all fucked up")
+            .iter()
     }
 
 
-    pub fn get_fm_component(&self, id: FileId) -> Option<&FmComponent> {
-        self.fm.get(&id)
-    }
-    pub fn get_md_component(&self, id: FileId) -> Option<&MdTextComponent> {
-        self.md_text.get(&id)
-    }
-    pub fn is_empty(&self, id: FileId) -> bool {
-        self.empty.get(&id).is_some()
-    }
-    pub fn get_type_component(&self, id: FileId) -> Option<&TypeComponent> {
-        self.type_.get(&id)
-    }
-    pub fn has_info_component(&self, id: FileId) -> bool {
-        self.info.get(&id).is_some()
-    }
-    pub fn get_action_component(&self, id: FileId) -> Option<&ActionComponent> {
-        self.action.get(&id)
-    }
-    pub fn get_status_component(&self, id: FileId) -> Option<&StatusComponent> {
-        self.status.get(&id)
-    }
-
-    pub fn query_component(&self, id: FileId, comp: ComponentKind) -> ComponentQuery<'_> {
-        match comp {
-            ComponentKind::Frontmatter => ComponentQuery::Frontmatter(self.get_fm_component    (id)),
-            ComponentKind::MdText      => ComponentQuery::MdText     (self.get_md_component    (id)),
-            ComponentKind::Empty       => ComponentQuery::Empty      (self.is_empty            (id)),
-            ComponentKind::Type        => ComponentQuery::Type       (self.get_type_component  (id)),
-            ComponentKind::Info        => ComponentQuery::Info       (self.has_info_component  (id)),
-            ComponentKind::Action      => ComponentQuery::Action     (self.get_action_component(id)),
-            ComponentKind::Status      => ComponentQuery::Status     (self.get_status_component(id)),
-        }
-    }
-
-    pub fn query_component_all(&self, comp: ComponentKind) -> ComponentQueryIter<'_> {
-        match comp {
-            ComponentKind::Frontmatter => ComponentQueryIter::Frontmatter(Box::new(self.fm     .iter())),
-            ComponentKind::MdText      => ComponentQueryIter::MdText     (Box::new(self.md_text.iter())),
-            ComponentKind::Empty       => ComponentQueryIter::Empty      (Box::new(self.empty  .iter())),
-            ComponentKind::Type        => ComponentQueryIter::Type       (Box::new(self.type_  .iter())),
-            ComponentKind::Info        => ComponentQueryIter::Info       (Box::new(self.info   .iter())),
-            ComponentKind::Action      => ComponentQueryIter::Action     (Box::new(self.action .iter())),
-            ComponentKind::Status      => ComponentQueryIter::Status     (Box::new(self.status .iter())),
-        }
-    }
 
     // --- writes
 
     /// Removes file from all components.
     /// NOTE: does not delete file from disk
     pub fn remove_file(&mut self, id: FileId) -> File {
-
-        let components = ComponentKind::all();
-
-        for cmp in components {
-            match cmp {
-                ComponentKind::Frontmatter => { self.fm     .remove(&id); },
-                ComponentKind::MdText      => { self.md_text.remove(&id); },
-                ComponentKind::Empty       => { self.empty  .remove(&id); },
-                ComponentKind::Type        => { self.type_  .remove(&id); },
-                ComponentKind::Info        => { self.info   .remove(&id); },
-                ComponentKind::Action      => { self.action .remove(&id); },
-                ComponentKind::Status      => { self.status .remove(&id); },
-            }
-        }
+        self
+            .components
+            .iter_mut()
+            .for_each(|x| {
+                x.1.remove(&id);
+            })
+        ;
 
         self.file.remove(&id).unwrap()
     }
+
+
+    // --- utils
+
+    fn get_comp_list<T: Component>(&self) -> Option<&ComponentMap<T>> {
+        let type_id = map_id::<T>();
+
+        let list = self.components.get(&type_id)?.as_ref() as &dyn Any;
+
+        Some(list
+            .downcast_ref()
+            .expect(CAST_ERR)
+        )
+    }
+
+    fn get_comp_list_mut<T: Component>(&mut self) -> Option<&mut ComponentMap<T>> {
+        let type_id = map_id::<T>();
+
+        let list = self.components.get_mut(&type_id)?.as_mut() as &mut dyn Any;
+
+        Some(list
+            .downcast_mut()
+            .expect(CAST_ERR)
+        )
+    }
+
+    fn get_comp_list_or_insert<T: Component>(&mut self) -> &mut HashMap<FileId, T> {
+        let type_id = map_id::<T>();
+
+        let list = self
+            .components
+            .entry(type_id)
+            .or_insert_with(|| {
+                let x = HashMap::<FileId, T>::new();
+
+                Box::new(x)
+            })
+            .as_mut()
+        ;
+
+
+        (list as &mut dyn Any)
+            .downcast_mut::<HashMap<FileId, T>>()
+            .expect(CAST_ERR)
+    }
+
 }
 
 
 
-impl<'a> FileView<'a> {
+impl<'a> EcsFileView<'a> {
     pub fn status_eq(&'a self, status: FmStatus) -> bool {
         self.status.is_some_and(|s| s.status == status)
     }
@@ -265,6 +280,14 @@ impl<'a> FileView<'a> {
                s.status != FmStatus::Archived
             && s.status != FmStatus::Completed
         })
+    }
+
+    pub fn is_info(&'a self) -> bool {
+        self.info.is_some()
+    }
+
+    pub fn is_empty(&'a self) -> bool {
+        self.empty.is_some()
     }
 
     pub fn needs_type(&'a self) -> bool {
@@ -325,16 +348,28 @@ impl<'a> FileView<'a> {
     }
 }
 
+#[inline(always)]
+fn map_id<T: Component>() -> TypeId {
+    TypeId::of::<HashMap<FileId, T>>()
+}
+
+
 fn fm_to_text(fm: &Mapping) -> String {
     yaml_serde::to_string(fm).unwrap()
 }
 
 
-impl ComponentKind {
-    fn all() -> Vec<Self> {
-        all::<ComponentKind>().collect()
-    }
+// impl ComponentKind {
+//     fn all() -> Vec<Self> {
+//         all::<ComponentKind>().collect()
+//     }
+// }
+
+pub enum ComponentError {
+    NoComponentsOfThatType,
+    ComponentNotFound,
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -387,7 +422,7 @@ mod tests {
         assert_eq!(info   .needs_type(), false, "info");
         assert_eq!(action .needs_type(), false, "action");
 
-        assert!(info  .info);
+        assert!(info  .is_info());
         assert!(info  .type_eq(FmType::Info));
         assert!(action.type_eq(FmType::Action));
     }
@@ -446,5 +481,11 @@ mod tests {
         assert_eq!(archived .is_completed(), false, "archived  is_completed");
         assert_eq!(complete .is_completed(), true,  "complete  is_completed");
         assert_eq!(completed.is_completed(), true,  "completed is_completed");
+    }
+
+    #[test]
+    #[ignore = "TODO"]
+    fn test_project_sorting() {
+        todo!()
     }
 }
