@@ -370,7 +370,7 @@ pub fn generate_vault() {
 }
 
 
-#[allow(dead_code)] // reason: prod select via static const
+#[allow(dead_code)] // reason: prod select via const in main
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Env {
     Prod,
@@ -378,13 +378,6 @@ pub enum Env {
 }
 
 impl Env {
-    pub fn vault_name(&self) -> &'static str {
-        match self {
-            Self::Prod => "Notes",
-            Self::Dev  => "Notes_dev",
-        }
-    }
-
 
     pub fn name(&self) -> &'static str {
         match self {

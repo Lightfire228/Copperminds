@@ -1,3 +1,5 @@
 folder_excludes: []
 
 vault_folder: ~/Notes_dev
+
+vault_name: Notes_dev

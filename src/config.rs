@@ -23,9 +23,10 @@ pub fn get_config(env: Env) -> Config {
     }
 
     Config {
+        env,
         folder_excludes: config.folder_excludes,
         vault_path:      config.vault_folder,
-        env,
+        vault_name:      config.vault_name,
     }
 
 }
@@ -40,9 +41,17 @@ pub fn get_config_file(env: Env) -> PathBuf {
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub folder_excludes: Vec<String>,
-    pub vault_path:      PathBuf,
     pub env:             Env,
+
+    /// Exclude any folders with these names from the index scan
+    pub folder_excludes: Vec<String>,
+
+    /// Path to vault on disk (`~` as an alias for `$HOME`)
+    pub vault_path:      PathBuf,
+
+    // TODO: obsidian might just use the folder name, in which case, this is redundant
+    /// Name of the vault as obsidian recognized it
+    pub vault_name:      String,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
@@ -50,6 +59,8 @@ pub struct YamlConfig {
     pub folder_excludes: Vec<String>,
 
     pub vault_folder:    PathBuf,
+
+    pub vault_name:      String,
 }
 
 impl Default for Config {
@@ -58,6 +69,7 @@ impl Default for Config {
             env:             Env::Dev,
             folder_excludes: Default::default(),
             vault_path:      Default::default(),
+            vault_name:      Default::default(),
         }
     }
 }

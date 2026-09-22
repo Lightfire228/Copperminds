@@ -5,7 +5,7 @@ use crate::config::Config;
 
 pub fn open_in_obsidian(config: &Config, file_name: &str) {
 
-    let vault = config.env.vault_name();
+    let vault = &config.vault_name;
 
     let uri = format!("obsidian://open?vault={vault}&file={}", urlencoding::encode(file_name));
 
