@@ -1,10 +1,11 @@
 use std::process::Command;
 
-use crate::vault::{ENV};
+use crate::config::Config;
 
-pub fn open_in_obsidian(file_name: &str) {
 
-    let vault = ENV.vault_name();
+pub fn open_in_obsidian(config: &Config, file_name: &str) {
+
+    let vault = config.env.vault_name();
 
     let uri = format!("obsidian://open?vault={vault}&file={}", urlencoding::encode(file_name));
 

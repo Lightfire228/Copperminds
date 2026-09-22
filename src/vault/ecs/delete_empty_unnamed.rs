@@ -119,6 +119,7 @@ mod tests {
         let non_empty_titles = [
             "Untitledtropolis",
             "Untitled-thingy",
+            "Untitled Goose Game",
             "2026-01-01 - 00_00_00 - titled",
             "2026-01-01 - titled",
             "2026-01-01 titled",
@@ -136,7 +137,7 @@ mod tests {
         let test_cases = build_empty_unnamed_test_cases(&empty_titles, &non_empty_titles, &non_empty_bodies);
 
 
-        let mut ecs = Ecs::new();
+        let mut ecs = Ecs::default();
 
         test_cases
             .iter    ()

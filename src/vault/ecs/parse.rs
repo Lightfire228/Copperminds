@@ -1,11 +1,13 @@
 use yaml_serde::{Mapping, Value};
 
-use crate::vault::{ecs::{ActionComponent, Ecs, File, FileId, FmComponent, MdTextComponent, NewFile, ProjectComponent, StatusComponent, TypeComponent, components::{EmptyComponent, InfoComponent}}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+use crate::vault::{
+    ecs::{Ecs, File, FileId, NewFile, components::*},
+    fm::*
+};
 
 use super::super::build_regex;
 use crate::prelude::*;
 
-use concat_idents::concat_idents;
 
 const RE_EMPTY: &str = r"^\s*$";
 
@@ -47,6 +49,17 @@ macro_rules! parse_prop {
         Some(x)
     })()};
 }
+
+macro_rules! parse_or_bail {
+    ($fm:ident, $prop:expr) => {{
+        let Some(x) = parse_prop!($fm, $prop) else {
+            return;
+        };
+
+        x
+    }};
+}
+
 
 
 impl Ecs {
@@ -95,7 +108,6 @@ impl Ecs {
         self.add_component(file.id, MdTextComponent { text: md });
     }
 
-
     fn parse_info(&mut self, type_: FmType, id: FileId) {
         if !matches!(type_, FmType::Info) {
             return;
@@ -103,41 +115,33 @@ impl Ecs {
 
         self.add_component(id, InfoComponent);
     }
-}
 
 
-macro_rules! add {
-    ($thing:ident, $kind:ident) => {
-        concat_idents!(fn_name = add_, $thing {
+    fn add_action(&mut self, fm: &Mapping,id: FileId) {
+        let action = parse_or_bail!(fm, FmProperty::Action);
 
-            fn fn_name(&mut self, fm: &Mapping, id: FileId) {
-                let Some(x) =
-                    parse_prop!(fm, FmProperty::$kind)
-                else {
-                    return;
-                };
-
-                self.add_component(
-                    id,
-                    concat_idents!(Comp = $kind, Component {
-                        Comp {
-                            $thing: x,
-                        }
-                    })
-                );
-            }
+        self.add_component(id, ActionComponent {
+            action,
         });
-    };
+    }
+
+    fn add_status(&mut self, fm: &Mapping,id: FileId) {
+        let status = parse_or_bail!(fm, FmProperty::Status);
+
+        self.add_component(id, StatusComponent {
+            status,
+        });
+    }
+
+    fn add_project(&mut self, fm: &Mapping, id: FileId){
+        let project = parse_or_bail!(fm, FmProperty::Project);
+
+        self.add_component(id, ProjectComponent {
+            project,
+        });
+    }
+
 }
-
-impl Ecs {
-
-    add!(action,  Action);
-    add!(status,  Status);
-    add!(project, Project);
-
-}
-
 
 pub fn parse_md_file(text: &str) -> Parsed {
 
@@ -370,7 +374,7 @@ mod tests {
     #[test]
     fn test_empty() {
 
-        let mut ecs = Ecs::new();
+        let mut ecs = Ecs::default();
 
         let empty        = " \n\n\n\t\t\t\t    \t\t \n\n \t   ".to_owned();
         let not_empty_01 = format!("{}.{}", empty, empty);

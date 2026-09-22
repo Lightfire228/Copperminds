@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display, sync::LazyLock};
 use enum_iterator::{Sequence, all};
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FmProperty {
     Inbox,
     Category,

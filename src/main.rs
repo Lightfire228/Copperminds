@@ -1,13 +1,15 @@
-use copperminds::*;
+use copperminds::{vault::Env, *};
+
 
 use pretty_env_logger::{formatted_timed_builder};
 
-use crate::{cli::{MenuOption}, vault::ENV};
-
+use crate::{cli::MenuOption};
 
 
 #[tokio::main]
 async fn main() {
+
+    let env = Env::Prod;
 
     // let log_level = log::LevelFilter::Info;
     let log_level = log::LevelFilter::Trace;
@@ -20,10 +22,12 @@ async fn main() {
         .init()
     ;
 
+    let config = config::get_config(env);
+
 
     println!("\n\n---\n");
 
-    match ENV {
+    match env {
         vault::Env::Prod => {
             println!("######### ENV #########");
             println!("# Prod");
@@ -39,7 +43,7 @@ async fn main() {
 
     match menu() {
         Menu::GenerateVault    => vault       ::generate_vault(),
-        Menu::IcedUI           => ui          ::main(vault::serve()),
+        Menu::IcedUI           => ui          ::main(vault::serve(&config), &config),
     }
 }
 

@@ -7,7 +7,7 @@ use futures::{
 };
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 
-use copperminds::{backup, vault};
+use copperminds::{backup, config::get_config, vault::{self, Env}};
 use tokio::{select, time};
 
 macro_rules! continue_on_err {
@@ -27,7 +27,8 @@ macro_rules! continue_on_err {
 /// and auto creates commits, and pushes the results to the backup git repo
 async fn main() {
 
-    let folder = vault::ENV.vault_path();
+    let config = get_config(Env::Prod);
+    let folder = config.vault_path;
 
     let (mut watcher, mut rx) = async_watcher().expect("Unable to get watcher");
 

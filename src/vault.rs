@@ -7,38 +7,44 @@ mod watch;
 mod generator;
 
 
-use crate::{file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{Ecs, NewFile, components::*}, fm::*}};
+use crate::{config::Config, file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{Ecs, NewFile, components::*}, fm::*}};
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};
-use std::{env, mem, path::{PathBuf}, usize};
+use std::{env, mem, path::{Path, PathBuf}, sync::LazyLock, usize};
 use crate::prelude::*;
 
 use tokio::{select, sync::{mpsc::{self, Sender, Receiver, channel}}};
 use walkdir::{DirEntry, WalkDir};
 
-pub const ENV: Env = Env::Dev;
+// pub const ENV: Env = Env::Prod;
 
 macro_rules! build_regex {
-    ($i:ident = $r:expr) => {
-        use regex::Regex;
+    (crate $reg_crate:ident, $i:ident = $r:expr) => {
+
+        use $reg_crate::Regex;
         use std::sync::LazyLock;
 
         // https://docs.rs/regex/latest/regex/#avoid-re-compiling-regexes-especially-in-a-loop
         static $i: LazyLock<Regex> = LazyLock::new(|| Regex::new($r).unwrap());
+
+    };
+    ($i:ident = $r:expr) => {
+        build_regex!(crate regex, $i = $r)
+    };
+
+    (fancy $i:ident = $r:expr) => {
+        build_regex!(crate fancy_regex, $i = $r)
     };
 }
 
 pub(crate) use build_regex;
 
 
-// TODO: restructure this like an ECS
 pub struct Index {
     subscribers: Vec<Sender<VaultUpdate>>,
-
-    _path:       PathBuf,
-
-    ecs: Ecs,
+    ecs:         Ecs,
+    config:      Config,
 }
 
 #[derive(Debug, Clone, Eq)]
@@ -49,10 +55,10 @@ pub struct FileView {
 
 
 impl Index {
-    pub fn build() -> Self {
+    pub fn build(config: Config) -> Self {
         let mut ecs = Ecs::new();
 
-        let files = scan_vault()
+        let files = scan_vault(&config)
             .filter   (|f| ends_with(f, ".md"))
         ;
 
@@ -69,16 +75,17 @@ impl Index {
         }
 
         Self {
-            _path:       ENV.vault_path(),
             subscribers: vec![],
             ecs,
+            config,
         }
     }
 
     pub fn rebuild(&mut self) {
         let subs = mem::take(&mut self.subscribers);
+        let conf = mem::take(&mut self.config);
 
-        *self = Index::build();
+        *self = Index::build(conf);
 
         self.subscribers = subs;
     }
@@ -135,7 +142,7 @@ impl Index {
     fn handle_open_in_obsidian(&self, opts: OpenInObsidian) {
         let file = self.ecs.get(opts.id).unwrap();
 
-        obsidian::open_in_obsidian(&file.file.name);
+        obsidian::open_in_obsidian(&self.config, &file.file.name);
     }
 
     fn handle_register(&mut self) -> Receiver<VaultUpdate> {
@@ -224,10 +231,10 @@ impl Index {
     }
 }
 
-fn scan_vault() -> impl Iterator<Item = DirEntry> {
-    WalkDir::new(ENV.vault_path())
+fn scan_vault(config: &Config) -> impl Iterator<Item = DirEntry> {
+    WalkDir::new(&config.vault_path)
         .into_iter   ()
-        .filter_entry(|e| !is_hidden(e))
+        .filter_entry(|e| !is_hidden(e) && !is_excluded(e.path(), config))
         .filter_map  (|e| e.ok())
 }
 
@@ -248,9 +255,23 @@ fn ends_with(entry: &DirEntry, ext: &str) -> bool {
 }
 
 
-pub fn serve() -> Sender<VaultCommand> {
+fn is_excluded(path: &Path, config: &Config) -> bool {
+    path
+        .ancestors()
+        .any      (|path| config
+            .folder_excludes
+            .iter()
+            .any(|exclude| {
+                path.ends_with(exclude)
+            })
+        )
+}
 
-    let mut index = Index::build();
+
+
+pub fn serve(config: &Config) -> Sender<VaultCommand> {
+
+    let mut index = Index::build(config.clone());
 
     // Do this before setting up the file watch
     index.delete_empty_unnamed_files();
@@ -258,7 +279,7 @@ pub fn serve() -> Sender<VaultCommand> {
 
     let (tx, rx) = mpsc::channel::<VaultCommand>(1000);
 
-    let watcher = watch::Watcher::new(ENV.vault_path()).unwrap();
+    let watcher = watch::Watcher::new(config.vault_path.clone()).unwrap();
 
     tokio::spawn(async move {
         handle_serve(index, rx, watcher).await;
@@ -350,7 +371,7 @@ pub fn generate_vault() {
 
 
 #[allow(dead_code)] // reason: prod select via static const
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Env {
     Prod,
     Dev,
@@ -364,14 +385,6 @@ impl Env {
         }
     }
 
-    // TODO: put this in a config
-    pub fn vault_path(&self) -> PathBuf {
-
-        let home = env::home_dir().unwrap();
-
-        home.join(self.vault_name())
-
-    }
 
     pub fn name(&self) -> &'static str {
         match self {
@@ -406,11 +419,16 @@ pub struct VaultStats {
     pub open_entertainment:     usize,
     pub open_maybe_someday:     usize,
     pub open_waiting_for:       usize,
+
+    pub project_files:          usize,
+    // pub unqiue_projects:        usize,
 }
 
 impl Index {
 
     pub fn calc_vault_stats_ecs(&self) -> VaultStats {
+
+
 
         VaultStats {
             info_total:           self.ecs.get_component_counts::<InfoComponent>(),
@@ -430,6 +448,9 @@ impl Index {
             open_entertainment:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::Entertainment))   .count(),
             open_maybe_someday:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::MaybeSomeday))    .count(),
             open_waiting_for:     self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::WaitingFor))      .count(),
+
+            project_files:        self.ecs.get_component_counts::<ProjectComponent>(),
+            // unqiue_projects:      self.ecs.iter_components::<ProjectComponent>().map(|x| )
         }
 
     }
@@ -450,5 +471,29 @@ impl<'a> From<EcsFileView<'a>> for FileView {
             id:   value.id,
             name: value.file.name.clone(),
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_excluded() {
+        let config = Config::with_excludes(vec![
+            "exclude"     .to_string(),
+            "also exclude".to_string(),
+        ]);
+
+        let test = |name| is_excluded(&PathBuf::from(name), &config);
+
+
+        assert_eq!(test("should/exclude/file.md"),      true);
+        assert_eq!(test("should/exclude"),              true);
+        assert_eq!(test("should/also exclude/file.md"), true);
+        assert_eq!(test("should/not exclude/file.md"),  false);
+        assert_eq!(test("should/not/exclude.md"),       false);
+
     }
 }

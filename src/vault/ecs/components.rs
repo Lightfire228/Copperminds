@@ -1,6 +1,6 @@
 use yaml_serde::Mapping;
 
-use crate::vault::{ecs::{File, FileId}, fm::*};
+use crate::{config::Config, vault::{ecs::{File, FileId}, fm::*}};
 
 pub trait Component: Send + 'static {}
 

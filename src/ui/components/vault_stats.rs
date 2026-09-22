@@ -55,6 +55,8 @@ impl VaultStatsComponent {
             text!("entertainment          - {:>5}", self.stats.open_entertainment),
             text!("maybe someday          - {:>5}", self.stats.open_maybe_someday),
             text!("waiting for            - {:>5}", self.stats.open_waiting_for),
+            text!(""),
+            text!("project files          - {:>5}", self.stats.project_files),
         ]
             .into()
     }

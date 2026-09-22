@@ -4,6 +4,7 @@ use std::{fs, path::PathBuf};
 
 use rand::{self, random_bool, random_range};
 use yaml_serde::Mapping;
+use crate::config::{Config, get_config};
 use crate::prelude::*;
 
 use crate::vault::fm::{FmAction, GetKey};
@@ -58,12 +59,12 @@ const TARGET_GEN_FOLDER: &str = "01 Generated Vault";
 pub fn generate_sample_vault() {
     info!("Running generator");
 
-    let env = Env::Dev;
+    let env    = Env::Dev;
+    let config = get_config(env);
 
-    let dev_vault = env.vault_path();
-    let folder    = dev_vault.join(TARGET_GEN_FOLDER);
+    let folder = config.vault_path.join(TARGET_GEN_FOLDER);
 
-    clear_vault(env);
+    clear_vault(&config);
     fs::create_dir(&folder).unwrap();
 
 
@@ -87,15 +88,15 @@ pub fn generate_sample_vault() {
         .count     ()
     ;
 
-    write_generator_statistics(&dev_vault, count);
+    write_generator_statistics(&config.vault_path, count);
 }
 
 
 
-fn clear_vault(env: Env) {
-    assert_ne!(env, Env::Prod, "YOU FOOL");
+fn clear_vault(config: &Config) {
+    assert_ne!(config.env, Env::Prod, "YOU FOOL");
 
-    let path = env.vault_path().join(TARGET_GEN_FOLDER);
+    let path = config.vault_path.join(TARGET_GEN_FOLDER);
 
     if fs::exists(&path).unwrap() {
         fs::remove_dir_all(&path).unwrap();

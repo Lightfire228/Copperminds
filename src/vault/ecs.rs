@@ -5,14 +5,14 @@ mod to_text;
 
 pub mod components;
 
-use std::{any::{Any, TypeId}, collections::{HashMap}, path::{PathBuf}};
+use std::{any::{Any, TypeId}, collections::HashMap, path::{Path, PathBuf}};
 
 use yaml_serde::Mapping;
 
 
 type FileId = file_id::FileId;
 
-use crate::vault::{ecs::components::*, fm::{FmAction, FmStatus, FmType}};
+use crate::{config::Config, vault::{ecs::components::*, fm::{FmAction, FmStatus, FmType}}};
 
 use super::build_regex;
 
@@ -259,10 +259,6 @@ impl<'a> EcsFileView<'a> {
 
     pub fn needs_type(&'a self) -> bool {
         self.type_.is_none()
-        && !self.file.path
-            .ancestors()
-            // TODO: move this to a config
-            .any      (|p| p.ends_with("03 Data"))
     }
 
     pub fn needs_sorting(&'a self) -> bool {
@@ -277,7 +273,7 @@ impl<'a> EcsFileView<'a> {
 
     pub fn is_unnamed(&'a self) -> bool {
         // (?i) - sets case insensitivity
-        build_regex!(RE = r"(?i)^([\d \-_]*|Untitled(\s.*?)?)\.md$");
+        build_regex!(RE = r"(?i)^([\d \-_]*|Untitled([\s\d\-_\(\)]*?)?)\.md$");
 
         RE.is_match(&self.file.name)
     }
@@ -343,7 +339,7 @@ mod tests {
 
     use yaml_serde::{Mapping, Value};
 
-    use crate::{test_utils::{id, mapping_to_str}, vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+    use crate::{test_utils::{self, id, mapping_to_str}, vault::{Env, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}}};
 
     use super::*;
 
@@ -372,7 +368,7 @@ mod tests {
     #[test]
     fn test_type_sorting() {
 
-        let mut ecs = Ecs::new();
+        let mut ecs = Ecs::default();
 
         let untyped = fm!(ecs, );
         let info    = fm!(ecs, FmProperty::Type => FmType::Info);
@@ -395,7 +391,7 @@ mod tests {
     #[test]
     fn test_action_sorting() {
 
-        let mut ecs = Ecs::new();
+        let mut ecs = Ecs::default();
 
         let no_action_info     = fm!(ecs, FmProperty::Type => FmType::Info);
         let no_action          = fm!(ecs,                                     FmProperty::Action => FmAction::Todo);
@@ -425,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_status_sorting() {
-        let mut ecs = Ecs::new();
+        let mut ecs = Ecs::default();
 
         let archive   = fm!(ecs, FmProperty::Status => "archive");
         let archived  = fm!(ecs, FmProperty::Status => FmStatus::Archived);
