@@ -339,7 +339,7 @@ mod tests {
 
     use yaml_serde::{Mapping, Value};
 
-    use crate::{test_utils::{self, id, mapping_to_str}, vault::{Env, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}}};
+    use crate::{test_utils::{self, id, mapping_to_str}, vault::{fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}}};
 
     use super::*;
 

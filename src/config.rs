@@ -1,7 +1,26 @@
 use std::{env, fs, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
-use crate::{file_shit, vault::Env};
+
+#[allow(dead_code)] // reason: prod select via const in main
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Env {
+    Prod,
+    Dev,
+}
+
+impl Env {
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Prod => "Prod",
+            Self::Dev  => "Dev",
+        }
+    }
+}
+
+
+use crate::{file_shit};
 
 pub fn get_config(env: Env) -> Config {
 
@@ -49,7 +68,7 @@ pub struct Config {
     /// Path to vault on disk (`~` as an alias for `$HOME`)
     pub vault_path:      PathBuf,
 
-    // TODO: obsidian might just use the folder name, in which case, this is redundant
+    // TODO: obsidian might just use the folder name? in which case, this is redundant
     /// Name of the vault as obsidian recognized it
     pub vault_name:      String,
 }

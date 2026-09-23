@@ -4,12 +4,11 @@ use std::{fs, path::PathBuf};
 
 use rand::{self, random_bool, random_range};
 use yaml_serde::Mapping;
-use crate::config::{Config, get_config};
+use crate::config::{Config, Env, get_config};
 use crate::prelude::*;
 
 use crate::vault::fm::{FmAction, GetKey};
 use crate::vault::generator::gen_info::generate_info;
-use crate::vault::{Env};
 
 mod utils;
 mod gen_info;

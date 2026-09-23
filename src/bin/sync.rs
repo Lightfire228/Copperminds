@@ -1,4 +1,3 @@
-
 use std::time::Duration;
 
 use futures::{
@@ -7,7 +6,7 @@ use futures::{
 };
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 
-use copperminds::{backup, config::get_config, vault::{self, Env}};
+use copperminds::{backup, config::{Env, get_config}};
 use tokio::{select, time};
 
 macro_rules! continue_on_err {

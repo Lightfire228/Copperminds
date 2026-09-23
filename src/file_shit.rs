@@ -2,7 +2,7 @@ use std::{env, fs, path::{Path, PathBuf}};
 
 use fancy_regex::Captures;
 
-use crate::vault::build_regex;
+use crate::prelude::*;
 
 
 /// Includes the file extension

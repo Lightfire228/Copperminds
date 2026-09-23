@@ -11,11 +11,10 @@ use iced::{Element, Font, Subscription, Theme, application};
 use tokio::sync::mpsc::{Sender};
 use tokio::sync::oneshot;
 
-use crate::config::Config;
+use crate::config::{Config, Env};
 use crate::ui::components::select_queue::{self, SelectQueue};
 use crate::ui::components::sort_queue::{self, SortQueue};
 use crate::ui::key_event::KeyPressed;
-use crate::vault::Env;
 use crate::vault::command::{Cmd, VaultCommand, VaultUpdate};
 use crate::prelude::*;
 

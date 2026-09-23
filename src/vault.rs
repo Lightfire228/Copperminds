@@ -17,30 +17,6 @@ use crate::prelude::*;
 use tokio::{select, sync::{mpsc::{self, Sender, Receiver, channel}}};
 use walkdir::{DirEntry, WalkDir};
 
-// pub const ENV: Env = Env::Prod;
-
-macro_rules! build_regex {
-    (crate $reg_crate:ident, $i:ident = $r:expr) => {
-
-        use $reg_crate::Regex;
-        use std::sync::LazyLock;
-
-        // https://docs.rs/regex/latest/regex/#avoid-re-compiling-regexes-especially-in-a-loop
-        static $i: LazyLock<Regex> = LazyLock::new(|| Regex::new($r).unwrap());
-
-    };
-    ($i:ident = $r:expr) => {
-        build_regex!(crate regex, $i = $r)
-    };
-
-    (fancy $i:ident = $r:expr) => {
-        build_regex!(crate fancy_regex, $i = $r)
-    };
-}
-
-pub(crate) use build_regex;
-
-
 pub struct Index {
     subscribers: Vec<Sender<VaultUpdate>>,
     ecs:         Ecs,
@@ -367,24 +343,6 @@ impl Index {
 
 pub fn generate_vault() {
     generator::generate_sample_vault();
-}
-
-
-#[allow(dead_code)] // reason: prod select via const in main
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Env {
-    Prod,
-    Dev,
-}
-
-impl Env {
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Prod => "Prod",
-            Self::Dev  => "Dev",
-        }
-    }
 }
 
 

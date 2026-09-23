@@ -1,13 +1,30 @@
-use copperminds::{vault::Env, *};
+mod backup;
+mod cli;
+mod collections;
+mod config;
+mod file_shit;
+mod obsidian;
+mod prelude;
+mod ui;
+mod vault;
+
+#[cfg(test)]
+mod test_utils;
 
 
 use pretty_env_logger::{formatted_timed_builder};
 
-use crate::{cli::MenuOption};
+use cli::MenuOption;
+
+use crate::config::Env;
 
 
 #[tokio::main]
 async fn main() {
+
+
+    println!("hi {}", 0.1 + 0.2);
+
 
     let env = Env::Prod;
 
@@ -28,7 +45,7 @@ async fn main() {
     println!("\n\n---\n");
 
     match env {
-        vault::Env::Prod => {
+        Env::Prod => {
             println!("######### ENV #########");
             println!("# Prod");
             println!("#");
