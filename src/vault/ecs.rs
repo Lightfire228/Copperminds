@@ -86,11 +86,11 @@ impl Ecs {
         self.file.get(&id).map(|x| self.to_file_view(id, x))
     }
 
-    pub fn iter_components<T: Component>(&self) -> impl Iterator<Item = (&FileId, &T)> {
+    pub fn _iter_components<T: Component>(&self) -> impl Iterator<Item = (&FileId, &T)> {
         self.get_comp_list().unwrap().iter()
     }
 
-    pub fn iter_components_mut<T: Component>(&mut self) -> impl Iterator<Item = (&FileId, &mut T)> {
+    pub fn _iter_components_mut<T: Component>(&mut self) -> impl Iterator<Item = (&FileId, &mut T)> {
         self.get_comp_list_mut().unwrap().iter_mut()
     }
 
@@ -108,7 +108,7 @@ impl Ecs {
         )
     }
 
-    pub fn get_component_mut<T: Component>(&mut self, comp_id: FileId) -> Result<&mut T, ComponentError> {
+    pub fn _get_component_mut<T: Component>(&mut self, comp_id: FileId) -> Result<&mut T, ComponentError> {
         type Er = ComponentError;
 
         let list = self

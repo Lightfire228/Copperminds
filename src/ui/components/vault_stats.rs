@@ -47,6 +47,7 @@ impl VaultStatsComponent {
             text!(""),
             text!("needs action           - {:>5}", self.stats.needs_action),
             text!("needs sorted           - {:>5}", self.stats.needs_sorted),
+            text!("illegal names          - {:>5}", self.stats.illegal_names),
             text!(""),
             text!("Open Actionables"),
             text!("==="),

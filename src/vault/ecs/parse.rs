@@ -61,14 +61,17 @@ macro_rules! parse_or_bail {
 }
 
 
-
 impl Ecs {
 
+    // TODO: make this a plug and play pipeline
     pub fn new_file(&mut self, file: NewFile) {
 
-        let is_empty = is_empty(&file.raw_text);
+        let is_empty   = has_empty_name(&file.raw_text);
+        let is_illegal = has_illegal_name(&file.name);
+
 
         let Parsed { fm, md } = parse_md_file(&file.raw_text);
+
 
         self.file.insert(file.id, File {
             unnamed:  is_unnamed(&file.name),
@@ -103,6 +106,10 @@ impl Ecs {
 
         if is_empty {
             self.add_component(file.id, EmptyComponent);
+        }
+
+        if is_illegal {
+            self.add_component(file.id, IllegalNameComponent);
         }
 
         self.add_component(file.id, MdTextComponent { text: md });
@@ -263,15 +270,17 @@ pub fn is_unnamed(file_name: &str) -> bool {
 }
 
 
-pub fn is_empty(file_name: &str) -> bool {
+pub fn has_empty_name(file_name: &str) -> bool {
     build_regex!(RE = RE_EMPTY);
 
     RE.is_match(file_name)
 }
 
+pub fn has_illegal_name(file_name: &str) -> bool {
+    build_regex!(RE = r#"[\?"<>\|:*\\/]"#);
 
-
-
+    RE.is_match(file_name)
+}
 
 
 /// The main concern here is avoiding data loss.

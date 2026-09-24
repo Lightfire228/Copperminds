@@ -34,7 +34,7 @@ pub fn load_file(name: &str) -> String {
 
 
 impl NewFile {
-    pub fn with_path(id: FileId, path: PathBuf) -> Self {
+    pub fn _with_path(id: FileId, path: PathBuf) -> Self {
         let name = file_shit::get_file_name(&path);
 
         Self {

@@ -1,10 +1,12 @@
-mod backup;
+pub mod backup;
+pub mod config;
+pub mod file_shit;
+pub mod prelude;
+
+
 mod cli;
 mod collections;
-mod config;
-mod file_shit;
 mod obsidian;
-mod prelude;
 mod ui;
 mod vault;
 

@@ -197,14 +197,6 @@ impl Index {
         //     })
         // ;
     }
-
-    pub fn ecs(&self) -> &Ecs {
-        &self.ecs
-    }
-
-    pub fn ecs_mut(&mut self) -> &mut Ecs {
-        &mut self.ecs
-    }
 }
 
 fn scan_vault(config: &Config) -> impl Iterator<Item = DirEntry> {
@@ -373,6 +365,8 @@ pub struct VaultStats {
 
     pub project_files:          usize,
     // pub unqiue_projects:        usize,
+
+    pub illegal_names:          usize,
 }
 
 impl Index {
@@ -402,6 +396,9 @@ impl Index {
 
             project_files:        self.ecs.get_component_counts::<ProjectComponent>(),
             // unqiue_projects:      self.ecs.iter_components::<ProjectComponent>().map(|x| )
+
+            illegal_names:        self.ecs.get_component_counts::<IllegalNameComponent>()
+
         }
 
     }

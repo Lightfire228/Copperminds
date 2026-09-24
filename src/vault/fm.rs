@@ -5,8 +5,6 @@ use enum_iterator::{Sequence, all};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FmProperty {
-    Inbox,
-    Category,
     Status,
     Type,
     Action,
@@ -71,8 +69,6 @@ macro_rules! impl_get_key {
 // TODO: would probably be better to use a HashMap<>,
 // since then you get "iter all values" for free
 impl_get_key!(FmProperty,
-    Inbox    => "inbox",
-    Category => "category",
     Status   => "status",
     Type     => "type",
     Action   => "action",

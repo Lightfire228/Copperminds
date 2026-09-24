@@ -44,6 +44,9 @@ pub struct ProjectComponent {
 pub struct EmptyComponent;
 
 #[derive(Debug)]
+pub struct IllegalNameComponent;
+
+#[derive(Debug)]
 pub struct InfoComponent;
 
 
