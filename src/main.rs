@@ -28,7 +28,7 @@ async fn main() {
     println!("hi {}", 0.1 + 0.2);
 
 
-    let env = Env::Prod;
+    let env = Env::Dev;
 
     // let log_level = log::LevelFilter::Info;
     let log_level = log::LevelFilter::Trace;
@@ -37,7 +37,6 @@ async fn main() {
         .filter_module("",            log::LevelFilter::Warn)
         .filter_module("wgpu_hal",    log::LevelFilter::Off)
         .filter_module("copperminds", log_level)
-        // .filter_module("copperminds", log::LevelFilter::Info)
         .init()
     ;
 

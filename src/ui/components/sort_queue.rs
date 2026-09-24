@@ -14,7 +14,7 @@ use crate::ui::components::prompt::{self, MenuCommand, Prompt};
 use crate::ui::key_event::KeyPressed;
 use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
 use crate::vault::command::{DeleteFile, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
-use crate::vault::ecs::components::EcsFileView;
+use crate::vault::ecs::EcsFileView;
 use crate::vault::fm::*;
 
 use crate::prelude::*;

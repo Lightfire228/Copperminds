@@ -1,10 +1,11 @@
+use std::marker::PhantomData;
 use std::usize;
 
 use file_id::FileId;
-use iced::{Alignment, keyboard};
+use iced::{Alignment, Length, Size, keyboard};
 use iced::widget::table::{self, Table};
 use iced::{Element, keyboard::Key};
-use iced::widget::{text};
+use iced::widget::{Scrollable, scrollable, text};
 
 use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
@@ -69,8 +70,10 @@ impl FileList {
             table::column("", file_name),
         ];
 
-        Table::new(cols, files)
-            .padding_x(10)
+        scrollable(
+            Table::new(cols, files)
+                .padding_x(10)
+        )
             .into()
 
     }

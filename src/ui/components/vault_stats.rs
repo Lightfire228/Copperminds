@@ -45,6 +45,7 @@ impl VaultStatsComponent {
             text!("actionables | complete - {:>5}", self.stats.actionables_complete),
             text!("actionables | archived - {:>5}", self.stats.actionables_archived),
             text!(""),
+            // TODO: change color when these are > 0
             text!("needs action           - {:>5}", self.stats.needs_action),
             text!("needs sorted           - {:>5}", self.stats.needs_sorted),
             text!("illegal names          - {:>5}", self.stats.illegal_names),

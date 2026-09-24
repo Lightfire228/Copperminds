@@ -2,7 +2,8 @@ use yaml_serde::{Mapping, Value};
 
 use crate::vault::{ecs::{ActionComponent, Ecs, FileId, components::*}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
 
-
+// since file formatting only uses the FmComponent, it is necessary to keep it in sync
+// when modifying anything frontmatter related
 impl Ecs {
 
     pub fn set_info(&mut self, id: FileId) {
@@ -33,6 +34,7 @@ impl Ecs {
         self.remove_empty(id);
     }
 
+
     fn set_type(&mut self, id: FileId, type_: FmType) -> &mut Mapping {
         let fm = self.get_fm_mut(id);
 
@@ -42,6 +44,8 @@ impl Ecs {
     }
 
     fn get_fm_mut(&mut self, id: FileId) -> &mut Mapping {
+        self.remove_empty(id);
+
         &mut self.get_component_or_insert(id, || FmComponent {
             fm: Mapping::new()
         })

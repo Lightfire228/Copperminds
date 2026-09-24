@@ -7,7 +7,7 @@ mod watch;
 mod generator;
 
 
-use crate::{config::Config, file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{Ecs, NewFile, components::*}, fm::*}};
+use crate::{config::Config, file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{Ecs, EcsFileView, NewFile, components::*}, fm::*}};
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};

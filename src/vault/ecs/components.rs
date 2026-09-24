@@ -48,18 +48,3 @@ pub struct IllegalNameComponent;
 
 #[derive(Debug)]
 pub struct InfoComponent;
-
-
-#[derive(Debug)]
-pub struct EcsFileView<'a> {
-    pub id:       FileId,
-    pub file:     &'a File,
-    pub fm:       Option<&'a FmComponent>,
-    pub md_text:  Option<&'a MdTextComponent>,
-    pub empty:    Option<&'a EmptyComponent>,
-    pub type_:    Option<&'a TypeComponent>,
-    pub info:     Option<&'a InfoComponent>,
-    pub action:   Option<&'a ActionComponent>,
-    pub status:   Option<&'a StatusComponent>,
-    pub project:  Option<&'a ProjectComponent>,
-}

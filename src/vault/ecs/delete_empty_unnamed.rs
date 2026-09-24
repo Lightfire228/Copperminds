@@ -1,4 +1,4 @@
-use crate::{file_shit, vault::ecs::{Ecs, EcsFileView}};
+use crate::{file_shit, vault::ecs::{Ecs, file_view::EcsFileView}};
 
 
 impl Ecs {
