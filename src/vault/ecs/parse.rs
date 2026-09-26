@@ -1,7 +1,9 @@
+use std::path::PathBuf;
+
 use yaml_serde::{Mapping, Value};
 
 use crate::vault::{
-    ecs::{Ecs, File, FileId, NewFile, components::*},
+    ecs::{Ecs, File, FileId, components::*},
     fm::*
 };
 
@@ -60,6 +62,14 @@ macro_rules! parse_or_bail {
     }};
 }
 
+
+pub struct NewFile {
+    pub id:       FileId,
+
+    pub path:     PathBuf,
+    pub raw_text: String,
+    pub name:     String,
+}
 
 impl Ecs {
 

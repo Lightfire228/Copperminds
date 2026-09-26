@@ -29,7 +29,7 @@ impl Ecs {
 mod tests {
     use std::{path::PathBuf};
 
-    use crate::{test_utils::id, vault::ecs::{FileId, NewFile}};
+    use crate::{test_utils::id, vault::ecs::{FileId, parse::NewFile}};
 
     use super::*;
 

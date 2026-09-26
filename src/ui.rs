@@ -1,6 +1,7 @@
 mod components;
 mod vault_subscription;
 mod key_event;
+mod table;
 
 
 use std::fmt::Display;
@@ -127,7 +128,7 @@ impl App {
 
         match message {
             Message::Event(Keyboard(event)) => {
-                trace!("keyboard event {event:?}");
+                // trace!("keyboard event {event:?}");
                 let action = self.handle_key_event(event);
 
                 let Some(action) = action else {
@@ -219,7 +220,7 @@ impl App {
     }
 
     fn handle_key_event(&mut self, event: Event) -> Option<Action> {
-        trace!("key event: {event:?}");
+        // trace!("key event: {event:?}");
 
         let key = KeyPressed::try_from(event).ok()?;
 

@@ -32,23 +32,7 @@ pub struct FileView {
 
 impl Index {
     pub fn build(config: Config) -> Self {
-        let mut ecs = Ecs::new();
-
-        let files = scan_vault(&config)
-            .filter   (|f| ends_with(f, ".md"))
-        ;
-
-        for file in files {
-            let path = file.path().to_path_buf();
-            let id   = file_id::get_file_id(&path).unwrap();
-
-            ecs.new_file(NewFile {
-                id,
-                path:     path.clone(),
-                raw_text: file_shit::get_file_text(&path),
-                name:     file_shit::get_file_name(&path),
-            });
-        }
+        let ecs = build_ecs(&config);
 
         Self {
             subscribers: vec![],
@@ -57,13 +41,8 @@ impl Index {
         }
     }
 
-    pub fn rebuild(&mut self) {
-        let subs = mem::take(&mut self.subscribers);
-        let conf = mem::take(&mut self.config);
-
-        *self = Index::build(conf);
-
-        self.subscribers = subs;
+    pub fn rebuild_index(&mut self) {
+        self.ecs = build_ecs(&self.config);
     }
 
     pub fn delete_empty_unnamed_files(&mut self) {
@@ -297,7 +276,7 @@ impl Index {
     fn handle_external_unknown_event(&mut self) -> VaultUpdate {
         debug!("Rebuilding the index");
 
-        self.rebuild();
+        self.rebuild_index();
 
         VaultUpdate::Rescan
     }
@@ -335,6 +314,28 @@ impl Index {
 
 pub fn generate_vault() {
     generator::generate_sample_vault();
+}
+
+fn build_ecs(config: &Config) -> Ecs {
+    let mut ecs = Ecs::new();
+
+    let files = scan_vault(&config)
+        .filter   (|f| ends_with(f, ".md"))
+    ;
+
+    for file in files {
+        let path = file.path().to_path_buf();
+        let id   = file_id::get_file_id(&path).unwrap();
+
+        ecs.new_file(NewFile {
+            id,
+            path:     path.clone(),
+            raw_text: file_shit::get_file_text(&path),
+            name:     file_shit::get_file_name(&path),
+        });
+    }
+
+    ecs
 }
 
 

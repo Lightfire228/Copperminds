@@ -2,13 +2,16 @@ use std::marker::PhantomData;
 use std::usize;
 
 use file_id::FileId;
-use iced::{Alignment, Length, Size, keyboard};
-use iced::widget::table::{self, Table};
+use iced::Renderer;
+use iced::advanced::{Widget};
+use iced::{Alignment, Color, Length, Size, border, keyboard};
 use iced::{Element, keyboard::Key};
-use iced::widget::{Scrollable, scrollable, text};
+use iced::widget::{container, sensor, text};
+use log::trace;
 
 use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
+use crate::ui::table;
 use crate::vault::FileView;
 
 
@@ -22,7 +25,6 @@ pub struct FileList {
 #[derive(Debug)]
 pub enum Message {
     LoadFiles(Files),
-
 }
 
 
@@ -43,6 +45,13 @@ impl FileList {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+
+        table::Table::new(3, 3).into()
+
+    }
+
+    pub fn _old_view(&self) -> Element<'_, Message> {
+
         type T<'a> = (usize, &'a FileView);
 
         let cursor = |(i, _): T|
@@ -61,19 +70,19 @@ impl FileList {
         let files = self
             .files
             .iter     ()
+            // .skip     (self.cursor.scroll)
+            // .take     (self.cursor.visible.max(1))
             .enumerate()
         ;
 
 
         let cols = [
-            table::column("", cursor).align_x(Alignment::Start),
-            table::column("", file_name),
+            iced::widget::table::column("", cursor).align_x(Alignment::Start),
+            iced::widget::table::column("", file_name),
         ];
 
-        scrollable(
-            Table::new(cols, files)
-                .padding_x(10)
-        )
+        iced::widget::table::Table::new(cols, files)
+            .padding_x(10)
             .into()
 
     }

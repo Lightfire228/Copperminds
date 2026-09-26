@@ -13,6 +13,7 @@ use yaml_serde::Mapping;
 type FileId = file_id::FileId;
 
 pub use file_view::EcsFileView;
+pub use parse    ::NewFile;
 
 use crate::{config::Config, vault::{ecs::{components::*}, fm::{FmAction, FmStatus, FmType}}};
 use super::build_regex;
@@ -41,21 +42,13 @@ pub struct File {
 }
 
 
-pub struct NewFile {
-    pub id:       FileId,
-
-    pub path:     PathBuf,
-    pub raw_text: String,
-    pub name:     String,
-}
-
 trait ComponentList: Any + Send + 'static {
     fn remove(&mut self, id: &FileId);
 }
 
 impl<'a, T> ComponentList for HashMap<FileId, T>
 where
-    T: Component + Any,
+    T: Component,
 {
     fn remove(&mut self, id: &FileId) {
         self.remove(id);
@@ -249,6 +242,7 @@ mod tests {
     use yaml_serde::{Mapping, Value};
 
     use crate::{test_utils::{self, id, mapping_to_str}, vault::{fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}}};
+    use super::parse::*;
 
     use super::*;
 
