@@ -46,7 +46,7 @@ impl FileList {
 
     pub fn view(&self) -> Element<'_, Message> {
 
-        table::Table::new(3, 3).into()
+        table::Table::new(2, self.files.len()).into()
 
     }
 
