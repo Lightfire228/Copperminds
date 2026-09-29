@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::usize;
 
 use file_id::FileId;
-use iced::Renderer;
+use iced::{Renderer, color};
 use iced::advanced::{Widget};
 use iced::{Alignment, Color, Length, Size, border, keyboard};
 use iced::{Element, keyboard::Key};
@@ -11,7 +11,7 @@ use log::trace;
 
 use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
-use crate::ui::table;
+use crate::ui::{table};
 use crate::vault::FileView;
 
 
@@ -46,7 +46,18 @@ impl FileList {
 
     pub fn view(&self) -> Element<'_, Message> {
 
-        table::Table::new(2, self.files.len()).into()
+        let table: Element<'_, Message> = table::Table::new(
+            vec![
+                |file: &FileView| text!("{}", file.name).wrapping(text::Wrapping::None).into(),
+                |file: &FileView| text!("{:?}", file.id).wrapping(text::Wrapping::None).into(),
+            ],
+            &self.files
+        )
+            .into()
+        ;
+
+        table.explain(color!(125, 255, 255))
+        // table
 
     }
 
