@@ -13,10 +13,23 @@ const CELL_HEIGHT: f32 = 50.0;
 
 
 pub struct Table<'a, Message, Theme, Renderer> {
-    rows:       usize,
+    _rows:      usize,
     cols:       usize,
-    data:       Vec<Element<'a, Message, Theme, Renderer>>,
+    cells:      Vec<Element<'a, Message, Theme, Renderer>>
+}
 
+macro_rules! i_to_xy {
+    ($self:expr, $i:expr) => {(
+        $i % $self.cols,
+        $i / $self.cols,
+    )};
+}
+
+
+macro_rules! _xy_to_i {
+    ($self:expr, $x:expr, $y:expr) => {
+        $self.cols * $y + $x
+    };
 }
 
 
@@ -34,20 +47,29 @@ where
         Data:    'a,
     {
 
-        Self {
-            rows: data      .len(),
-            cols: col_select.len(),
+        let cells = data
+            .iter     ()
+            .flat_map (|row|
 
-            data: data
-                .iter()
-                .flat_map(|row| col_select.iter().map(|col| col(row)))
-                .collect()
-            ,
+                col_select
+                    .iter()
+                    .map (|col| col(row))
+            )
+            .collect ()
+        ;
+
+        Self {
+            _rows: data      .len(),
+            cols:  col_select.len(),
+
+            cells,
         }
     }
+
 }
 
-impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
+impl<'a, Message, Theme, Renderer>
+    Widget<Message, Theme, Renderer>
     for Table<'a, Message, Theme, Renderer>
 where
     Renderer: 'a + advanced::Renderer + iced::advanced::text::Renderer,
@@ -63,9 +85,9 @@ where
 
     fn children(&self) -> Vec<Tree> {
         self
-            .data
+            .cells
             .iter   ()
-            .map    (|cell| Tree::new(cell))
+            .map    (Tree::new)
             .collect()
     }
 
@@ -74,7 +96,7 @@ where
     }
 
     fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(&self.data);
+        tree.diff_children(&self.cells);
     }
 
 
@@ -95,13 +117,12 @@ where
         let cell_limits = Limits::new(cell_size, cell_size);
 
         let children = self
-            .data
+            .cells
             .iter_mut ()
             .enumerate()
             .map      (|(i, cell)| {
 
-                let x = i % self.cols;
-                let y = i / self.cols;
+                let (x, y) = i_to_xy!(self, i);
 
                 let x = x as f32 * cell_size.width;
                 let y = y as f32 * cell_size.height;
@@ -135,56 +156,45 @@ where
             return;
         }
 
-
         let mut layout_iter = layout.children();
-        for y in 0..self.rows {
-            for x in 0..self.cols {
-                let i = y * self.cols + x;
 
 
-                let layout = layout_iter.next().unwrap();
+        let children = self
+            .cells
+            .iter     ()
+            .enumerate()
+        ;
 
-                let width  = layout.bounds().width;
-                let height = layout.bounds().height;
+        for (i, cell) in children {
+            let (x, y) = i_to_xy!(self, i);
 
-                // calculate new viewport to clip content overflow
-                let viewport = &iced::Rectangle {
-                    x: bounds.x + (x as f32 * layout.bounds().width),
-                    y: bounds.y + (y as f32 * layout.bounds().height),
-                    width,
-                    height,
-                };
+            let layout = layout_iter.next().unwrap();
 
-                self.data[i].as_widget().draw(
-                    &tree.children[i],
-                    renderer,
-                    theme,
-                    style,
-                    layout,
-                    cursor,
-                    viewport,
-                );
+            let width  = layout.bounds().width;
+            let height = layout.bounds().height;
 
-                // renderer.fill_quad(
-                //     cell(iced::Rectangle {
-                //         x:      bounds.x + width  * x as f32,
-                //         y:      bounds.y + height * y as f32,
-                //         width,
-                //         height,
-                //     }),
-                //     color!(0, 0, 0, 1.0),
-                // );
-            }
+            // calculate new viewport to clip content overflow
+            let viewport = &iced::Rectangle {
+                x: bounds.x + (x as f32 * layout.bounds().width),
+                y: bounds.y + (y as f32 * layout.bounds().height),
+                width,
+                height,
+            };
+
+            cell.as_widget().draw(
+                &tree.children[i],
+                renderer,
+                theme,
+                style,
+                layout,
+                cursor,
+                viewport,
+            );
         }
-
-        // renderer.fill_quad(
-        //     cell(bounds),
-        //     color!(0, 0, 0, 1.0),
-        // );
     }
 }
 
-fn cell(rect: iced::Rectangle) -> renderer::Quad {
+fn _cell(rect: iced::Rectangle) -> renderer::Quad {
     renderer::Quad {
         bounds: rect,
         border: Border {
