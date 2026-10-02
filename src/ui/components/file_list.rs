@@ -11,6 +11,7 @@ use log::trace;
 
 use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
+use crate::ui::table::RowInfo;
 use crate::ui::{table};
 use crate::vault::FileView;
 
@@ -46,55 +47,52 @@ impl FileList {
 
     pub fn view(&self) -> Element<'_, Message> {
 
-        let table: Element<'_, Message> = table::Table::new(
-            vec![
-                |file: &FileView| text!("{}", file.name).wrapping(text::Wrapping::None).into(),
-                |file: &FileView| text!("{:?}", file.id).wrapping(text::Wrapping::None).into(),
-            ],
-            &self.files
-        )
-            .into()
-        ;
+        // type T<'a> = (usize, &'a FileView);
 
-        table.explain(color!(125, 255, 255))
-        // table
+        macro_rules! get_cursor {
+            ($row:expr, $cursor:expr) => {{
+                let cursor = if $cursor == $row {
+                    "> "
+                }
+                else {
+                    ""
+                };
 
-    }
+                text!("{cursor}")
+                    .wrapping(text::Wrapping::None)
+                    .into()
+            }};
+        }
 
-    pub fn _old_view(&self) -> Element<'_, Message> {
-
-        type T<'a> = (usize, &'a FileView);
-
-        let cursor = |(i, _): T|
-            if i == self.cursor {
-                "> "
-            }
-            else {
-                ""
-            }
-        ;
-
-        let file_name = |(_, f): T| text!("{}", f.name)
-            .wrapping(text::Wrapping::None)
-        ;
+        fn get_file_name<'a>(file: &FileView) -> Element<'a, Message> {
+            text!("{}", file.name)
+                .wrapping(text::Wrapping::None)
+                .into()
+        }
 
         let files = self
             .files
             .iter     ()
             // .skip     (self.cursor.scroll)
             // .take     (self.cursor.visible.max(1))
-            .enumerate()
+            // .enumerate()
         ;
 
+        let cursor = self.cursor;
 
-        let cols = [
-            iced::widget::table::column("", cursor).align_x(Alignment::Start),
-            iced::widget::table::column("", file_name),
-        ];
-
-        iced::widget::table::Table::new(cols, files)
-            .padding_x(10)
+        type Fv = FileView;
+        type Ri = RowInfo;
+        let table: Element<'_, Message> = table::Table::new(
+            &[
+                Box::new(move |_:    &Fv, info: Ri| get_cursor!  (info.row, cursor)),
+                Box::new(move |file: &Fv, _:    Ri| get_file_name(file)),
+            ],
+            files,
+        )
             .into()
+        ;
+
+        table.explain(color!(125, 255, 255))
 
     }
 

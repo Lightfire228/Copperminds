@@ -16,6 +16,7 @@ pub struct Table<'a, Message, Theme, Renderer> {
     _rows:      usize,
     cols:       usize,
     cells:      Vec<Element<'a, Message, Theme, Renderer>>
+
 }
 
 macro_rules! i_to_xy {
@@ -32,34 +33,48 @@ macro_rules! _xy_to_i {
     };
 }
 
+pub struct RowInfo {
+    pub row:  usize,
+}
+
+macro_rules! get_data {
+    () => {
+        &[Box<dyn Fn(&'a Data, RowInfo) -> Element<'widget, Message, Theme, Renderer>>]
+    };
+}
 
 impl<'widget, Message, Theme, Renderer>
     Table<'widget, Message, Theme, Renderer>
 where
     Renderer: 'widget + advanced::Renderer + iced::advanced::text::Renderer,
     Theme:    'widget + iced::widget::text::Catalog,
-
 {
-    pub fn new<'a, GetData, Data>(col_select: Vec<GetData>, data: &'a [Data]) -> Self
+
+    pub fn new<'a, Data>(
+        col_select: get_data!(),
+        data:       impl Iterator<Item = &'a Data>
+    )
+        -> Self
     where
-        'widget: 'a,
-        GetData: Fn(&'a Data) -> Element<'widget, Message, Theme, Renderer>,
-        Data:    'a,
+        'widget:  'a,
+        Data:     'a,
     {
 
-        let cells = data
-            .iter     ()
-            .flat_map (|row|
+        let cells: Vec<_> = data
+            .enumerate()
+            .flat_map (|(i, row)|
 
                 col_select
                     .iter()
-                    .map (|col| col(row))
+                    .map (move |col| col(row, RowInfo {
+                        row:  i,
+                    }))
             )
             .collect ()
         ;
 
         Self {
-            _rows: data      .len(),
+            _rows: cells     .len(),
             cols:  col_select.len(),
 
             cells,
