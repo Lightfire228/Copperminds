@@ -21,12 +21,12 @@ where
     cols:  usize,
     cells: Vec<Element<'a, Message, Theme, Renderer>>,
 
+    callback: CallBack,
+}
+
+pub struct TableState {
     rows_visible:  usize,
     last_callback: usize,
-    callback:      CallBack,
-
-
-
 }
 
 macro_rules! i_to_xy {
@@ -65,7 +65,6 @@ where
         col_select:    get_data!(),
         data:          impl Iterator<Item = &'a Data>,
         callback:      CallBack,
-        last_callback: usize,
     )
         -> Self
     where
@@ -91,8 +90,6 @@ where
             cols:  col_select.len(),
 
             cells,
-            rows_visible:  0,
-            last_callback,
             callback,
         }
     }
@@ -124,7 +121,10 @@ where
     }
 
     fn state(&self) -> tree::State {
-        tree::State::new(())
+        tree::State::new(TableState {
+            rows_visible:  0,
+            last_callback: 0,
+        })
     }
 
     fn diff(&self, tree: &mut Tree) {
@@ -141,12 +141,14 @@ where
         -> Node
     {
 
+        let state: &mut TableState = tree.state.downcast_mut();
+
         let cell_size = Size {
             width:  limits.max().width / self.cols as f32,
             height: CELL_HEIGHT,
         };
 
-        self.rows_visible = (limits.max().height / CELL_HEIGHT).ceil() as usize;
+        state.rows_visible = (limits.max().height / CELL_HEIGHT).floor() as usize;
 
         let cell_limits = Limits::new(cell_size, cell_size);
 
@@ -229,7 +231,7 @@ where
 
     fn update(
         &mut self,
-        _tree:      &mut Tree,
+        tree:       &mut Tree,
         _event:     &iced::Event,
         _layout:     advanced::Layout<'_>,
         _cursor:     advanced::mouse::Cursor,
@@ -239,12 +241,14 @@ where
         _viewport:  &iced::Rectangle,
     )
     {
-        if self.rows_visible != self.last_callback {
-            self.last_callback = self.rows_visible;
+        let state: &mut TableState = tree.state.downcast_mut();
+
+        if state.rows_visible != state.last_callback {
+            state.last_callback = state.rows_visible;
 
             let callback = &self.callback;
 
-            shell.publish(callback(self.rows_visible));
+            shell.publish(callback(state.rows_visible));
         }
     }
 }

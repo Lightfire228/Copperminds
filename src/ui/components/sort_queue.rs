@@ -63,7 +63,9 @@ impl SortQueue {
                         Space::new().height(Fill),
 
                         text!("==="),
+                        text!("index:      {}", self.file_list.index()),
                         text!("cursor:     {}", self.file_list.cursor()),
+                        text!("scroll:     {}", self.file_list.scroll()),
                         text!("file count: {}", self.file_list.file_count()),
                         self.prompt.view().map(|_| Message::None)
 

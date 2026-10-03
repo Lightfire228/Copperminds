@@ -7,7 +7,7 @@ use iced::advanced::{Widget};
 use iced::{Alignment, Color, Length, Size, border, keyboard};
 use iced::{Element, keyboard::Key};
 use iced::widget::{container, sensor, text};
-use log::trace;
+use log::{debug, trace};
 
 use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
@@ -20,6 +20,7 @@ pub struct FileList {
     files:        Vec<FileView>,
     cursor:       usize,
     rows_visible: usize,
+    scroll:       usize,
 }
 
 
@@ -44,9 +45,15 @@ impl FileList {
     pub fn new() -> Self {
         Self {
             files:        vec![],
+
+            scroll:       0,
             cursor:       0,
             rows_visible: 0,
         }
+    }
+
+    pub fn index(&self) -> usize {
+        self.scroll + self.cursor
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -77,8 +84,8 @@ impl FileList {
         let files = self
             .files
             .iter     ()
-            // .skip     (self.cursor.scroll)
-            // .take     (self.cursor.visible.max(1))
+            .skip     (self.scroll)
+            .take     (self.rows_visible)
             // .enumerate()
         ;
 
@@ -92,15 +99,13 @@ impl FileList {
                 &Box::new(move |file: &Fv, _:    Ri| get_file_name(file)),
             ],
             files,
-            |rows| {
-                Message::RowsVisible(rows)
-            },
-            self.rows_visible,
+            Message::RowsVisible,
         )
             .into()
         ;
 
-        table.explain(color!(125, 255, 255))
+        // table.explain(color!(125, 255, 255))
+        table
 
     }
 
@@ -146,10 +151,37 @@ impl FileList {
     }
 
     fn on_navigate(&mut self, direction: Direction, count: usize) -> Option<Action> {
+        let prv = self.cursor;
+
+        let max_index  = self.files.len().saturating_sub(1);
+        let max_cursor = max_index.min(self.rows_visible.saturating_sub(1));
+
         match direction {
-            Direction::Up   => self.cursor = self.cursor.saturating_sub(count),
-            Direction::Down => self.cursor = (self.cursor + count).min(self.files.len() -1),
+            Direction::Up   => {
+                self.cursor = self.cursor.saturating_sub(count);
+
+                if prv < count {
+                    self.scroll = self.scroll.saturating_sub(count - prv);
+                }
+            },
+            Direction::Down => {
+                let count = if prv + count > max_cursor {
+                    let diff = prv + count - max_cursor;
+
+                    self.scroll = (self.scroll + diff).min(max_index - max_cursor);
+
+                    count - diff
+                }
+                else {
+                   count
+                };
+
+                self.cursor = (self.cursor + count).min(max_index);
+
+            }
         }
+
+
 
         self.on_selected()
     }
@@ -157,7 +189,7 @@ impl FileList {
     pub fn get_selected(&self) -> Option<&FileView> {
         self
             .files
-            .get(self.cursor)
+            .get(self.index())
     }
 
     pub fn file_count(&self) -> usize {
@@ -168,6 +200,9 @@ impl FileList {
         self.cursor
     }
 
+    pub fn scroll(&self) -> usize {
+        self.scroll
+    }
 }
 
 
