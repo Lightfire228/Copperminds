@@ -19,7 +19,6 @@ use crate::vault::fm::*;
 
 use crate::prelude::*;
 
-#[derive(Debug, Clone)]
 pub struct SortQueue {
     vault:        Sender<VaultCommand>,
     queue_type:   QueueType,

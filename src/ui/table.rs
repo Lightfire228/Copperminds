@@ -1,6 +1,7 @@
 
 use std::marker::PhantomData;
 
+use iced::advanced::graphics::core::event;
 use iced::border::Radius;
 use iced::widget::{Text, text};
 use iced::{Border, Element, Length, Shadow, Size, color};
@@ -12,10 +13,19 @@ use crate::prelude::*;
 const CELL_HEIGHT: f32 = 50.0;
 
 
-pub struct Table<'a, Message, Theme, Renderer> {
-    _rows:      usize,
-    cols:       usize,
-    cells:      Vec<Element<'a, Message, Theme, Renderer>>
+pub struct Table<'a, Message, Theme, Renderer, CallBack>
+where
+    CallBack: Fn(usize) -> Message
+{
+    _rows: usize,
+    cols:  usize,
+    cells: Vec<Element<'a, Message, Theme, Renderer>>,
+
+    rows_visible:  usize,
+    last_callback: usize,
+    callback:      CallBack,
+
+
 
 }
 
@@ -39,20 +49,23 @@ pub struct RowInfo {
 
 macro_rules! get_data {
     () => {
-        &[Box<dyn Fn(&'a Data, RowInfo) -> Element<'widget, Message, Theme, Renderer>>]
+        &[&dyn Fn(&'a Data, RowInfo) -> Element<'widget, Message, Theme, Renderer>]
     };
 }
 
-impl<'widget, Message, Theme, Renderer>
-    Table<'widget, Message, Theme, Renderer>
+impl<'widget, Message, Theme, Renderer, CallBack>
+    Table<'widget, Message, Theme, Renderer, CallBack>
 where
     Renderer: 'widget + advanced::Renderer + iced::advanced::text::Renderer,
     Theme:    'widget + iced::widget::text::Catalog,
+    CallBack: Fn(usize) -> Message
 {
 
     pub fn new<'a, Data>(
-        col_select: get_data!(),
-        data:       impl Iterator<Item = &'a Data>
+        col_select:    get_data!(),
+        data:          impl Iterator<Item = &'a Data>,
+        callback:      CallBack,
+        last_callback: usize,
     )
         -> Self
     where
@@ -78,17 +91,21 @@ where
             cols:  col_select.len(),
 
             cells,
+            rows_visible:  0,
+            last_callback,
+            callback,
         }
     }
 
 }
 
-impl<'a, Message, Theme, Renderer>
+impl<'a, Message, Theme, Renderer, CallBack>
     Widget<Message, Theme, Renderer>
-    for Table<'a, Message, Theme, Renderer>
+    for Table<'a, Message, Theme, Renderer, CallBack>
 where
     Renderer: 'a + advanced::Renderer + iced::advanced::text::Renderer,
     Theme:    'a + iced::widget::text::Catalog,
+    CallBack: Fn(usize) -> Message
 {
 
     fn size(&self) -> Size<Length> {
@@ -128,6 +145,8 @@ where
             width:  limits.max().width / self.cols as f32,
             height: CELL_HEIGHT,
         };
+
+        self.rows_visible = (limits.max().height / CELL_HEIGHT).ceil() as usize;
 
         let cell_limits = Limits::new(cell_size, cell_size);
 
@@ -207,6 +226,27 @@ where
             );
         }
     }
+
+    fn update(
+        &mut self,
+        _tree:      &mut Tree,
+        _event:     &iced::Event,
+        _layout:     advanced::Layout<'_>,
+        _cursor:     advanced::mouse::Cursor,
+        _renderer:  &Renderer,
+        _clipboard: &mut dyn advanced::Clipboard,
+        shell:      &mut advanced::Shell<'_, Message>,
+        _viewport:  &iced::Rectangle,
+    )
+    {
+        if self.rows_visible != self.last_callback {
+            self.last_callback = self.rows_visible;
+
+            let callback = &self.callback;
+
+            shell.publish(callback(self.rows_visible));
+        }
+    }
 }
 
 fn _cell(rect: iced::Rectangle) -> renderer::Quad {
@@ -222,15 +262,16 @@ fn _cell(rect: iced::Rectangle) -> renderer::Quad {
     }
 }
 
-impl<'a, Message: 'a, Theme, Renderer>
-    From<Table<'a, Message, Theme, Renderer>>
+impl<'a, Message: 'a, Theme, Renderer, CallBack>
+    From<Table<'a, Message, Theme, Renderer, CallBack>>
     for Element<'a, Message, Theme, Renderer>
 where
     Renderer: 'a + advanced::Renderer + iced::advanced::text::Renderer,
     Theme:    'a + iced::widget::text::Catalog,
+    CallBack: 'a + Fn(usize) -> Message
 
 {
-    fn from(value: Table<'a, Message, Theme, Renderer>) -> Self {
+    fn from(value: Table<'a, Message, Theme, Renderer, CallBack>) -> Self {
         Element::new(value)
     }
 }

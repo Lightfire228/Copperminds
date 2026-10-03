@@ -62,7 +62,6 @@ enum Action {
 }
 
 
-#[derive(Debug)]
 enum UIMode {
     SelectQueue(SelectQueue),
     SortQueue  (SortQueue),

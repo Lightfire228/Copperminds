@@ -11,21 +11,22 @@ use log::trace;
 
 use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
-use crate::ui::table::RowInfo;
+use crate::ui::table::{RowInfo, Table};
 use crate::ui::{table};
 use crate::vault::FileView;
 
 
-#[derive(Debug, Clone)]
 pub struct FileList {
-    files:    Vec<FileView>,
-    cursor:   usize,
+    files:        Vec<FileView>,
+    cursor:       usize,
+    rows_visible: usize,
 }
 
 
 #[derive(Debug)]
 pub enum Message {
-    LoadFiles(Files),
+    LoadFiles  (Files),
+    RowsVisible(usize),
 }
 
 
@@ -38,10 +39,13 @@ type _Task = iced::Task<Message>;
 
 impl FileList {
 
+
+
     pub fn new() -> Self {
         Self {
-            files:    vec![],
-            cursor:   0,
+            files:        vec![],
+            cursor:       0,
+            rows_visible: 0,
         }
     }
 
@@ -84,10 +88,14 @@ impl FileList {
         type Ri = RowInfo;
         let table: Element<'_, Message> = table::Table::new(
             &[
-                Box::new(move |_:    &Fv, info: Ri| get_cursor!  (info.row, cursor)),
-                Box::new(move |file: &Fv, _:    Ri| get_file_name(file)),
+                &Box::new(move |_:    &Fv, info: Ri| get_cursor!  (info.row, cursor)),
+                &Box::new(move |file: &Fv, _:    Ri| get_file_name(file)),
             ],
             files,
+            |rows| {
+                Message::RowsVisible(rows)
+            },
+            self.rows_visible,
         )
             .into()
         ;
@@ -104,6 +112,12 @@ impl FileList {
                 self.files = files.into();
 
                 self.files.sort_by_key(|x| x.id);
+
+                None
+            },
+
+            Message::RowsVisible(rows) => {
+                self.rows_visible = rows;
 
                 None
             }
