@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::usize;
 
 use file_id::FileId;
+use iced::advanced::overlay::Element as AdvancedElement;
 use iced::{Renderer, color};
 use iced::advanced::{Widget};
 use iced::{Alignment, Color, Length, Size, border, keyboard};
@@ -11,7 +12,7 @@ use log::{debug, trace};
 
 use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
-use crate::ui::table::{RowInfo, Table};
+use crate::ui::table::{ColInfo, Row, Table};
 use crate::ui::{table};
 use crate::vault::FileView;
 
@@ -61,9 +62,9 @@ impl FileList {
         // type T<'a> = (usize, &'a FileView);
 
         macro_rules! get_cursor {
-            ($row:expr, $cursor:expr) => {{
+            ($row:expr, $cursor:expr, $carat:expr) => {{
                 let cursor = if $cursor == $row {
-                    "> "
+                    $carat
                 }
                 else {
                     ""
@@ -78,6 +79,7 @@ impl FileList {
         fn get_file_name<'a>(file: &FileView) -> Element<'a, Message> {
             text!("{}", file.name)
                 .wrapping(text::Wrapping::None)
+                // .wrapping(text::Wrapping::Word)
                 .into()
         }
 
@@ -86,17 +88,20 @@ impl FileList {
             .iter     ()
             .skip     (self.scroll)
             .take     (self.rows_visible)
+            // .take     (1)
             // .enumerate()
         ;
 
+
+
         let cursor = self.cursor;
 
-        type Fv = FileView;
-        type Ri = RowInfo;
         let table: Element<'_, Message> = table::Table::new(
+            25.0,
             &[
-                &Box::new(move |_:    &Fv, info: Ri| get_cursor!  (info.row, cursor)),
-                &Box::new(move |file: &Fv, _:    Ri| get_file_name(file)),
+                ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, cursor, "> ")},
+                ColInfo { size: Length::Fill,        col: &|row: Row<FileView>| get_file_name(row.data)},
+                ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, cursor, " <")},
             ],
             files,
             Message::RowsVisible,

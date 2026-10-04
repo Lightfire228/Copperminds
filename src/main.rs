@@ -24,10 +24,6 @@ use crate::config::Env;
 #[tokio::main]
 async fn main() {
 
-
-    println!("hi {}", 0.1 + 0.2);
-
-
     let env = Env::Dev;
 
     // let log_level = log::LevelFilter::Info;
