@@ -143,8 +143,6 @@ where
     )
         -> Node
     {
-        debug!("layout");
-
         let state: &mut TableState = tree.state.downcast_mut();
 
         state.rows_visible = (limits.max().height / self.row_height).floor() as usize;
@@ -205,7 +203,7 @@ where
             });
         }
 
-        // BUG: multiple columns with Fill sizing
+        // BUG: multiple columns with Fill sizing don't work
 
         let children = self
             .cells
@@ -220,8 +218,6 @@ where
                     height: self.row_height,
                 };
 
-                dbg!(cell_size);
-
                 let cell_limits = Limits::new(cell_size, cell_size);
 
                 let x = cols_sizes.iter().take(x).sum();
@@ -234,8 +230,6 @@ where
             })
             .collect()
         ;
-
-        let children = dbg!(children);
 
         Node::with_children(limits.max(), children)
     }
@@ -251,12 +245,10 @@ where
         cursor:    iced::advanced::mouse::Cursor,
         viewport: &iced::Rectangle,
     ) {
-        debug!("draw");
 
         let bounds = layout.bounds();
 
         if !bounds.intersects(viewport) {
-            debug!("yoyo");
             return;
         }
 
@@ -317,7 +309,6 @@ where
         _viewport:  &iced::Rectangle,
     )
     {
-        debug!("update");
         let state: &mut TableState = tree.state.downcast_mut();
 
         if state.rows_visible != state.last_callback {
