@@ -56,8 +56,8 @@ async fn main() {
 
 
     match menu() {
-        Menu::GenerateVault    => vault       ::generate_vault(),
-        Menu::IcedUI           => ui          ::main(vault::serve(&config), &config),
+        Menu::GenerateVault    => vault::generate_vault(),
+        Menu::IcedUI           => ui   ::main(vault::serve(&config), &config),
     }
 }
 

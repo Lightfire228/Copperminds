@@ -59,11 +59,9 @@ impl FileList {
 
     pub fn view(&self) -> Element<'_, Message> {
 
-        // type T<'a> = (usize, &'a FileView);
-
         macro_rules! get_cursor {
-            ($row:expr, $cursor:expr, $carat:expr) => {{
-                let cursor = if $cursor == $row {
+            ($row:expr, $carat:expr) => {{
+                let cursor = if self.cursor == $row {
                     $carat
                 }
                 else {
@@ -88,20 +86,14 @@ impl FileList {
             .iter     ()
             .skip     (self.scroll)
             .take     (self.rows_visible)
-            // .take     (1)
-            // .enumerate()
         ;
-
-
-
-        let cursor = self.cursor;
 
         let table: Element<'_, Message> = table::Table::new(
             25.0,
             &[
-                ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, cursor, "> ")},
+                ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, "> ")},
                 ColInfo { size: Length::Fill,        col: &|row: Row<FileView>| get_file_name(row.data)},
-                ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, cursor, " <")},
+                ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, " <")},
             ],
             files,
             Message::RowsVisible,
@@ -122,6 +114,9 @@ impl FileList {
                 self.files = files.into();
 
                 self.files.sort_by_key(|x| x.id);
+
+                self.scroll = self.scroll.min(self.calc_max_scroll());
+                self.cursor = self.cursor.min(self.calc_max_cursor());
 
                 None
             },
@@ -155,11 +150,12 @@ impl FileList {
         }
     }
 
+    #[must_use]
     fn on_navigate(&mut self, direction: Direction, count: usize) -> Option<Action> {
         let prv = self.cursor;
 
-        let max_index  = self.files.len().saturating_sub(1);
-        let max_cursor = max_index.min(self.rows_visible.saturating_sub(1));
+        let max_index  = self.calc_max_index();
+        let max_cursor = self.calc_max_cursor();
 
         match direction {
             Direction::Up   => {
@@ -186,9 +182,23 @@ impl FileList {
             }
         }
 
-
-
         self.on_selected()
+    }
+
+    fn calc_max_index(&self) -> usize {
+        self.files.len().saturating_sub(1)
+    }
+
+    fn calc_max_cursor(&self) -> usize {
+        self
+            .calc_max_index()
+            .min(self.rows_visible.saturating_sub(1))
+    }
+
+    fn calc_max_scroll(&self) -> usize {
+        self
+            .calc_max_index()
+            .saturating_sub(self.calc_max_cursor())
     }
 
     pub fn get_selected(&self) -> Option<&FileView> {

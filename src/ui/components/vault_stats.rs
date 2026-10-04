@@ -1,4 +1,6 @@
-use iced::{Element};
+use chrono::format::Colons::Colon;
+use iced::advanced::graphics::color;
+use iced::{Color, Element, color};
 use iced::widget::{column, text};
 use tokio::sync::mpsc::Sender;
 
@@ -34,6 +36,15 @@ impl VaultStatsComponent {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+
+        let yellow = color!(0xd6bc2a);
+        let red    = color!(0xd63e2a);
+
+
+        let illegal      = (self.stats.illegal_names > 0).then_some(red);
+        let needs_action = (self.stats.needs_action  > 0).then_some(yellow);
+        let needs_sorted = (self.stats.needs_sorted  > 0).then_some(yellow);
+
         column![
             text!("Vault Stats"),
             text!("==="),
@@ -45,10 +56,9 @@ impl VaultStatsComponent {
             text!("actionables | complete - {:>5}", self.stats.actionables_complete),
             text!("actionables | archived - {:>5}", self.stats.actionables_archived),
             text!(""),
-            // TODO: change color when these are > 0
-            text!("needs action           - {:>5}", self.stats.needs_action),
-            text!("needs sorted           - {:>5}", self.stats.needs_sorted),
-            text!("illegal names          - {:>5}", self.stats.illegal_names),
+            text!("needs action           - {:>5}", self.stats.needs_action) .color_maybe(needs_action),
+            text!("needs sorted           - {:>5}", self.stats.needs_sorted) .color_maybe(needs_sorted),
+            text!("illegal names          - {:>5}", self.stats.illegal_names).color_maybe(illegal),
             text!(""),
             text!("Open Actionables"),
             text!("==="),
