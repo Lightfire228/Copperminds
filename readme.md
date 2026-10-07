@@ -1,4 +1,9 @@
+<div align="center">
+
+<img width="200" src="./res/copperminds_icon.png"/>
+
 # Copperminds
+</div>
 
 This is a utility for me, by me, specifically tailored to my [Obsidian](https://obsidian.md/) vault
 

@@ -2,13 +2,17 @@ mod components;
 mod vault_subscription;
 mod key_event;
 mod table;
+mod command;
 
 
 use std::fmt::Display;
 use std::hash::Hash;
+use std::path::PathBuf;
 
 use iced::keyboard::{Event};
+use iced::window::{self, Icon, Settings};
 use iced::{Element, Font, Subscription, Theme, application};
+use image::ImageFormat;
 use tokio::sync::mpsc::{Sender};
 use tokio::sync::oneshot;
 
@@ -36,6 +40,11 @@ pub fn main(tx: Sender<VaultCommand>, config: &Config) {
         .title       (App  ::title)
         .subscription(App  ::subscription)
         .default_font(Font ::MONOSPACE)
+        .window      (Settings {
+            icon: Some(icon()),
+
+            ..Default::default()
+        })
         .run         ()
         .unwrap      ()
     ;
@@ -67,7 +76,6 @@ enum UIMode {
     SortQueue  (SortQueue),
 }
 
-
 impl App {
     fn new(tx: Sender<VaultCommand>, env: Env) -> (Self, Task) {
         let (component, task) = SelectQueue::new(tx.clone());
@@ -94,6 +102,7 @@ impl App {
     fn title(&self) -> String {
         format!("Copperminds - {}", self.env.name())
     }
+
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
@@ -236,6 +245,12 @@ impl App {
             UIMode::SortQueue  (x) => x.view().map(Message::SortQueue),
         }
     }
+}
+
+fn icon() -> Icon {
+    let icon = include_bytes!("../res/copperminds_icon.png");
+
+    window::icon::from_file_data(icon, Some(ImageFormat::Png)).unwrap()
 }
 
 
