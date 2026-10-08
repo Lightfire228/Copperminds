@@ -1,6 +1,16 @@
+pub mod parsing;
+
 use std::{collections::HashMap, fmt::Display, sync::LazyLock};
 
 use enum_iterator::{Sequence, all};
+use yaml_serde::Mapping;
+
+pub struct FrontmatterYaml {
+    pub type_:   Option<FmType>,
+    pub action:  Option<FmAction>,
+    pub status:  Option<FmStatus>,
+    // pub project: Option<FmProject>,
+}
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,11 +34,18 @@ pub enum FmAction {
     MaybeSomeday,
     WaitingFor,
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Sequence)]
 pub enum FmStatus {
     Completed,
     Archived,
 }
+
+// #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+// pub struct FmProject {
+//     pub name:         String,
+//     pub is_workspace: bool,
+// }
 
 
 
@@ -47,6 +64,17 @@ impl FmStatus {
         }
     }
 }
+
+// impl From<Mapping> for FrontmatterYaml {
+//     fn from(value: Mapping) -> Self {
+//         Self {
+//             type_:   FmType::try_from(value),
+//             action:  todo!(),
+//             status:  todo!(),
+//             project: todo!(),
+//         }
+//     }
+// }
 
 pub trait GetKey {
     fn get_key(&self) -> String;

@@ -15,7 +15,7 @@ type FileId = file_id::FileId;
 pub use file_view::EcsFileView;
 pub use parse    ::NewFile;
 
-use crate::{config::Config, vault::{ecs::{components::*}, fm::{FmAction, FmStatus, FmType}}};
+use crate::{config::Config, vault::{ecs::components::*, fm::{FmAction, FmStatus, FmType}}};
 use super::build_regex;
 
 static CAST_ERR: &str = "the types done got all fucked up";
@@ -102,7 +102,7 @@ impl Ecs {
         )
     }
 
-    pub fn _get_component_mut<T: Component>(&mut self, comp_id: FileId) -> Result<&mut T, ComponentError> {
+    pub fn get_component_mut<T: Component>(&mut self, comp_id: FileId) -> Result<&mut T, ComponentError> {
         type Er = ComponentError;
 
         let list = self
@@ -138,17 +138,18 @@ impl Ecs {
     }
 
     fn to_file_view<'a>(&'a self, id: FileId, file: &'a File) -> EcsFileView<'a> {
+        let fm: Option<&FmComponent> = self.get_component(id).ok();
+
         EcsFileView {
             id,
             file,
-            fm:       self.get_component(id).ok(),
             md_text:  self.get_component(id).ok(),
-            empty:    self.get_component(id).ok(),
-            type_:    self.get_component(id).ok(),
-            info:     self.get_component(id).ok(),
-            action:   self.get_component(id).ok(),
-            status:   self.get_component(id).ok(),
-            project:  self.get_component(id).ok(),
+            empty:    self.get_component::<EmptyFileComponent>(id).is_ok(),
+            type_:    fm.and_then(|fm| fm.type_ .value.as_ref()),
+            action:   fm.and_then(|fm| fm.action.value.as_ref()),
+            status:   fm.and_then(|fm| fm.status.value.as_ref()),
+            // project:  fm.map(|fm| fm.project),
+            fm,
         }
     }
 

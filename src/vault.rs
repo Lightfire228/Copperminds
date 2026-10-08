@@ -377,10 +377,10 @@ impl Index {
 
 
         VaultStats {
-            info_total:           self.ecs.get_component_counts::<InfoComponent>(),
+            info_total:           self.ecs.get_all().filter(|x| x.is_info())                                           .count(),
             info_archived:        self.ecs.get_all().filter(|x| x.is_info() && x.status_eq(FmStatus::Archived ))       .count(),
             info_complete:        self.ecs.get_all().filter(|x| x.is_info() && x.status_eq(FmStatus::Completed))       .count(),
-            actionables_total:    self.ecs.get_component_counts::<ActionComponent>(),
+            actionables_total:    self.ecs.get_all().filter(|x| x.is_actionable())                                     .count(),
             actionables_open:     self.ecs.get_all().filter(|x| x.is_actionable() && x.is_open())                      .count(),
             actionables_complete: self.ecs.get_all().filter(|x| x.is_actionable() && x.status_eq(FmStatus::Completed)) .count(),
             actionables_archived: self.ecs.get_all().filter(|x| x.is_actionable() && x.status_eq(FmStatus::Archived))  .count(),
@@ -395,7 +395,8 @@ impl Index {
             open_maybe_someday:   self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::MaybeSomeday))    .count(),
             open_waiting_for:     self.ecs.get_all().filter(|x| x.is_open() && x.action_eq(FmAction::WaitingFor))      .count(),
 
-            project_files:        self.ecs.get_component_counts::<ProjectComponent>(),
+            // project_files:        self.ecs.get_component_counts::<ProjectComponent>(),
+            project_files:        0,
             // unqiue_projects:      self.ecs.iter_components::<ProjectComponent>().map(|x| )
 
             illegal_names:        self.ecs.get_component_counts::<IllegalNameComponent>()

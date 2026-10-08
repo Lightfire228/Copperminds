@@ -1,60 +1,53 @@
 use yaml_serde::{Mapping, Value};
 
-use crate::vault::{ecs::{ActionComponent, Ecs, FileId, components::*}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
 
-// since file formatting only uses the FmComponent, it is necessary to keep it in sync
-// when modifying anything frontmatter related
 impl Ecs {
 
     pub fn set_info(&mut self, id: FileId) {
         self.set_type(id, FmType::Info);
-
-        self.add_component(id, InfoComponent);
-        self.remove_empty (id);
     }
 
     pub fn set_action(&mut self, id: FileId, action: FmAction) {
         let fm = self.set_type(id, FmType::Action);
-        set_property(fm, FmProperty::Action.get_key(), action.get_key());
 
-        self.get_component_or_insert(id, || ActionComponent {
-            action,
-        });
-        self.remove_empty (id);
+        fm.action = FmProp {
+            value:    Some(action),
+            modified: true,
+        };
     }
 
     pub fn set_status(&mut self, id: FileId, status: FmStatus) {
-
         let fm = self.get_fm_mut(id);
-        set_property(fm, FmProperty::Status.get_key(), status.get_key());
 
-        self.get_component_or_insert(id, || StatusComponent {
-            status,
-        });
-        self.remove_empty(id);
+        fm.status = FmProp {
+            value:    Some(status),
+            modified: true,
+        };
     }
 
-
-    fn set_type(&mut self, id: FileId, type_: FmType) -> &mut Mapping {
+    fn set_type(&mut self, id: FileId, type_: FmType) -> &mut FmComponent {
         let fm = self.get_fm_mut(id);
 
-        set_property(fm, FmProperty::Type.get_key(), type_.get_key());
+        fm.type_ = FmProp {
+            value:    Some(type_),
+            modified: true,
+        };
 
         fm
     }
 
-    fn get_fm_mut(&mut self, id: FileId) -> &mut Mapping {
-        self.remove_empty(id);
 
-        &mut self.get_component_or_insert(id, || FmComponent {
-            fm: Mapping::new()
-        })
-            .fm
+    fn get_fm_mut(&mut self, id: FileId) -> &mut FmComponent {
+        self.remove_empty_flag(id);
+
+        self.get_component_or_insert(id, || Default::default())
     }
 
-    fn remove_empty(&mut self, id: FileId) {
-        _ = self.remove_component::<EmptyComponent>(id);
+    fn remove_empty_flag(&mut self, id: FileId) {
+        _ = self.remove_component::<EmptyFileComponent>(id);
     }
+
 }
 
 
