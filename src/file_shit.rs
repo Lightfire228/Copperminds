@@ -15,6 +15,11 @@ pub fn get_file_name(path: &Path) -> String {
         .to_owned ()
 }
 
+// lol
+pub fn get_folder_name(path: &Path) -> String {
+    get_file_name(path)
+}
+
 pub fn get_file_text(path: &Path) -> String {
     fs::read_to_string(path).unwrap()
 }

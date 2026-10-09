@@ -1,4 +1,4 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::{self, PathBuf}};
 use serde::{Deserialize, Serialize};
 
 
@@ -41,11 +41,13 @@ pub fn get_config(env: Env) -> Config {
         panic!("vault folder does not exist");
     }
 
+    let vault_name = file_shit::get_folder_name(&config.vault_folder);
+
     Config {
         env,
         folder_excludes: config.folder_excludes,
         vault_path:      config.vault_folder,
-        vault_name:      config.vault_name,
+        vault_name:      vault_name,
     }
 
 }
@@ -68,18 +70,16 @@ pub struct Config {
     /// Path to vault on disk (`~` as an alias for `$HOME`)
     pub vault_path:      PathBuf,
 
-    // TODO: obsidian might just use the folder name? in which case, this is redundant
-    /// Name of the vault as obsidian recognized it
+    /// derived from `vault_path`
     pub vault_name:      String,
+
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone) ]
 pub struct YamlConfig {
     pub folder_excludes: Vec<String>,
 
     pub vault_folder:    PathBuf,
-
-    pub vault_name:      String,
 }
 
 impl Default for Config {
@@ -90,15 +90,6 @@ impl Default for Config {
             vault_path:      Default::default(),
             vault_name:      Default::default(),
         }
-    }
-}
-
-impl Config {
-    pub fn with_excludes(excludes: Vec<String>) -> Self {
-        let mut x = Self::default();
-        x.folder_excludes = excludes;
-
-        x
     }
 }
 

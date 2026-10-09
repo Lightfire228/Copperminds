@@ -3,7 +3,7 @@ use std::{fs, path::{Path, PathBuf}, sync::Mutex};
 use file_id::FileId;
 use yaml_serde::Mapping;
 
-use crate::{file_shit, vault::ecs::NewFile};
+use crate::{file_shit, vault::ecs::{Ecs, NewFile}};
 
 
 static COUNTER: Mutex<u64> = Mutex::new(0);
@@ -24,6 +24,28 @@ pub fn id() -> FileId {
     }
 }
 
+macro_rules! fm {
+    ($($key:expr => $value:expr),*$(,)? ) => {{
+
+
+        #[allow(unused_mut)] // reason: ignore warning for empty fm creation
+        let mut fm = Mapping::new();
+
+        $(
+            fm.insert(Value::String($key.get_key()), $value.into());
+        )*
+
+        fm
+    }};
+    ($ecs:ident, $($key:expr => $value:expr),*$(,)? ) => {{
+        let fm = fm!($($key => $value),*);
+
+        $ecs.load_fm_test(fm)
+    }};
+}
+
+pub(crate) use fm;
+
 
 pub fn load_file(name: &str) -> String {
     let dir  = format!("{}/test_files/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -43,5 +65,20 @@ impl NewFile {
             name,
             raw_text: Default::default(),
         }
+    }
+}
+
+impl Ecs {
+    pub fn load_fm_test(&mut self, fm: Mapping) -> FileId {
+        let id = id();
+
+        self.new_file(NewFile {
+            id,
+            path:     PathBuf::new(),
+            raw_text: mapping_to_str(fm),
+            name:     String::new(),
+        });
+
+        id
     }
 }

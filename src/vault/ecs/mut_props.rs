@@ -17,11 +17,31 @@ impl Ecs {
         };
     }
 
+    #[allow(dead_code)]
+    pub fn remove_action(&mut self, id: FileId) {
+        let fm = self.get_fm_mut(id);
+
+        fm.action = FmProp {
+            value:    None,
+            modified: true,
+        };
+    }
+
     pub fn set_status(&mut self, id: FileId, status: FmStatus) {
         let fm = self.get_fm_mut(id);
 
         fm.status = FmProp {
             value:    Some(status),
+            modified: true,
+        };
+    }
+
+    #[allow(dead_code)]
+    pub fn remove_status(&mut self, id: FileId) {
+        let fm = self.get_fm_mut(id);
+
+        fm.status = FmProp {
+            value:    None,
             modified: true,
         };
     }
@@ -37,6 +57,16 @@ impl Ecs {
         fm
     }
 
+    #[allow(dead_code)]
+    pub fn remove_type(&mut self, id: FileId)  {
+        let fm = self.get_fm_mut(id);
+
+        fm.type_ = FmProp {
+            value:    None,
+            modified: true,
+        };
+    }
+
 
     fn get_fm_mut(&mut self, id: FileId) -> &mut FmComponent {
         self.remove_empty_flag(id);
@@ -49,17 +79,6 @@ impl Ecs {
     }
 
 }
-
-
-
-fn set_property(fm: &mut Mapping, property: String, value: String) {
-
-    let key = Value::String(property);
-    let val = Value::String(value);
-
-    fm.insert(key, val);
-}
-
 
 
 

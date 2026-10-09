@@ -95,27 +95,76 @@ fn fm_to_text(fm: &Mapping) -> String {
 }
 
 
-fn set_property(fm: &mut Mapping, property: String, value: Value) {
-    let key = Value::String(property);
-
-    fm.insert(key, value);
-}
-
-fn set_property_str(fm: &mut Mapping, property: String, value: String) {
-    set_property(fm, property, Value::String(value));
-}
-
-
-
 
 #[cfg(test)]
 mod tests {
+    use yaml_serde::Number;
+
+    use crate::{test_utils::fm, vault::fm::{FmAction, FmStatus}};
+
     use super::*;
 
     #[test]
-    #[ignore = "todo"]
     fn test_unrelated_props() {
-        todo!()
+
+        use crate::vault::ecs::mut_props::*;
+
+        let mut ecs = Ecs::default();
+
+        let og_fm = fm!(
+            "foo"         => true,
+            "bar"         => "2000-01-01",
+            "none"        => Value::Null,
+            "lorem ipsum" => "dolor salut",
+
+            "baz" => fm!(
+                "nested" => true,
+                "ooga"   => 10,
+                "booga"  => 10.0,
+            ),
+        );
+
+        let id = ecs.load_fm_test(og_fm.clone());
+
+        // make a bunch of changes
+        ecs.set_info         (id);
+        ecs.replicate_changes(id);
+
+        ecs.set_status       (id, FmStatus::Completed);
+        ecs.replicate_changes(id);
+
+        ecs.set_action       (id, FmAction::Backlog);
+        ecs.replicate_changes(id);
+
+
+        let modified_fm = &ecs.get_component::<FmComponent>(id).unwrap().fm;
+
+        for key in og_fm.keys() {
+            let expected = og_fm      .get(key).unwrap();
+            let modified = modified_fm.get(key).unwrap();
+
+            assert_eq!(expected, modified);
+        }
+
+        // remove those changes
+        ecs.remove_type      (id);
+        ecs.replicate_changes(id);
+
+        ecs.remove_status    (id);
+        ecs.replicate_changes(id);
+
+        ecs.remove_action    (id);
+        ecs.replicate_changes(id);
+
+
+        let modified_fm = &ecs.get_component::<FmComponent>(id).unwrap().fm;
+        assert_eq!(&og_fm, modified_fm);
+
     }
 
+    impl Ecs {
+        fn replicate_changes(&mut self, id: FileId) {
+            self.get_component_mut::<FmComponent>(id).unwrap().update();
+        }
+    }
 }

@@ -429,6 +429,15 @@ impl<'a> From<EcsFileView<'a>> for FileView {
 mod tests {
     use super::*;
 
+    impl Config {
+        pub fn with_excludes(excludes: Vec<String>) -> Self {
+            let mut x = Self::default();
+            x.folder_excludes = excludes;
+
+            x
+        }
+    }
+
     #[test]
     fn test_is_excluded() {
         let config = Config::with_excludes(vec![

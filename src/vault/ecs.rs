@@ -231,6 +231,7 @@ fn map_id<T: Component>() -> TypeId {
 //     }
 // }
 
+#[derive(Debug)]
 pub enum ComponentError {
     NoComponentsOfThatType,
     ComponentNotFound,
@@ -242,31 +243,14 @@ mod tests {
 
     use yaml_serde::{Mapping, Value};
 
-    use crate::{test_utils::{self, id, mapping_to_str}, vault::{fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}}};
+    use crate::{test_utils::{self, fm, id, mapping_to_str}, vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
     use super::parse::*;
 
     use super::*;
 
-    macro_rules! fm {
-        ($ecs:ident, $($key:expr => $value:expr),*$(,)? ) => {{
-            #[allow(unused_mut)] // reason: ignore warning for empty fm creation
-            let mut fm = Mapping::new();
 
-            $(
-                fm.insert(Value::String($key.get_key()), Value::String($value.get_key()));
-            )*
-
-            let id = id();
-
-            $ecs.new_file(NewFile {
-                id,
-                path:     PathBuf::new(),
-                raw_text: mapping_to_str(fm),
-                name:     String::new(),
-            });
-
-            id
-        }};
+    fn s<T: GetKey>(value: T) -> String {
+        value.get_key()
     }
 
     #[test]
@@ -275,8 +259,8 @@ mod tests {
         let mut ecs = Ecs::default();
 
         let untyped = fm!(ecs, );
-        let info    = fm!(ecs, FmProperty::Type => FmType::Info);
-        let action  = fm!(ecs, FmProperty::Type => FmType::Action);
+        let info    = fm!(ecs, FmProperty::Type => s(FmType::Info));
+        let action  = fm!(ecs, FmProperty::Type => s(FmType::Action));
 
 
         let untyped = ecs.get(untyped).unwrap();
@@ -297,11 +281,11 @@ mod tests {
 
         let mut ecs = Ecs::default();
 
-        let no_action_info     = fm!(ecs, FmProperty::Type => FmType::Info);
-        let no_action          = fm!(ecs,                                     FmProperty::Action => FmAction::Todo);
-        let needs_action       = fm!(ecs, FmProperty::Type => FmType::Action);
-        let action_todo        = fm!(ecs, FmProperty::Type => FmType::Action, FmProperty::Action => FmAction::Todo);
-        let action_waiting_for = fm!(ecs, FmProperty::Type => FmType::Action, FmProperty::Action => FmAction::WaitingFor);
+        let no_action_info     = fm!(ecs, FmProperty::Type => s(FmType::Info));
+        let no_action          = fm!(ecs,                                        FmProperty::Action => s(FmAction::Todo));
+        let needs_action       = fm!(ecs, FmProperty::Type => s(FmType::Action));
+        let action_todo        = fm!(ecs, FmProperty::Type => s(FmType::Action), FmProperty::Action => s(FmAction::Todo));
+        let action_waiting_for = fm!(ecs, FmProperty::Type => s(FmType::Action), FmProperty::Action => s(FmAction::WaitingFor));
 
 
         let no_action_info     = ecs.get(no_action_info)    .unwrap();
@@ -328,9 +312,9 @@ mod tests {
         let mut ecs = Ecs::default();
 
         let archive   = fm!(ecs, FmProperty::Status => "archive");
-        let archived  = fm!(ecs, FmProperty::Status => FmStatus::Archived);
+        let archived  = fm!(ecs, FmProperty::Status => s(FmStatus::Archived));
         let complete  = fm!(ecs, FmProperty::Status => "complete");
-        let completed = fm!(ecs, FmProperty::Status => FmStatus::Completed);
+        let completed = fm!(ecs, FmProperty::Status => s(FmStatus::Completed));
 
         let archive   = ecs.get(archive  ).unwrap();
         let archived  = ecs.get(archived ).unwrap();
