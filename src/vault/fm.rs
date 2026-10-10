@@ -3,7 +3,7 @@ pub mod parsing;
 use std::{collections::HashMap, fmt::Display, sync::LazyLock};
 
 use enum_iterator::{Sequence, all};
-use yaml_serde::Mapping;
+use yaml_serde::{Mapping, Value};
 
 pub struct FrontmatterYaml {
     pub type_:   Option<FmType>,
@@ -207,3 +207,21 @@ impl FmAction {
         all::<FmAction>().collect()
     }
 }
+
+
+macro_rules! impl_from {
+    ($ident:ident) => {
+
+        impl From<$ident> for Value {
+            fn from(value: $ident) -> Self {
+                Value::String(value.get_key())
+            }
+        }
+
+    };
+}
+
+impl_from!(FmProperty);
+impl_from!(FmType);
+impl_from!(FmAction);
+impl_from!(FmStatus);

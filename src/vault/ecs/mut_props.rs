@@ -4,6 +4,12 @@ use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProperty,
 
 impl Ecs {
 
+    pub fn replicate_changes_to_fm(&mut self, id: FileId) {
+        if let Ok(fm) = self.get_component_mut::<FmComponent>(id) {
+            fm.update();
+        }
+    }
+
     pub fn set_info(&mut self, id: FileId) {
         self.set_type(id, FmType::Info);
     }
@@ -80,75 +86,168 @@ impl Ecs {
 
 }
 
+impl FmComponent {
+    fn update(&mut self) {
+        update_prop_str(&mut self.fm, FmProperty::Type,   &mut self.type_);
+        update_prop_str(&mut self.fm, FmProperty::Action, &mut self.action);
+        update_prop_str(&mut self.fm, FmProperty::Status, &mut self.status);
+    }
+
+}
+
+fn update_prop_str<'a, T: GetKey>(fm: &mut Mapping, prop: FmProperty, value: &mut FmProp<T>) {
+    if !value.modified {
+        return;
+    }
+
+    value.modified = false;
+
+    let key = Value::String(prop.get_key());
+
+    let Some(value) = &value.value else {
+        fm.remove(key);
+        return;
+    };
+
+    let value = Value::String(value.get_key());
+
+    let slot = fm.entry(key).or_insert_with(|| Value::Null);
+
+    *slot = value;
+}
+
+
+
 
 
 /// The main concern here is avoiding data loss.
 /// Nothing should change the file in any way other than the intended effect
 #[cfg(test)]
 mod tests {
-    use std::{vec};
+    use yaml_serde::Number;
 
-    use crate::test_utils::load_file;
+    use crate::{test_utils::fm, vault::fm::{FmAction, FmStatus, FmType}};
+
+    use super::*;
 
 
-    fn _load_test_bodies() -> Vec<String> {
-        vec![
-            load_file("parsing/test_body_01.md"),
-            load_file("parsing/test_body_02.md"),
-        ]
+    fn get_fm(ecs: &Ecs, id: FileId) -> &Mapping {
+        &ecs.get_component::<FmComponent>(id).unwrap().fm
     }
 
     #[test]
-    #[ignore = "todo"]
-    fn test_property_writes() {
-        // macro_rules! value {
-        //     ($x:literal) => {
-        //         Value::String($x.to_owned())
-        //     };
-        // }
+    fn test_mutations() {
 
-        // let bodies = load_test_bodies();
+        let mut ecs = Ecs::default();
 
-        // for text in bodies {
-        //     let mut body = parse_md_file(&text);
-        //     let mut fm   = Mapping::new();
+        let id = fm!(ecs, );
 
-        //     macro_rules! assert {
-        //         () => {
-        //             assert_eq!(body.fm.as_ref(), Some(&fm));
-        //             assert_eq!(body.md,          text);
-        //         };
-        //     }
+        ecs.set_info               (id);
+        ecs.replicate_changes_to_fm(id);
 
-        //     macro_rules! add {
-        //         ($key:literal, $val:literal) => {
-        //             body.set_property($key.to_owned(), $val.to_owned());
-        //             fm.insert(value!($key), value!($val));
-
-        //             assert!();
-        //         };
-        //     }
-
-        //     add!("test prop 01", "test val 01");
-        //     add!("test prop 02", "test val 02");
-        //     add!("test prop 03", "test val 03");
+        assert_eq!(get_fm(&ecs, id), &fm!(FmProperty::Type => FmType::Info));
 
 
-        //     // test modify
-        //     body.set_property("test prop 02".to_owned(), "changed".to_owned());
 
-        //     let x = fm.get_mut(value!("test prop 02")).unwrap();
-        //     *x = value!("changed");
+        ecs.set_status             (id, FmStatus::Archived);
+        ecs.replicate_changes_to_fm(id);
 
-        //     assert!();
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Type   => FmType  ::Info,
+            FmProperty::Status => FmStatus::Archived,
+        ));
 
 
-        //     // test delete
-        //     body.remove_property("test prop 02".to_owned());
-        //     fm.remove(value!("test prop 02"));
 
-        //     assert!();
-        // }
+        ecs.set_action             (id, FmAction::Backlog);
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Type   => FmType  ::Action,
+            FmProperty::Status => FmStatus::Archived,
+            FmProperty::Action => FmAction::Backlog,
+        ));
+
+
+
+        ecs.remove_type            (id);
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Status => FmStatus::Archived,
+            FmProperty::Action => FmAction::Backlog,
+        ));
+
+
+
+        ecs.remove_action          (id);
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Status => FmStatus::Archived,
+        ));
+
+
+
+        ecs.remove_status          (id);
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!());
     }
 
+    #[test]
+    fn test_unrelated_props() {
+        use crate::vault::ecs::mut_props::*;
+
+        let mut ecs = Ecs::default();
+
+        let og_fm = fm!(
+            "foo"         => true,
+            "bar"         => "2000-01-01",
+            "none"        => Value::Null,
+            "lorem ipsum" => "dolor salut",
+
+            "baz" => fm!(
+                "nested" => true,
+                "ooga"   => 10,
+                "booga"  => 10.0,
+            ),
+        );
+
+        let id = ecs.load_fm_test(og_fm.clone());
+
+        // make a bunch of changes
+        ecs.set_info               (id);
+        ecs.replicate_changes_to_fm(id);
+
+        ecs.set_status             (id, FmStatus::Completed);
+        ecs.replicate_changes_to_fm(id);
+
+        ecs.set_action             (id, FmAction::Backlog);
+        ecs.replicate_changes_to_fm(id);
+
+
+        let modified_fm = get_fm(&ecs, id);
+
+        for key in og_fm.keys() {
+            let expected = og_fm      .get(key).unwrap();
+            let modified = modified_fm.get(key).unwrap();
+
+            assert_eq!(expected, modified);
+        }
+
+        // remove those changes
+        ecs.remove_type            (id);
+        ecs.replicate_changes_to_fm(id);
+
+        ecs.remove_status          (id);
+        ecs.replicate_changes_to_fm(id);
+
+        ecs.remove_action          (id);
+        ecs.replicate_changes_to_fm(id);
+
+
+        let modified_fm = get_fm(&ecs, id);
+        assert_eq!(&og_fm, modified_fm);
+    }
 }

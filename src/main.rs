@@ -24,7 +24,6 @@ use crate::config::Env;
 #[tokio::main]
 async fn main() {
 
-    // TODO: write unit tests for mut_props.rs
     let env = Env::Dev;
 
     // let log_level = log::LevelFilter::Info;
