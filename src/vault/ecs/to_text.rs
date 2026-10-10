@@ -106,7 +106,6 @@ mod tests {
 
     #[test]
     fn test_unrelated_props() {
-
         use crate::vault::ecs::mut_props::*;
 
         let mut ecs = Ecs::default();

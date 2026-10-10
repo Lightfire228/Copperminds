@@ -9,6 +9,7 @@ use iced::{Element, Task, keyboard::Key, widget::container};
 use iced::widget::{Space, column, row, text};
 
 use crate::collections::Files;
+use crate::ui::actions::Command;
 use crate::ui::components::file_list::{self, FileList};
 use crate::ui::components::prompt::{self, MenuCommand, Prompt};
 use crate::ui::key_event::KeyPressed;
@@ -25,18 +26,31 @@ pub struct SortQueue {
 
     file_list:    FileList,
     prompt:       Prompt<Command>,
+    command_list: Vec<MenuCommand<Command>>
 }
 
 
 impl SortQueue {
 
     pub fn new(queue_type: QueueType, vault: Sender<VaultCommand>) -> (Self, Task<Message>) {
+
+        let command_list: Vec<_> = Command::all()
+            .into_iter()
+            .filter_map   (|c| Some(MenuCommand {
+                code:    c.get_code(queue_type)?,
+                name:    c.get_label(),
+                command: c,
+            }))
+            .collect()
+        ;
+
         (
             Self {
-                queue_type,
                 vault:     vault.clone(),
                 file_list: FileList::new(),
-                prompt:    Prompt  ::new(queue_type.get_command_list().to_owned()),
+                prompt:    Prompt  ::new(command_list.iter().copied()),
+                queue_type,
+                command_list,
             },
             Task::batch([
                 Task::perform(load_files(vault, queue_type), Message::LoadFiles),
@@ -47,7 +61,7 @@ impl SortQueue {
 
     pub fn view(&self) -> Element<'_, Message> {
 
-        let options = self.queue_type.get_command_list()
+        let options = self.command_list
             .iter()
             .map (|o| text!("{} - {}", o.code, o.name).into())
         ;
@@ -326,76 +340,5 @@ impl TryInto<ModifyFileKind> for Command {
             Command::SetStatus(s) => ModifyFileKind::SetStatus(s),
             Command::DeleteFile   => Err(())?,
         })
-    }
-}
-
-macro_rules! cmd_table {
-    ($( ($command:expr, $code:literal, $name:literal) ),*$(,)? ) => {[
-
-        $(
-            MenuCommand {
-                code:    $code,
-                name:    $name,
-                command: $command
-            },
-        )*
-    ]}
-}
-
-type Cm = Command;
-type Fa = FmAction;
-type Fs = FmStatus;
-
-// TODO: make sort queue command agnostic
-pub static COMMANDS: &'static [MenuCommand<Command>] = &cmd_table!(
-    (Cm::SetTypeInfo,                  "i", "type    - info"),
-    (Cm::SetAction(Fa::Todo),          "t", "action  - todo"),
-    (Cm::SetAction(Fa::Backlog),       "b", "action  - backlog"),
-    (Cm::SetAction(Fa::Entertainment), "e", "action  - entertainment"),
-    (Cm::SetAction(Fa::MaybeSomeday),  "m", "action  - maybe someday"),
-    (Cm::SetAction(Fa::WaitingFor),    "w", "action  - waiting for"),
-    (Cm::SetStatus(Fs::Completed),     "c", "status  - complete"),
-    (Cm::SetStatus(Fs::Archived),      "a", "status  - archived"),
-    (Cm::DeleteFile,                   "d", "command - delete file"),
-);
-
-pub static ACTIONABLES_COMMANDS: &'static [MenuCommand<Command>] = &cmd_table!(
-    (Cm::SetTypeInfo,                  "i", "type   - info"),
-    (Cm::SetAction(Fa::Todo),          "t", "action - todo"),
-    (Cm::SetAction(Fa::Backlog),       "b", "action - backlog"),
-    (Cm::SetAction(Fa::Entertainment), "e", "action - entertainment"),
-    (Cm::SetAction(Fa::MaybeSomeday),  "m", "action - maybe someday"),
-    (Cm::SetAction(Fa::WaitingFor),    "w", "action - waiting for"),
-    (Cm::SetStatus(Fs::Completed),     "c", "status - complete"),
-    (Cm::SetStatus(Fs::Archived),      "a", "status - archived"),
-);
-
-impl Display for Command {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Command::SetTypeInfo  => write!(f, "Set Type Info"),
-            Command::SetAction(a) => write!(f, "Set Action {a}"),
-            Command::SetStatus(s) => write!(f, "Set Status {s}"),
-            Command::DeleteFile   => write!(f, "Delete File"),
-        }
-    }
-}
-
-
-#[derive(Debug, Clone, Copy)]
-pub enum Command {
-    SetTypeInfo,
-    SetAction(FmAction),
-    SetStatus(FmStatus),
-    DeleteFile,
-}
-
-
-impl QueueType {
-    fn get_command_list(&self) -> &'static [MenuCommand<Command>] {
-        match self {
-            QueueType::Inbox       => COMMANDS,
-            QueueType::Actionables => ACTIONABLES_COMMANDS,
-        }
     }
 }

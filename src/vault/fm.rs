@@ -18,6 +18,8 @@ pub enum FmProperty {
     Status,
     Type,
     Action,
+
+    #[allow(dead_code)]
     Project,
 }
 
@@ -94,8 +96,6 @@ macro_rules! impl_get_key {
     };
 }
 
-// TODO: would probably be better to use a HashMap<>,
-// since then you get "iter all values" for free
 impl_get_key!(FmProperty,
     Status   => "status",
     Type     => "type",

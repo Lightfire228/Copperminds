@@ -33,11 +33,10 @@ type _Task = iced::Task<Message>;
 
 impl<T: Copy> Prompt<T> {
 
-    pub fn new(commands: Vec<MenuCommand<T>>) -> Self {
+    pub fn new<'a>(commands: impl Iterator<Item = MenuCommand<T>>) -> Self {
         Self {
             text:     String::new(),
             commands: commands
-                .iter   ()
                 .map    (|x| (x.code, x.command))
                 .collect(),
         }
@@ -140,7 +139,7 @@ impl<T: Copy> Prompt<T> {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct MenuCommand<T: Copy> {
     pub code:    &'static str,
     pub name:    &'static str,

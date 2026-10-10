@@ -2,6 +2,7 @@ mod components;
 mod vault_subscription;
 mod key_event;
 mod table;
+mod actions;
 
 
 use std::fmt::Display;
