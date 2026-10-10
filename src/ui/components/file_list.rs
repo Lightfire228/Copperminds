@@ -77,7 +77,6 @@ impl FileList {
         fn get_file_name<'a>(file: &FileView) -> Element<'a, Message> {
             text!("{}", file.name)
                 .wrapping(text::Wrapping::None)
-                // .wrapping(text::Wrapping::Word)
                 .into()
         }
 

@@ -9,7 +9,7 @@ use iced::{Element, Task, keyboard::Key, widget::container};
 use iced::widget::{Space, column, row, text};
 
 use crate::collections::Files;
-use crate::ui::actions::Command;
+use crate::ui::actions::UiAction;
 use crate::ui::components::file_list::{self, FileList};
 use crate::ui::components::prompt::{self, MenuCommand, Prompt};
 use crate::ui::key_event::KeyPressed;
@@ -25,8 +25,8 @@ pub struct SortQueue {
     queue_type:   QueueType,
 
     file_list:    FileList,
-    prompt:       Prompt<Command>,
-    command_list: Vec<MenuCommand<Command>>
+    prompt:       Prompt<UiAction>,
+    command_list: Vec<MenuCommand<UiAction>>
 }
 
 
@@ -34,7 +34,7 @@ impl SortQueue {
 
     pub fn new(queue_type: QueueType, vault: Sender<VaultCommand>) -> (Self, Task<Message>) {
 
-        let command_list: Vec<_> = Command::all()
+        let command_list: Vec<_> = UiAction::all()
             .into_iter()
             .filter_map   (|c| Some(MenuCommand {
                 code:    c.get_code(queue_type)?,
@@ -135,7 +135,7 @@ impl SortQueue {
         })
     }
 
-    fn handle_prompt_action(&mut self, action: prompt::Action<Command>) -> Option<Action> {
+    fn handle_prompt_action(&mut self, action: prompt::Action<UiAction>) -> Option<Action> {
 
         Some(match action {
             prompt::Action::RunCommand(command) => Action::Run(self.handle_vault_action(command)),
@@ -170,7 +170,7 @@ impl SortQueue {
 
     }
 
-    fn handle_vault_action(&mut self, commands: Vec<Command>) -> Task<Message> {
+    fn handle_vault_action(&mut self, commands: Vec<UiAction>) -> Task<Message> {
 
         let Ok(commands) = self
             .validate_commands(commands)
@@ -191,7 +191,7 @@ impl SortQueue {
             return Task::none();
         };
 
-        let is_delete = commands.iter().find(|x| matches!(x, Command::DeleteFile)).is_some();
+        let is_delete = commands.iter().find(|x| matches!(x, UiAction::DeleteFile)).is_some();
 
         if is_delete {
             return Task::future(async move {
@@ -236,15 +236,15 @@ impl SortQueue {
 
     }
 
-    fn validate_commands(&self, commands: Vec<Command>) -> Result<Vec<Command>, String> {
+    fn validate_commands(&self, commands: Vec<UiAction>) -> Result<Vec<UiAction>, String> {
 
         let mut delete     = vec![];
         let mut not_delete = vec![];
 
         for cmd in commands.iter() {
             match cmd {
-                Command::DeleteFile => delete    .push(cmd),
-                _                   => not_delete.push(cmd),
+                UiAction::DeleteFile => delete    .push(cmd),
+                _                    => not_delete.push(cmd),
             }
         }
 
@@ -330,15 +330,15 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 }
 
 
-impl TryInto<ModifyFileKind> for Command {
+impl TryInto<ModifyFileKind> for UiAction {
     type Error = ();
 
     fn try_into(self) -> Result<ModifyFileKind, Self::Error> {
         Ok(match self {
-            Command::SetTypeInfo  => ModifyFileKind::SetTypeInfo,
-            Command::SetAction(a) => ModifyFileKind::SetAction(a),
-            Command::SetStatus(s) => ModifyFileKind::SetStatus(s),
-            Command::DeleteFile   => Err(())?,
+            UiAction::SetTypeInfo  => ModifyFileKind::SetTypeInfo,
+            UiAction::SetAction(a) => ModifyFileKind::SetAction(a),
+            UiAction::SetStatus(s) => ModifyFileKind::SetStatus(s),
+            _                      => Err(())?,
         })
     }
 }
