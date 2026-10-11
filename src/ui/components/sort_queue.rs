@@ -325,7 +325,15 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
         },
 
         QueueType::Actionables => UiFilter {
-            by_action: FilterByList::Include(vec![FmAction::Todo]),
+
+            // TODO: make this configurable from the UI
+            by_action: FilterByList::Include(vec![
+                // FmAction::Todo,
+                FmAction::Backlog,
+                // FmAction::MaybeSomeday,
+                // FmAction::WaitingFor,
+
+            ]),
             is_open:   true.into(),
 
             ..Default::default()

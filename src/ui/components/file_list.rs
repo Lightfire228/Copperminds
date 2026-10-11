@@ -37,6 +37,19 @@ pub enum Action {
     Selected(FileId)
 }
 
+
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+pub enum SortBy {
+    Id,
+    Name,
+}
+
+// const SORT_BY: SortBy = SortBy::Id;
+const SORT_BY: SortBy = SortBy::Name;
+
+
+
 type _Task = iced::Task<Message>;
 
 impl FileList {
@@ -112,7 +125,7 @@ impl FileList {
             Message::LoadFiles(files) => {
                 self.files = files.into();
 
-                self.files.sort_by_key(|x| x.id);
+                self.sort();
 
                 self.scroll = self.scroll.min(self.calc_max_scroll());
                 self.cursor = self.cursor.min(self.calc_max_cursor());
@@ -125,6 +138,13 @@ impl FileList {
 
                 None
             }
+        }
+    }
+
+    fn sort(&mut self) {
+        match SORT_BY {
+            SortBy::Id   => self.files.sort_by_key(|x|    x.id),
+            SortBy::Name => self.files.sort_by    (|a, b| a.name.cmp(&b.name)),
         }
     }
 
