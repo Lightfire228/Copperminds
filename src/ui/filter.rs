@@ -13,25 +13,12 @@ pub struct UiFilter {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum FilterByList<T> {
+    All,
     None,
     Include(Vec<T>),
-
-    #[allow(dead_code)]
     Exclude(Vec<T>),
-}
-
-impl<T> FilterByList<T>
-where
-    T: Sequence
-{
-    pub fn _all() -> Self {
-        Self::Include(enum_iterator::all().collect())
-    }
-
-    pub fn _none() -> Self {
-        Self::Exclude(enum_iterator::all().collect())
-    }
 }
 
 impl<T> FilterByList<T>
@@ -40,9 +27,10 @@ where
 {
     pub fn matches(&self, value: Option<&T>) -> bool {
         match self {
+            FilterByList::All            => true,
+            FilterByList::None           => value.is_none(),
             FilterByList::Include(items) => value.is_some_and(|v|  items.contains(v)),
             FilterByList::Exclude(items) => value.is_none_or (|v| !items.contains(v)),
-            FilterByList::None           => true,
         }
     }
 }
@@ -68,6 +56,19 @@ fn all(values: &[bool]) -> bool {
 
 impl<T> Default for FilterByList<T> {
     fn default() -> Self {
-        FilterByList::None
+        FilterByList::All
     }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "todo"]
+    fn test_filters() {
+        todo!()
+    }
+
 }
