@@ -24,8 +24,8 @@ pub enum VaultCommand {
 pub type Responder <T> = oneshot::Sender<T>;
 pub type Subscriber<T> = mpsc   ::Receiver<T>;
 
-// pub type Predicate = Box<dyn Fn(&EcsFileView) -> bool + Send>;
-pub type Predicate = fn(&EcsFileView) -> bool;
+pub type Predicate = Box<dyn Fn(&EcsFileView) -> bool + Send>;
+// pub type Predicate = fn(&EcsFileView) -> bool;
 
 
 pub struct IterFilesWith {
@@ -106,6 +106,9 @@ pub enum ModifyFileKind {
 
 impl Debug for IterFilesWith {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IterFilesWith").field("filter", &self.filter).finish()
+        let ptr: *const _ = &self.filter;
+        let ptr = ptr as usize;
+
+        f.debug_struct("IterFilesWith").field("filter", &format!("Boxed dyn fn {ptr:x}")).finish()
     }
 }

@@ -23,7 +23,7 @@ pub enum FmProperty {
     Project,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Sequence)]
 pub enum FmType {
     Info,
     Action,

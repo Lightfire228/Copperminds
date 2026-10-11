@@ -3,6 +3,8 @@ mod vault_subscription;
 mod key_event;
 mod table;
 mod actions;
+mod queue_type;
+mod filter;
 
 
 use std::fmt::Display;
@@ -136,7 +138,6 @@ impl App {
 
         match message {
             Message::Event(Keyboard(event)) => {
-                // trace!("keyboard event {event:?}");
                 let action = self.handle_key_event(event);
 
                 let Some(action) = action else {
@@ -228,8 +229,6 @@ impl App {
     }
 
     fn handle_key_event(&mut self, event: Event) -> Option<Action> {
-        // trace!("key event: {event:?}");
-
         let key = KeyPressed::try_from(event).ok()?;
 
         Some(match &mut self.ui_mode {
@@ -268,21 +267,6 @@ async fn send_vault_cmd<T>(vault: &Sender<VaultCommand>, cmd: impl Cmd<T>) -> T 
     rx.await.unwrap()
 }
 
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum QueueType {
-    Inbox,
-    Actionables,
-}
-
-impl Display for QueueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            QueueType::Inbox       => write!(f, "Inbox"),
-            QueueType::Actionables => write!(f, "Actionables"),
-        }
-    }
-}
 
 
 struct VaultSubscriber {

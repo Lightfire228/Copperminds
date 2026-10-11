@@ -13,7 +13,9 @@ use crate::ui::actions::UiAction;
 use crate::ui::components::file_list::{self, FileList};
 use crate::ui::components::prompt::{self, MenuCommand, Prompt};
 use crate::ui::key_event::KeyPressed;
-use crate::ui::{self, QueueType, UIMode, send_vault_cmd};
+use crate::ui::filter::{UiFilter, FilterByList};
+use crate::ui::{self, UIMode, send_vault_cmd};
+use crate::ui::queue_type::QueueType;
 use crate::vault::command::{DeleteFile, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
 use crate::vault::ecs::EcsFileView;
 use crate::vault::fm::*;
@@ -28,6 +30,8 @@ pub struct SortQueue {
     prompt:       Prompt<UiAction>,
     command_list: Vec<MenuCommand<UiAction>>
 }
+
+
 
 
 impl SortQueue {
@@ -312,17 +316,26 @@ impl From<Message> for ui::Message {
 
 async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 
+    let filter = match queue {
 
-    let cmd = match queue {
-        QueueType::Inbox       => |f: &EcsFileView| f.needs_sorting(),
-        QueueType::Actionables => |f: &EcsFileView| f.needs_action_assigned(),
+        QueueType::Inbox       => UiFilter {
+            needs_sorted: true.into(),
+
+            ..Default::default()
+        },
+
+        QueueType::Actionables => UiFilter {
+            by_action: FilterByList::Include(vec![FmAction::Todo]),
+            is_open:   true.into(),
+
+            ..Default::default()
+        },
     };
-
 
     send_vault_cmd(
         &vault,
         IterFilesWith {
-            filter: cmd,
+            filter: Box::new(move |f: &EcsFileView| filter.matches(f)),
         }
     )
     .await

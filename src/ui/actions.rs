@@ -2,7 +2,8 @@ use std::fmt::Display;
 
 use enum_iterator::Sequence;
 
-use crate::{ui::{QueueType, components::sort_queue::SortQueue}, vault::fm::{FmAction, FmStatus}};
+use crate::{ui::{components::sort_queue::SortQueue}, vault::fm::{FmAction, FmStatus}};
+use crate::ui::queue_type::QueueType;
 
 
 type Ua = UiAction;
