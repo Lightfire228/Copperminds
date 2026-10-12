@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use yaml_serde::{Mapping, Value};
 
 use crate::vault::{
-    ecs::{Ecs, File, FileId, components::*}, fm::{parsing::{Parsed, parse_md_file}, *}
+    ecs::{Ecs, File, FileId, components::*}, fm::{parsing::{FrontmatterYaml, Parsed, parse_md_file}, *}
 };
 
 use super::super::build_regex;
@@ -56,7 +56,7 @@ impl Ecs {
                 type_:    FmProp { value: parsed.type_,   modified },
                 action:   FmProp { value: parsed.action,  modified },
                 status:   FmProp { value: parsed.status,  modified },
-                // project:  FmProp { value: parsed.project, modified },
+                project:  FmProp { value: parsed.project, modified },
 
                 modified: false,
             });

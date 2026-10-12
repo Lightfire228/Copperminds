@@ -1,7 +1,19 @@
 
 use yaml_serde::{Mapping, Value};
 
-use crate::{prelude::*, vault::fm::{FmProperty, FrontmatterYaml, GetKey}};
+use crate::{prelude::*, vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+
+
+pub struct FrontmatterYaml {
+    pub type_:   Option<FmType>,
+    pub action:  Option<FmAction>,
+    pub status:  Option<FmStatus>,
+    pub project: Option<String>,
+
+    // TODO: move this under `action`
+    pub clarified: Option<bool>,
+}
+
 
 pub struct Parsed {
     pub fm: Option<Mapping>,
@@ -53,34 +65,54 @@ pub fn parse_md_file(text: &str) -> Parsed {
     }
 }
 
-
-macro_rules! parse_prop {
-    // TODO: maybe refactor this as a .map() combinator
-    ($fm:expr, $kind:expr) => { (|| {
-        let Ok(x) = fm_get_property($fm, $kind) else {
-            None?
-        };
-
-        #[allow(irrefutable_let_patterns)]
-        let Ok  (x) = x.as_str().try_into() else {
-            warn!("unknown {} prop: {x}", $kind.get_key());
-            None?
-        };
-
-        Some(x)
-    })()};
-}
-
 impl From<&Mapping> for FrontmatterYaml {
-    fn from(value: &Mapping) -> Self {
+    fn from(fm: &Mapping) -> Self {
         Self {
-            type_:   parse_prop!  (value, FmProperty::Type),
-            action:  parse_prop!  (value, FmProperty::Action),
-            status:  parse_prop!  (value, FmProperty::Status),
-            // project: parse_project(value)
+            type_:     parse_prop(fm, FmProperty::Type),
+            action:    parse_prop(fm, FmProperty::Action),
+            status:    parse_prop(fm, FmProperty::Status),
+            clarified: parse_bool(fm, FmProperty::Clarified),
+            project:   parse_prop(fm, FmProperty::Project),
         }
     }
 }
+
+
+fn parse_prop<T>(fm: &Mapping, kind: FmProperty) -> Option<T>
+where
+    T: GetKey + for<'a> TryFrom<&'a str>
+{
+
+    let x = fm_get_property_str(fm, kind).ok()?;
+
+    let Ok(x) = T::try_from(x.as_str()) else {
+        warn!("unknown {} prop: {x}", kind.get_key());
+        None?
+    };
+
+    Some(x)
+}
+
+fn parse_bool(fm: &Mapping, prop: FmProperty) -> Option<bool> {
+
+    let prop_name = prop.get_key();
+
+    let x = fm.get(&prop_name)?;
+
+    let x = match x {
+        Value::Null    => None?,
+        Value::Bool(x) => x,
+
+        _ => {
+            warn!("unknown {prop_name} prop: {x:?}");
+            None?
+        }
+    };
+
+    Some(*x)
+}
+
+
 
 // fn parse_project(fm: &Mapping) -> Option<FmProject> {
 //
@@ -102,7 +134,7 @@ impl From<&Mapping> for FrontmatterYaml {
 // }
 
 
-fn fm_get_property(fm: &Mapping, prop: FmProperty) -> Result<String, PropertyError> {
+fn fm_get_property_str(fm: &Mapping, prop: FmProperty) -> Result<String, PropertyError> {
     yaml_get_val_by_name(fm, &prop.get_key())
 }
 

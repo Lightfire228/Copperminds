@@ -9,6 +9,7 @@ mod collections;
 mod obsidian;
 mod ui;
 mod vault;
+mod command_parser;
 
 #[cfg(test)]
 mod test_utils;
@@ -23,7 +24,7 @@ use crate::config::Env;
 
 #[tokio::main]
 async fn main() {
-    let env = Env::Prod;
+    let env = Env::Dev;
 
     // let log_level = log::LevelFilter::Info;
     let log_level = log::LevelFilter::Trace;

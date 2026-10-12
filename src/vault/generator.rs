@@ -55,6 +55,7 @@ struct Settings {
 const TARGET_GEN_FOLDER: &str = "01 Generated Vault";
 
 
+// TODO: this is no longer sufficient
 pub fn generate_sample_vault() {
     info!("Running generator");
 

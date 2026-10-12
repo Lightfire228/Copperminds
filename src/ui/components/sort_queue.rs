@@ -9,6 +9,7 @@ use iced::{Element, Task, keyboard::Key, widget::container};
 use iced::widget::{Space, column, row, text};
 
 use crate::collections::Files;
+use crate::command_parser::{CommandExpr, CommandGroup};
 use crate::ui::actions::UiAction;
 use crate::ui::components::file_list::{self, FileList};
 use crate::ui::components::prompt::{self, MenuCommand, Prompt};
@@ -27,8 +28,8 @@ pub struct SortQueue {
     queue_type:   QueueType,
 
     file_list:    FileList,
-    prompt:       Prompt<UiAction>,
-    command_list: Vec<MenuCommand<UiAction>>
+    prompt:       Prompt,
+    // command_list: Vec<MenuCommand<UiAction>>
 }
 
 
@@ -52,9 +53,9 @@ impl SortQueue {
             Self {
                 vault:     vault.clone(),
                 file_list: FileList::new(),
-                prompt:    Prompt  ::new(command_list.iter().copied()),
+                prompt:    Prompt  ::new(),
                 queue_type,
-                command_list,
+                // command_list,
             },
             Task::batch([
                 Task::perform(load_files(vault, queue_type), Message::LoadFiles),
@@ -65,9 +66,23 @@ impl SortQueue {
 
     pub fn view(&self) -> Element<'_, Message> {
 
-        let options = self.command_list
-            .iter()
-            .map (|o| text!("{} - {}", o.code, o.name).into())
+        // TODO: aliases for actions and status
+
+        let options = [
+            text!(":i               - set info"),
+            text!(""),
+            text!(":a todo          - set action"),
+            text!(":a backlog       -"),
+            text!(":a maybe_someday -"),
+            text!(":a waiting_for   -"),
+            text!(""),
+            text!(":s complete      - set status"),
+            text!(":s archive       -"),
+            text!(""),
+            text!(":d               - delete file"),
+        ]
+            .into_iter()
+            .map(|x| x.into())
         ;
 
         container(
@@ -89,7 +104,7 @@ impl SortQueue {
 
                     ]
                 )
-                    .width  (300)
+                    .width  (350)
                     .padding(10)
                 ,
                 self.file_list.view().map(Message::FileListMessage),
@@ -139,7 +154,7 @@ impl SortQueue {
         })
     }
 
-    fn handle_prompt_action(&mut self, action: prompt::Action<UiAction>) -> Option<Action> {
+    fn handle_prompt_action(&mut self, action: prompt::Action) -> Option<Action> {
 
         Some(match action {
             prompt::Action::RunCommand(command) => Action::Run(self.handle_vault_action(command)),
@@ -174,7 +189,7 @@ impl SortQueue {
 
     }
 
-    fn handle_vault_action(&mut self, commands: Vec<UiAction>) -> Task<Message> {
+    fn handle_vault_action(&mut self, commands: Vec<CommandExpr>) -> Task<Message> {
 
         let Ok(commands) = self
             .validate_commands(commands)
@@ -211,7 +226,7 @@ impl SortQueue {
 
         let changes: Vec<_> = commands
             .into_iter()
-            .map      (|x| x.try_into().expect("unreachable"))
+            .map      (|x| x.try_into().expect("not a valid modify action"))
             .collect  ()
         ;
 
@@ -240,7 +255,13 @@ impl SortQueue {
 
     }
 
-    fn validate_commands(&self, commands: Vec<UiAction>) -> Result<Vec<UiAction>, String> {
+    fn validate_commands(&self, commands: Vec<CommandExpr>) -> Result<Vec<UiAction>, String> {
+
+        let commands: Vec<UiAction> = commands
+            .into_iter()
+            .map      (|x| x.into())
+            .collect  ()
+        ;
 
         let mut delete     = vec![];
         let mut not_delete = vec![];

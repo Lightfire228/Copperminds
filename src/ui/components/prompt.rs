@@ -5,6 +5,7 @@ use iced::keyboard;
 use iced::{Element, keyboard::Key, widget::container};
 use iced::widget::{text};
 
+use crate::command_parser::{CommandExpr, CommandGroup, TokenKind, parse, tokenize};
 use crate::prelude::*;
 use crate::ui::key_event::KeyPressed;
 
@@ -16,29 +17,25 @@ pub enum Message {
 
 
 #[derive(Debug)]
-pub enum Action<T> {
-    RunCommand(Vec<T>),
+pub enum Action {
+    RunCommand(Vec<CommandExpr>),
     OpenSelected,
 }
 
 
 #[derive(Debug, Clone)]
-pub struct Prompt<T: Copy> {
+pub struct Prompt {
     text:     String,
-    commands: HashMap<&'static str, T>,
 }
 
 type _Task = iced::Task<Message>;
 
 
-impl<T: Copy> Prompt<T> {
+impl Prompt {
 
-    pub fn new<'a>(commands: impl Iterator<Item = MenuCommand<T>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            text:     String::new(),
-            commands: commands
-                .map    (|x| (x.code, x.command))
-                .collect(),
+            text: String::new(),
         }
     }
 
@@ -49,7 +46,7 @@ impl<T: Copy> Prompt<T> {
     }
 
     #[must_use]
-    pub fn update(&mut self, message: Message) -> Option<Action<T>> {
+    pub fn update(&mut self, message: Message) -> Option<Action> {
 
         match message {
             Message::Clear => {
@@ -66,12 +63,12 @@ impl<T: Copy> Prompt<T> {
     }
 
     #[must_use]
-    pub fn handle_key_event(&mut self, key: &KeyPressed) -> Option<Action<T>> {
+    pub fn handle_key_event(&mut self, key: &KeyPressed) -> Option<Action> {
         trace!("prompt key: {key:?}");
 
         use keyboard::key::Named;
 
-        Some(match &key.key {
+        Some(match &key.modified_key {
             Key::Named(Named::Space) => {
 
                 if self.text.is_empty() {
@@ -122,18 +119,13 @@ impl<T: Copy> Prompt<T> {
         })
     }
 
-    fn parse_commands(&self) -> Result<Vec<T>, String> {
+    fn parse_commands(&self) -> Result<Vec<CommandExpr>, String> {
 
-        self
-            .text
-            .split    ("")
-            .filter   (|x| *x != "")
-            .map      (|ch| self.commands
-                .get       (ch)
-                .copied    ()
-                .ok_or_else(|| format!("No command found for '{ch}'"))
-            )
-            .collect()
+        let tokens   = tokenize(&self.text).map_err(|err| format!("Error tokenizing: {err:?}"))?;
+        let commands = parse   (tokens)    .map_err(|err| format!("Error parsing: {err:?}"   ))?;
+
+        Ok(commands)
+
     }
 
 }

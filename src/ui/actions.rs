@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use enum_iterator::Sequence;
 
-use crate::{ui::{components::sort_queue::SortQueue}, vault::fm::{FmAction, FmStatus}};
+use crate::{command_parser::{CommandExpr, CommandGroup}, ui::components::sort_queue::SortQueue, vault::fm::{FmAction, FmStatus}};
 use crate::ui::queue_type::QueueType;
 
 
@@ -86,6 +86,18 @@ impl Display for UiAction {
             UiAction::SetStatus(s) => write!(f, "Set Status {s}"),
             UiAction::DeleteFile   => write!(f, "Delete File"),
             UiAction::FilterBy (x) => write!(f, "Filter By {x}"),
+        }
+    }
+}
+
+
+impl From<CommandExpr> for UiAction {
+    fn from(expr: CommandExpr) -> Self {
+        match expr {
+            CommandExpr::Delete       => UiAction::DeleteFile,
+            CommandExpr::SetAction(x) => UiAction::SetAction(x),
+            CommandExpr::SetStatus(x) => UiAction::SetStatus(x),
+            CommandExpr::SetInfo      => UiAction::SetTypeInfo,
         }
     }
 }

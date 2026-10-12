@@ -5,21 +5,12 @@ use std::{collections::HashMap, fmt::Display, sync::LazyLock};
 use enum_iterator::{Sequence, all};
 use yaml_serde::{Mapping, Value};
 
-pub struct FrontmatterYaml {
-    pub type_:   Option<FmType>,
-    pub action:  Option<FmAction>,
-    pub status:  Option<FmStatus>,
-    // pub project: Option<FmProject>,
-}
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FmProperty {
     Status,
     Type,
     Action,
-
-    #[allow(dead_code)]
+    Clarified,
     Project,
 }
 
@@ -42,6 +33,8 @@ pub enum FmStatus {
     Completed,
     Archived,
 }
+
+
 
 // #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 // pub struct FmProject {
@@ -97,10 +90,11 @@ macro_rules! impl_get_key {
 }
 
 impl_get_key!(FmProperty,
-    Status   => "status",
-    Type     => "type",
-    Action   => "action",
-    Project  => "project",
+    Status    => "status",
+    Type      => "type",
+    Action    => "action",
+    Project   => "project",
+    Clarified => "clarified",
 );
 
 impl_get_key!(FmType,

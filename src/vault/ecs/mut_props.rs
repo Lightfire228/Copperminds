@@ -250,4 +250,53 @@ mod tests {
         let modified_fm = get_fm(&ecs, id);
         assert_eq!(&og_fm, modified_fm);
     }
+
+    #[test]
+    fn test_name_collision() {
+        use crate::vault::ecs::mut_props::*;
+
+        let mut ecs = Ecs::default();
+
+        let og_fm = fm!(
+            "foo"         => true,
+            "bar"         => "2000-01-01",
+            "none"        => Value::Null,
+            "lorem ipsum" => "dolor salut",
+
+            // Make sure this stays intact
+            "action" => fm!(
+                "nested" => true,
+                "ooga"   => 10,
+                "booga"  => 10.0,
+            ),
+        );
+
+        let id = ecs.load_fm_test(og_fm.clone());
+
+        // make a bunch of changes
+        ecs.set_info               (id);
+        ecs.replicate_changes_to_fm(id);
+
+        ecs.set_status             (id, FmStatus::Completed);
+        ecs.replicate_changes_to_fm(id);
+
+        let modified_fm = get_fm(&ecs, id);
+
+        for key in og_fm.keys() {
+            let expected = og_fm      .get(key).unwrap();
+            let modified = modified_fm.get(key).unwrap();
+
+            assert_eq!(expected, modified);
+        }
+
+        // remove those changes
+        ecs.remove_type            (id);
+        ecs.replicate_changes_to_fm(id);
+
+        ecs.remove_status          (id);
+        ecs.replicate_changes_to_fm(id);
+
+        let modified_fm = get_fm(&ecs, id);
+        assert_eq!(&og_fm, modified_fm);
+    }
 }

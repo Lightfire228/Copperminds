@@ -9,9 +9,9 @@ use crate::prelude::*;
 pub fn get_file_name(path: &Path) -> String {
     path
         .file_name()
-        .unwrap   ()
+        .expect   ("no file name")
         .to_str   ()
-        .unwrap   ()
+        .expect   ("couldn't convert file name to string")
         .to_owned ()
 }
 
