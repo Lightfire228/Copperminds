@@ -1,5 +1,7 @@
 use core::fmt;
-use std::vec::IntoIter;
+use std::{iter::Peekable, vec::IntoIter};
+
+use enum_iterator::{Sequence, all};
 
 use crate::vault::fm::{FmAction, FmStatus};
 
@@ -18,17 +20,26 @@ pub fn tokenize(str: &str) -> TResult<Vec<Token>> {
 
 }
 
-pub fn parse(tokens: Vec<Token>) -> Result<Vec<CommandExpr>, ParseError> {
-    let mut tokens = tokens.into_iter();
-
+pub fn parse(tokens: Vec<Token>) -> Result<Vec<CommandGroup>, ParseError> {
+    let mut parser = Parser {
+        tokens: tokens.into_iter().peekable(),
+    };
     let mut commands = vec![];
 
-    while let Some(operator) = tokens.next() {
-        commands.push(parse_operator(operator, &mut tokens)?);
+    while let Some(operator) = parser.tokens.next() {
+        commands.push(parser.parse_operator(operator)?);
     }
 
     Ok(commands)
 }
+
+pub fn parse_groups(groups: Vec<CommandGroup>) -> Result<Vec<CommandExpr>, ParseError> {
+    groups
+        .into_iter()
+        .map      (|g| g.parse_group())
+        .collect()
+}
+
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Token {
@@ -36,7 +47,7 @@ pub struct Token {
     pub lexeme: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Sequence)]
 pub enum TokenKind {
     Colon,
     At,
@@ -44,6 +55,17 @@ pub enum TokenKind {
     // Star, Slash,
 
     Text,
+}
+
+impl TokenKind {
+    pub const fn is_operator(&self) -> bool {
+        matches!(self,
+              TokenKind::Colon
+            | TokenKind::At
+            | TokenKind::Plus
+            | TokenKind::Minus
+        )
+    }
 }
 
 
@@ -107,10 +129,6 @@ impl Tokenizer {
         };
 
         Ok(true)
-    }
-
-    fn tokenize_error(&self, args: fmt::Arguments) -> ! {
-        panic!("{}", args)
     }
 
     fn skip_whitespace(&mut self, chars: &[char])  {
@@ -231,7 +249,8 @@ pub enum CommandExpr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandGroup {
     pub operator: Token,
-    pub value:    String,
+    pub target:   Token,
+    pub value:    Option<Token>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -249,66 +268,91 @@ pub enum ParseErrorKind {
     MissingValue,
 }
 
-fn parse_operator(op: Token, tokens: &mut IntoIter<Token>) -> Result<CommandExpr, ParseError> {
+struct Parser {
+    tokens:    Peekable<IntoIter<Token>>,
+}
 
-    match op.kind {
-        TokenKind::Colon => parse_set_prop(op, tokens),
+macro_rules! parse_err {
+    ($token:expr, $kind:ident) => {
+        Err(ParseError {
+            kind:  ParseErrorKind::$kind,
+            token: $token,
+        })
+    };
+}
+impl Parser {
 
-        _ => Err(ParseError {
-            kind:  ParseErrorKind::UnknownOperator,
-            token: op,
-        })?,
+    fn parse_operator(&mut self, op: Token) -> Result<CommandGroup, ParseError> {
+
+        let is_operator = matches!(op.kind,
+              TokenKind::Colon
+            | TokenKind::At
+            | TokenKind::Minus
+            | TokenKind::Plus
+        );
+
+        if !is_operator {
+            return parse_err!(op, UnknownOperator);
+        }
+
+        let Some(target) = self.tokens.next() else {
+            return parse_err!(op, MissingTarget);
+        };
+
+        let value = self.tokens.next_if(|x| x.kind == TokenKind::Text);
+
+        Ok(CommandGroup {
+            operator: op,
+            target,
+            value,
+        })
+    }
+
+}
+
+impl CommandGroup {
+    fn parse_group(self) -> Result<CommandExpr, ParseError> {
+
+        type Tk = TokenKind;
+        Ok(match (self.operator.kind, self.target.lexeme.as_str()) {
+            (Tk::Colon, "d") => CommandExpr::Delete,
+            (Tk::Colon, "i") => CommandExpr::SetInfo,
+            (Tk::Colon, "a") => self.parse_set_action()?,
+            (Tk::Colon, "s") => self.parse_set_status()?,
+            _ => parse_err!(self.operator, UnknownOperator)?
+        })
     }
 }
 
-fn parse_set_prop(op: Token, tokens: &mut IntoIter<Token>) -> Result<CommandExpr, ParseError> {
+macro_rules! impl_parse {
+    ($func:ident, $target:ident, $expr:ident) => {
+
+        fn $func(self) -> Result<CommandExpr, ParseError> {
+
+            let Some(value) = self.value else {
+                return parse_err!(self.target, MissingValue);
+            };
 
 
-    type Ek = ParseErrorKind;
-    let err = |kind| ParseError {
-        kind,
-        token: (&op).to_owned()
+            let value: $target = value
+                .lexeme
+                .as_str  ()
+                .try_into()
+                .or_else (|_| $target::from_alias(&value.lexeme).ok_or(()))
+                .map_err (|_| ParseError {
+                    kind:  ParseErrorKind::UnknownValue,
+                    token: value,
+                })?
+            ;
+
+            Ok(CommandExpr::$expr(value))
+        }
     };
-
-    let target = tokens.next().ok_or_else(|| err(Ek::MissingTarget))?;
-
-    Ok(match target.lexeme.as_str() {
-        "d" => CommandExpr::Delete,
-        "i" => CommandExpr::SetInfo,
-        "a" => parse_set_action(target, tokens)?,
-        "s" => parse_set_status(target, tokens)?,
-        _   => Err(err(Ek::UnknownTarget))?
-    })
 }
+impl CommandGroup {
 
-fn parse_set_action(target: Token, tokens: &mut IntoIter<Token>) -> Result<CommandExpr, ParseError> {
-
-    type Ek = ParseErrorKind;
-    let err = |kind| ParseError {
-        kind,
-        token: (&target).to_owned()
-    };
-
-    let value = tokens.next().ok_or_else(|| err(Ek::MissingValue ))?;
-
-    let value: FmAction = value.lexeme.as_str().try_into().map_err(|_| err(Ek::UnknownValue))?;
-
-    Ok(CommandExpr::SetAction(value))
-}
-
-fn parse_set_status(target: Token, tokens: &mut IntoIter<Token>) -> Result<CommandExpr, ParseError> {
-
-    type Ek = ParseErrorKind;
-    let err = |kind| ParseError {
-        kind,
-        token: (&target).to_owned()
-    };
-
-    let value = tokens.next().ok_or_else(|| err(Ek::MissingValue ))?;
-
-    let value: FmStatus = value.lexeme.as_str().try_into().map_err(|_| err(Ek::UnknownValue))?;
-
-    Ok(CommandExpr::SetStatus(value))
+    impl_parse!(parse_set_action, FmAction, SetAction);
+    impl_parse!(parse_set_status, FmStatus, SetStatus);
 }
 
 
@@ -316,50 +360,106 @@ fn parse_set_status(target: Token, tokens: &mut IntoIter<Token>) -> Result<Comma
 mod tests {
     use super::*;
 
+    macro_rules! token {
+        ($kind:ident, $lexeme:expr) => {
+            Token {
+                kind:   TokenKind::$kind,
+                lexeme: $lexeme.to_string(),
+            }
+        };
+
+        ($kind:ident) => {
+            Token {
+                kind:   TokenKind::$kind,
+                lexeme: TokenKind::$kind.get_op().to_string(),
+            }
+        };
+    }
+
+    impl TokenKind {
+        fn get_op(&self) -> &str {
+            match self {
+                TokenKind::Colon => ":",
+                TokenKind::At    => "@",
+                TokenKind::Plus  => "+",
+                TokenKind::Minus => "-",
+
+                _ => unimplemented!("not an operator")
+            }
+        }
+    }
+
+
+
     #[test]
     fn test_tokenizer() {
         let str = ":a todo @s archive +b \"asdf\" -d 'qwerty\\' uiop'";
 
         let tokens = tokenize(str).unwrap();
 
-        macro_rules! token {
-            ($kind:expr, $lexeme:expr) => {
-                Token {
-                    kind:   $kind,
-                    lexeme: $lexeme.to_string(),
-                }
-            };
-        }
-
-        type Tk = TokenKind;
         assert_eq!(tokens, vec![
-            token!(Tk::Colon, ":"),
-            token!(Tk::Text,  "a"),
-            token!(Tk::Text,  "todo"),
+            token!(Colon),
+            token!(Text,  "a"),
+            token!(Text,  "todo"),
 
-            token!(Tk::At,    "@"),
-            token!(Tk::Text,  "s"),
-            token!(Tk::Text,  "archive"),
+            token!(At),
+            token!(Text,  "s"),
+            token!(Text,  "archive"),
 
-            token!(Tk::Plus,  "+"),
-            token!(Tk::Text,  "b"),
-            token!(Tk::Text,  "asdf"),
+            token!(Plus),
+            token!(Text,  "b"),
+            token!(Text,  "asdf"),
 
-            token!(Tk::Minus, "-"),
-            token!(Tk::Text,  "d"),
-            token!(Tk::Text,  "qwerty\' uiop"),
+            token!(Minus),
+            token!(Text,  "d"),
+            token!(Text,  "qwerty\' uiop"),
         ])
 
     }
 
     #[test]
     fn test_parser() {
-        let str = ":a todo :s archived :d :i";
+        let str = ":a todo @s archive +b \"asdf\" -u -d 'qwerty\\' uiop'";
 
         let tokens   = tokenize(str)   .unwrap();
-        let commands = parse   (tokens).unwrap();
+        let groups = parse   (tokens).unwrap();
 
-        type Tk = TokenKind;
+        macro_rules! command {
+            ($op:ident, $target:expr) => {
+                CommandGroup {
+                    operator: token!($op),
+                    target:   token!(Text, $target),
+                    value:    None,
+                }
+            };
+            ($op:ident, $target:expr, $value:expr) => {
+                CommandGroup {
+                    operator: token!($op),
+                    target:        token!(Text, $target),
+                    value:    Some(token!(Text, $value)),
+                }
+            };
+        }
+
+
+        assert_eq!(groups, vec![
+            command!(Colon, "a", "todo"),
+            command!(At,    "s", "archive"),
+            command!(Plus,  "b", "asdf"),
+            command!(Minus, "u"),
+            command!(Minus, "d", "qwerty\' uiop"),
+        ])
+
+    }
+
+    #[test]
+    fn test_command_parser() {
+        let str = ":a todo :s archived :d :i";
+
+        let tokens   = tokenize    (str)   .unwrap();
+        let groups   = parse       (tokens).unwrap();
+        let commands = parse_groups(groups).unwrap();
+
         assert_eq!(commands, vec![
             CommandExpr::SetAction(FmAction::Todo),
             CommandExpr::SetStatus(FmStatus::Archived),
@@ -368,5 +468,4 @@ mod tests {
         ])
 
     }
-
 }

@@ -219,3 +219,30 @@ impl_from!(FmProperty);
 impl_from!(FmType);
 impl_from!(FmAction);
 impl_from!(FmStatus);
+
+
+impl FmAction {
+    // TODO: move this to a parse rule table or something
+    pub fn from_alias(value: &str) -> Option<Self> {
+        Some(match value {
+            "t" => FmAction::Todo,
+            "b" => FmAction::Backlog,
+            "e" => FmAction::Entertainment,
+            "m" => FmAction::MaybeSomeday,
+            "w" => FmAction::WaitingFor,
+            _ => None?
+        })
+    }
+}
+
+
+impl FmStatus {
+    // TODO: move this to a parse rule table or something
+    pub fn from_alias(value: &str) -> Option<Self> {
+        Some(match value {
+            "c" => FmStatus::Completed,
+            "a" => FmStatus::Archived,
+            _ => None?
+        })
+    }
+}

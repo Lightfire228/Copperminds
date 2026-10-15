@@ -5,7 +5,7 @@ use iced::keyboard;
 use iced::{Element, keyboard::Key, widget::container};
 use iced::widget::{text};
 
-use crate::command_parser::{CommandExpr, CommandGroup, TokenKind, parse, tokenize};
+use crate::command_parser::{CommandExpr, CommandGroup, TokenKind, parse, parse_groups, tokenize};
 use crate::prelude::*;
 use crate::ui::key_event::KeyPressed;
 
@@ -121,19 +121,12 @@ impl Prompt {
 
     fn parse_commands(&self) -> Result<Vec<CommandExpr>, String> {
 
-        let tokens   = tokenize(&self.text).map_err(|err| format!("Error tokenizing: {err:?}"))?;
-        let commands = parse   (tokens)    .map_err(|err| format!("Error parsing: {err:?}"   ))?;
+        let tokens   = tokenize    (&self.text).map_err(|err| format!("Error tokenizing: {err:?}"))?;
+        let groups   = parse       (tokens)    .map_err(|err| format!("Error parsing: {err:?}"   ))?;
+        let commands = parse_groups(groups)    .map_err(|err| format!("Error parsing: {err:?}"   ))?;
 
         Ok(commands)
 
     }
 
-}
-
-
-#[derive(Debug, Clone, Copy)]
-pub struct MenuCommand<T: Copy> {
-    pub code:    &'static str,
-    pub name:    &'static str,
-    pub command: T,
 }
