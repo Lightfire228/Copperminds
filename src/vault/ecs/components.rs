@@ -15,7 +15,7 @@ pub struct FmComponent {
     pub type_:    FmProp<FmType>,
     pub action:   FmProp<FmAction>,
     pub status:   FmProp<FmStatus>,
-    pub project:  FmProp<String>,
+    pub project:  FmProp<FmProject>,
     // TODO: clarified prop
     pub modified: bool,
 }

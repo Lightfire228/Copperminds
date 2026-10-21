@@ -57,7 +57,7 @@ fn replace_tilde(path_str: &str, captures: Vec<Captures<'_, str>>) -> String {
     let mut replaced = String::new();
 
     let home = home_dir();
-    let home = home.to_str().unwrap();
+    let home = home.to_str().expect("unable to read home dir as str");
 
     let mut replace = |start, end| {
         replaced.push_str(&path_str[start..end]);
@@ -69,7 +69,7 @@ fn replace_tilde(path_str: &str, captures: Vec<Captures<'_, str>>) -> String {
         .into_iter()
         .map(|x| x
             .get   (0)
-            .expect("error running regex")
+            .expect("error getting regex capture")
         )
     ;
 

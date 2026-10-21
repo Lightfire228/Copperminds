@@ -1,6 +1,6 @@
-use yaml_serde::{Mapping, Value};
+use yaml_serde::{Mapping, Value, to_value};
 
-use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProject, FmProperty, FmStatus, FmType, GetKey}};
 
 impl Ecs {
 
@@ -52,6 +52,39 @@ impl Ecs {
         };
     }
 
+    pub fn set_project_name(&mut self, id: FileId, name: String) {
+        let fm = self.get_fm_mut(id);
+
+        let project = fm.project.value.take().unwrap_or_else(|| FmProject {
+            name,
+            is_workspace: false
+        });
+
+        fm.project = FmProp {
+            value:    Some(project),
+            modified: true,
+        };
+    }
+
+    pub fn set_project(&mut self, id: FileId, project: FmProject) {
+        let fm = self.get_fm_mut(id);
+
+        fm.project = FmProp {
+            value:    Some(project),
+            modified: true,
+        };
+    }
+
+    #[allow(dead_code)]
+    pub fn remove_project(&mut self, id: FileId) {
+        let fm = self.get_fm_mut(id);
+
+        fm.project = FmProp {
+            value:    None,
+            modified: true,
+        };
+    }
+
     fn set_type(&mut self, id: FileId, type_: FmType) -> &mut FmComponent {
         let fm = self.get_fm_mut(id);
 
@@ -88,9 +121,10 @@ impl Ecs {
 
 impl FmComponent {
     fn update(&mut self) {
-        update_prop_str(&mut self.fm, FmProperty::Type,   &mut self.type_);
-        update_prop_str(&mut self.fm, FmProperty::Action, &mut self.action);
-        update_prop_str(&mut self.fm, FmProperty::Status, &mut self.status);
+        update_prop_str (&mut self.fm, FmProperty::Type,    &mut self.type_);
+        update_prop_str (&mut self.fm, FmProperty::Action,  &mut self.action);
+        update_prop_str (&mut self.fm, FmProperty::Status,  &mut self.status);
+        update_prop_proj(&mut self.fm, FmProperty::Project, &mut self.project);
     }
 
 }
@@ -110,6 +144,33 @@ fn update_prop_str<'a, T: GetKey>(fm: &mut Mapping, prop: FmProperty, value: &mu
     };
 
     let value = Value::String(value.get_key());
+
+    let slot = fm.entry(key).or_insert_with(|| Value::Null);
+
+    *slot = value;
+}
+
+fn update_prop_proj<'a>(fm: &mut Mapping, prop: FmProperty, value: &mut FmProp<FmProject>) {
+    if !value.modified {
+        return;
+    }
+
+    value.modified = false;
+
+    let key = Value::String(prop.get_key());
+
+    let Some(value) = &value.value else {
+        fm.remove(key);
+        return;
+    };
+
+
+    let value = if value.is_workspace {
+        to_value(value).expect("Unable to serialize FmProject")
+    }
+    else {
+        Value::String(value.name.clone())
+    };
 
     let slot = fm.entry(key).or_insert_with(|| Value::Null);
 
@@ -142,6 +203,7 @@ mod tests {
 
         let id = fm!(ecs, );
 
+        // Add props
         ecs.set_info               (id);
         ecs.replicate_changes_to_fm(id);
 
@@ -160,6 +222,44 @@ mod tests {
 
 
         ecs.set_action             (id, FmAction::Backlog);
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Type   => FmType  ::Action,
+            FmProperty::Status => FmStatus::Archived,
+            FmProperty::Action => FmAction::Backlog,
+        ));
+
+
+        ecs.set_project_name(id, "proj".to_string());
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Type    => FmType  ::Action,
+            FmProperty::Status  => FmStatus::Archived,
+            FmProperty::Action  => FmAction::Backlog,
+            FmProperty::Project => "proj",
+        ));
+
+        ecs.set_project(id, FmProject {
+            name:         "proj".to_string(),
+            is_workspace: true,
+        });
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Type    => FmType  ::Action,
+            FmProperty::Status  => FmStatus::Archived,
+            FmProperty::Action  => FmAction::Backlog,
+            FmProperty::Project => fm!(
+                "name"         => "proj",
+                "is_workspace" => true,
+            ),
+        ));
+
+
+        // Remove props
+        ecs.remove_project         (id);
         ecs.replicate_changes_to_fm(id);
 
         assert_eq!(get_fm(&ecs, id), &fm!(

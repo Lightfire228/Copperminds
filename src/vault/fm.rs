@@ -36,11 +36,11 @@ pub enum FmStatus {
 
 
 
-// #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-// pub struct FmProject {
-//     pub name:         String,
-//     pub is_workspace: bool,
-// }
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct FmProject {
+    pub name: String,
+    pub is_workspace: bool,
+}
 
 
 

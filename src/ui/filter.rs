@@ -10,6 +10,7 @@ pub struct UiFilter {
     pub by_status:    FilterByList<FmStatus>,
     pub needs_sorted: Option<bool>,
     pub is_open:      Option<bool>,
+    pub has_project:  Option<bool>,
 }
 
 #[derive(Debug)]
@@ -44,6 +45,7 @@ impl UiFilter {
 
             self.needs_sorted.is_none_or(|x| x == file.needs_sorting()),
             self.is_open     .is_none_or(|x| x == file.is_open      ()),
+            self.has_project .is_none_or(|x| x == file.project.is_some()),
 
         ])
     }

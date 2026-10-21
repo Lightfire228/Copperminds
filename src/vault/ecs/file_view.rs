@@ -1,6 +1,6 @@
 use yaml_serde::Mapping;
 
-use crate::{prelude::build_regex, vault::{ecs::{File, FileId, components::*}, fm::{FmAction, FmStatus, FmType}}};
+use crate::{prelude::build_regex, vault::{ecs::{File, FileId, components::*}, fm::{FmAction, FmProject, FmStatus, FmType}}};
 
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ pub struct EcsFileView<'a> {
     pub type_:    Option<&'a FmType>,
     pub action:   Option<&'a FmAction>,
     pub status:   Option<&'a FmStatus>,
-    // pub project:  Option<&'a FmProject>,
+    pub project:  Option<&'a FmProject>,
 }
 
 

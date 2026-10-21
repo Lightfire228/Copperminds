@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Debug};
 
 use file_id::FileId;
 use tokio::sync::{mpsc, oneshot};
@@ -13,6 +13,7 @@ pub enum VaultCommand {
     OpenInObsidian  (OpenInObsidian,   Responder<()>),
     Register        (Register,         Responder<Subscriber<VaultUpdate>>),
     GetVaultStats   (GetVaultStats,    Responder<VaultStats>),
+    GetProjects     (GetProjects,      Responder<HashSet<String>>),
     NukeActionables (NukeActionables,  Responder<()>),
 
     ModifyFile      (ModifyFile,       Responder<Result<(), String>>),
@@ -57,6 +58,9 @@ pub struct GetVaultStats {
 }
 
 #[derive(Debug)]
+pub struct GetProjects {}
+
+#[derive(Debug)]
 pub struct NukeActionables {}
 
 
@@ -83,6 +87,7 @@ to_command!(GetVaultStats,    VaultStats);
 to_command!(ModifyFile,       Result<(), String>);
 to_command!(DeleteFile,       ());
 to_command!(NukeActionables,  ());
+to_command!(GetProjects,      HashSet<String>);
 
 impl<T> Cmd<T> for VaultCommand {
     fn to_command(self, _: Responder<T>) -> VaultCommand {
@@ -96,11 +101,12 @@ pub enum VaultUpdate {
     Rescan,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ModifyFileKind {
     SetTypeInfo,
-    SetAction(FmAction),
-    SetStatus(FmStatus),
+    SetAction (FmAction),
+    SetStatus (FmStatus),
+    SetProject(String),
 }
 
 

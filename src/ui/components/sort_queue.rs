@@ -1,4 +1,5 @@
 
+use std::collections::HashSet;
 use std::fmt::Display;
 
 use file_id::FileId;
@@ -12,12 +13,12 @@ use crate::collections::Files;
 use crate::command_parser::{CommandExpr, CommandGroup};
 use crate::ui::actions::UiAction;
 use crate::ui::components::file_list::{self, FileList};
-use crate::ui::components::prompt::{self, MenuCommand, Prompt};
+use crate::ui::components::prompt::{self, Prompt};
 use crate::ui::key_event::KeyPressed;
 use crate::ui::filter::{UiFilter, FilterByList};
 use crate::ui::{self, UIMode, send_vault_cmd};
 use crate::ui::queue_type::QueueType;
-use crate::vault::command::{DeleteFile, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
+use crate::vault::command::{DeleteFile, GetProjects, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
 use crate::vault::ecs::EcsFileView;
 use crate::vault::fm::*;
 
@@ -29,6 +30,7 @@ pub struct SortQueue {
 
     file_list:    FileList,
     prompt:       Prompt,
+    projects:     Vec<String>,
     // command_list: Vec<MenuCommand<UiAction>>
 }
 
@@ -39,26 +41,17 @@ impl SortQueue {
 
     pub fn new(queue_type: QueueType, vault: Sender<VaultCommand>) -> (Self, Task<Message>) {
 
-        let command_list: Vec<_> = UiAction::all()
-            .into_iter()
-            .filter_map   (|c| Some(MenuCommand {
-                code:    c.get_code(queue_type)?,
-                name:    c.get_label(),
-                command: c,
-            }))
-            .collect()
-        ;
-
         (
             Self {
                 vault:     vault.clone(),
                 file_list: FileList::new(),
                 prompt:    Prompt  ::new(),
+                projects:  Vec     ::new(),
                 queue_type,
-                // command_list,
             },
             Task::batch([
-                Task::perform(load_files(vault, queue_type), Message::LoadFiles),
+                Task::perform(load_files   (vault.clone(), queue_type), Message::LoadFiles),
+                Task::perform(load_projects(vault),                     Message::LoadProjects),
             ])
 
         )
@@ -67,22 +60,32 @@ impl SortQueue {
     pub fn view(&self) -> Element<'_, Message> {
 
         // TODO: aliases for actions and status
+        //
+        // TODO: split this into a "help" component and a "projects list" component
 
         let options = [
-            text!(":i               - set info"),
+            text!(":i                - set info"),
             text!(""),
-            text!(":a todo          - set action"),
-            text!(":a backlog       -"),
-            text!(":a maybe_someday -"),
-            text!(":a waiting_for   -"),
+            text!(":a todo           - set action"),
+            text!(":a backlog        -"),
+            text!(":a maybe_someday  -"),
+            text!(":a waiting_for    -"),
             text!(""),
-            text!(":s complete      - set status"),
-            text!(":s archive       -"),
+            text!(":s complete       - set status"),
+            text!(":s archive        -"),
             text!(""),
-            text!(":d               - delete file"),
+            text!(":p [project name] -"),
+            text!(""),
+            text!(":d                - delete file"),
         ]
             .into_iter()
             .map(|x| x.into())
+        ;
+
+        let projects = self
+            .projects
+            .iter()
+            .map(|p| text!("- {p}").into())
         ;
 
         container(
@@ -92,6 +95,11 @@ impl SortQueue {
                         text!("{}", self.queue_type),
                         text!("==="),
                         column(options),
+                        text!(""),
+
+                        text!("Projects"),
+                        text!("==="),
+                        column(projects),
 
                         Space::new().height(Fill),
 
@@ -129,6 +137,7 @@ impl SortQueue {
                 let action = self.file_list.update(message)?;
                 self.handle_file_list_action(action)?
             }
+
             Message::LoadFiles(files) => {
                 let message = file_list::Message::LoadFiles(files.into());
 
@@ -136,16 +145,32 @@ impl SortQueue {
                 self.handle_file_list_action(action)?
             }
 
+            Message::LoadProjects(projects) => {
+                self.projects = projects.into_iter().collect();
+
+                self.projects.sort();
+
+                None?
+            }
+
             Message::VaultUpdate(update) => Action::Run(
 
                 match update {
-                    VaultUpdate::Rescan => Task::perform(
-                        load_files(self.vault.clone(), self.queue_type),
-                        Message::LoadFiles
-                    ),
+                    VaultUpdate::Rescan => self.reload_task()
                 }
             ),
         })
+    }
+
+    fn reload_task(&self) -> Task<Message> {
+
+        let vault = || self.vault.clone();
+
+        Task::batch([
+            Task::perform(load_files   (vault(), self.queue_type), Message::LoadFiles),
+            Task::perform(load_projects(vault()),                  Message::LoadProjects),
+        ])
+
     }
 
     fn handle_file_list_action(&mut self, action: file_list::Action) -> Option<Action> {
@@ -298,8 +323,8 @@ impl SortQueue {
         Action::Run(
             Task::future(future).discard()
         )
-
     }
+
 
 }
 
@@ -317,8 +342,9 @@ pub enum Message {
     FileListMessage (file_list::Message),
     PromptMessage   (prompt   ::Message),
 
-    LoadFiles(Files),
-    VaultUpdate(VaultUpdate),
+    LoadFiles   (Files),
+    LoadProjects(HashSet<String>),
+    VaultUpdate (VaultUpdate),
 }
 
 
@@ -349,13 +375,18 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 
             // TODO: make this configurable from the UI
             by_action: FilterByList::Include(vec![
-                // FmAction::Todo,
+                FmAction::Todo,
                 FmAction::Backlog,
                 // FmAction::MaybeSomeday,
                 // FmAction::WaitingFor,
 
             ]),
-            is_open:   true.into(),
+            has_project: false.into(),
+            by_status:   FilterByList::Exclude(vec![
+                FmStatus::Archived,
+            ]),
+            // is_open:   true.into(),
+
 
             ..Default::default()
         },
@@ -371,16 +402,26 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
     .into()
 }
 
+async fn load_projects(vault: Sender<VaultCommand>) -> HashSet<String> {
+    send_vault_cmd(
+        &vault,
+        GetProjects {}
+    )
+    .await
+    .into()
+}
+
 
 impl TryInto<ModifyFileKind> for UiAction {
     type Error = ();
 
     fn try_into(self) -> Result<ModifyFileKind, Self::Error> {
         Ok(match self {
-            UiAction::SetTypeInfo  => ModifyFileKind::SetTypeInfo,
-            UiAction::SetAction(a) => ModifyFileKind::SetAction(a),
-            UiAction::SetStatus(s) => ModifyFileKind::SetStatus(s),
-            _                      => Err(())?,
+            UiAction::SetTypeInfo   => ModifyFileKind::SetTypeInfo,
+            UiAction::SetAction (a) => ModifyFileKind::SetAction (a),
+            UiAction::SetStatus (s) => ModifyFileKind::SetStatus (s),
+            UiAction::SetProject(p) => ModifyFileKind::SetProject(p),
+            _                       => Err(())?,
         })
     }
 }

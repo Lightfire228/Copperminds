@@ -1,14 +1,14 @@
 
-use yaml_serde::{Mapping, Value};
+use yaml_serde::{Mapping, Value, from_value};
 
-use crate::{prelude::*, vault::fm::{FmAction, FmProperty, FmStatus, FmType, GetKey}};
+use crate::{prelude::*, vault::fm::{FmAction, FmProject, FmProperty, FmStatus, FmType, GetKey}};
 
 
 pub struct FrontmatterYaml {
     pub type_:   Option<FmType>,
     pub action:  Option<FmAction>,
     pub status:  Option<FmStatus>,
-    pub project: Option<String>,
+    pub project: Option<FmProject>,
 
     // TODO: move this under `action`
     pub clarified: Option<bool>,
@@ -68,11 +68,11 @@ pub fn parse_md_file(text: &str) -> Parsed {
 impl From<&Mapping> for FrontmatterYaml {
     fn from(fm: &Mapping) -> Self {
         Self {
-            type_:     parse_prop(fm, FmProperty::Type),
-            action:    parse_prop(fm, FmProperty::Action),
-            status:    parse_prop(fm, FmProperty::Status),
-            clarified: parse_bool(fm, FmProperty::Clarified),
-            project:   parse_prop(fm, FmProperty::Project),
+            type_:     parse_prop   (fm, FmProperty::Type),
+            action:    parse_prop   (fm, FmProperty::Action),
+            status:    parse_prop   (fm, FmProperty::Status),
+            clarified: parse_bool   (fm, FmProperty::Clarified),
+            project:   parse_project(fm, FmProperty::Project),
         }
     }
 }
@@ -110,6 +110,29 @@ fn parse_bool(fm: &Mapping, prop: FmProperty) -> Option<bool> {
     };
 
     Some(*x)
+}
+
+fn parse_project(fm: &Mapping, prop: FmProperty) -> Option<FmProject> {
+
+    let prop_name = prop.get_key();
+
+    let x = fm.get(&prop_name)?;
+
+    Some(match x {
+        Value::Null       => None?,
+        Value::String (s) => FmProject { name: s.clone(), is_workspace: false },
+        Value::Mapping(_) => from_value(x.clone())
+            .inspect_err(|_| {
+                warn!("unknown {prop_name} prop: {x:?}");
+            })
+            .ok()?
+        ,
+
+        _ => {
+            warn!("unknown {prop_name} prop: {x:?}");
+            None?
+        }
+    })
 }
 
 

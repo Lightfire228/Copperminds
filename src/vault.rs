@@ -11,7 +11,7 @@ use crate::{config::Config, file_shit, obsidian, vault::{command::{ModifyFile, M
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};
-use std::{env, mem, path::{Path, PathBuf}, sync::LazyLock, usize};
+use std::{collections::HashSet, env, mem, path::{Path, PathBuf}, sync::LazyLock, usize};
 use crate::prelude::*;
 
 use tokio::{select, sync::{mpsc::{self, Sender, Receiver, channel}}};
@@ -75,6 +75,14 @@ impl Index {
             .collect()
     }
 
+    fn get_vault_projects(&self) -> HashSet<String> {
+        self
+            .ecs
+            .get_all   ()
+            .filter_map(|f| f.project.map(|p| p.name.clone()))
+            .collect   ()
+    }
+
     pub fn handle_command(&mut self, command: VaultCommand) {
 
         macro_rules! send {
@@ -91,6 +99,7 @@ impl Index {
             VaultCommand::DeleteFile     (opts, resp) => send!(resp => self.delete_file            (opts.id)),
             VaultCommand::NukeActionables(_,    resp) => send!(resp => self.nuke_action_property   ()),
             VaultCommand::GetVaultStats  (_,    resp) => send!(resp => self.calc_vault_stats_ecs   ()),
+            VaultCommand::GetProjects    (_,    resp) => send!(resp => self.get_vault_projects     ()),
         }
     }
 
@@ -112,11 +121,12 @@ impl Index {
 
         self.validate_modify_commands(&opts.changes)?;
 
-        for change in &opts.changes {
+        for change in opts.changes {
             match change {
-                ModifyFileKind::SetTypeInfo  => self.ecs.set_info  (opts.id),
-                ModifyFileKind::SetAction(a) => self.ecs.set_action(opts.id, *a),
-                ModifyFileKind::SetStatus(s) => self.ecs.set_status(opts.id, *s),
+                ModifyFileKind::SetTypeInfo   => self.ecs.set_info        (opts.id),
+                ModifyFileKind::SetAction (a) => self.ecs.set_action      (opts.id, a),
+                ModifyFileKind::SetStatus (s) => self.ecs.set_status      (opts.id, s),
+                ModifyFileKind::SetProject(p) => self.ecs.set_project_name(opts.id, p),
             }
         }
 
@@ -131,12 +141,14 @@ impl Index {
         let mut info       = vec![];
         let mut action     = vec![];
         let mut status     = vec![];
+        let mut projects   = vec![];
 
         for cmd in changes.iter() {
             match cmd {
-                ModifyFileKind::SetTypeInfo  => info  .push(cmd),
-                ModifyFileKind::SetAction(_) => action.push(cmd),
-                ModifyFileKind::SetStatus(_) => status.push(cmd),
+                ModifyFileKind::SetTypeInfo   => info    .push(cmd),
+                ModifyFileKind::SetAction (_) => action  .push(cmd),
+                ModifyFileKind::SetStatus (_) => status  .push(cmd),
+                ModifyFileKind::SetProject(_) => projects.push(cmd),
             }
         }
 
@@ -155,8 +167,9 @@ impl Index {
 
         check!(info, action, format!("Incompatible commands, Set Info and {:?}", action));
 
-        check!(action, format!("Only 1 Set Action command allowed: {:?}", action));
-        check!(status, format!("Only 1 Set Status command allowed: {:?}", status));
+        check!(action,   format!("Only 1 Set Action command allowed: {:?}", action));
+        check!(status,   format!("Only 1 Set Status command allowed: {:?}", status));
+        check!(projects, format!("Only 1 Set Project command allowed: {:?}", projects));
 
         Ok(())
     }

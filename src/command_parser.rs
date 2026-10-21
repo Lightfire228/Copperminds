@@ -3,7 +3,7 @@ use std::{iter::Peekable, vec::IntoIter};
 
 use enum_iterator::{Sequence, all};
 
-use crate::vault::fm::{FmAction, FmStatus};
+use crate::vault::fm::{FmAction, FmProject, FmStatus};
 
 pub fn tokenize(str: &str) -> TResult<Vec<Token>> {
 
@@ -240,8 +240,9 @@ impl Tokenizer {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandExpr {
-    SetAction(FmAction),
-    SetStatus(FmStatus),
+    SetAction (FmAction),
+    SetStatus (FmStatus),
+    SetProject(String),
     SetInfo,
     Delete,
 }
@@ -319,7 +320,8 @@ impl CommandGroup {
             (Tk::Colon, "i") => CommandExpr::SetInfo,
             (Tk::Colon, "a") => self.parse_set_action()?,
             (Tk::Colon, "s") => self.parse_set_status()?,
-            _ => parse_err!(self.operator, UnknownOperator)?
+            (Tk::Colon, "p") => self.parse_set_project()?,
+            _ => parse_err!(self.operator, UnknownTarget)?
         })
     }
 }
@@ -351,8 +353,18 @@ macro_rules! impl_parse {
 }
 impl CommandGroup {
 
-    impl_parse!(parse_set_action, FmAction, SetAction);
-    impl_parse!(parse_set_status, FmStatus, SetStatus);
+    impl_parse!(parse_set_action,  FmAction,  SetAction);
+    impl_parse!(parse_set_status,  FmStatus,  SetStatus);
+
+    fn parse_set_project(self) -> Result<CommandExpr, ParseError> {
+
+        let Some(value) = self.value else {
+            return parse_err!(self.target, MissingValue);
+        };
+
+
+        Ok(CommandExpr::SetProject(value.lexeme))
+    }
 }
 
 
@@ -421,7 +433,7 @@ mod tests {
     fn test_parser() {
         let str = ":a todo @s archive +b \"asdf\" -u -d 'qwerty\\' uiop'";
 
-        let tokens   = tokenize(str)   .unwrap();
+        let tokens = tokenize(str)   .unwrap();
         let groups = parse   (tokens).unwrap();
 
         macro_rules! command {
@@ -454,7 +466,7 @@ mod tests {
 
     #[test]
     fn test_command_parser() {
-        let str = ":a todo :s archived :d :i";
+        let str = ":a todo :s archived :d :i :p 'project name'";
 
         let tokens   = tokenize    (str)   .unwrap();
         let groups   = parse       (tokens).unwrap();
@@ -465,6 +477,7 @@ mod tests {
             CommandExpr::SetStatus(FmStatus::Archived),
             CommandExpr::Delete,
             CommandExpr::SetInfo,
+            CommandExpr::SetProject("project name".to_owned()),
         ])
 
     }
