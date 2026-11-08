@@ -1,5 +1,5 @@
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 
 use file_id::FileId;
@@ -30,11 +30,39 @@ pub struct SortQueue {
 
     file_list:    FileList,
     prompt:       Prompt,
-    projects:     Vec<String>,
+    projects:     Vec<(String, usize)>,
     // command_list: Vec<MenuCommand<UiAction>>
 }
 
 
+fn load_filter(queue: QueueType) -> UiFilter {
+    match queue {
+
+        QueueType::Inbox       => UiFilter {
+            needs_sorted: true.into(),
+
+            ..Default::default()
+        },
+
+        QueueType::Actionables => UiFilter {
+
+            // TODO: make this configurable from the UI
+            by_action: FilterByList::Include(vec![
+                FmAction::Todo,
+                // FmAction::Backlog,
+                // FmAction::MaybeSomeday,
+                // FmAction::WaitingFor,
+            ]),
+            by_project: FilterByList::Include(vec![
+                "home".to_owned(),
+            ]),
+            is_open:   true.into(),
+
+
+            ..Default::default()
+        },
+    }
+}
 
 
 impl SortQueue {
@@ -85,7 +113,7 @@ impl SortQueue {
         let projects = self
             .projects
             .iter()
-            .map(|p| text!("- {p}").into())
+            .map(|p| text!("- {:<20} - {:>3}", p.0, p.1).into())
         ;
 
         container(
@@ -112,7 +140,7 @@ impl SortQueue {
 
                     ]
                 )
-                    .width  (350)
+                    .width  (375)
                     .padding(10)
                 ,
                 self.file_list.view().map(Message::FileListMessage),
@@ -139,7 +167,10 @@ impl SortQueue {
             }
 
             Message::LoadFiles(files) => {
-                let message = file_list::Message::LoadFiles(files.into());
+
+                _debug_print_file_checklist(&files);
+
+                let message = file_list::Message::LoadFiles(files);
 
                 let action = self.file_list.update(message)?;
                 self.handle_file_list_action(action)?
@@ -328,6 +359,14 @@ impl SortQueue {
 
 }
 
+fn _debug_print_file_checklist(files: &Files) {
+    let mut names: Vec<_> = files.iter().map(|f| f.name.clone()).collect();
+    names.sort();
+
+    for file in names {
+        println!("- [ ] [[{}]]", file);
+    }
+}
 
 impl From<SortQueue> for UIMode {
     fn from(val: SortQueue) -> Self {
@@ -343,7 +382,7 @@ pub enum Message {
     PromptMessage   (prompt   ::Message),
 
     LoadFiles   (Files),
-    LoadProjects(HashSet<String>),
+    LoadProjects(HashMap<String, usize>),
     VaultUpdate (VaultUpdate),
 }
 
@@ -363,34 +402,7 @@ impl From<Message> for ui::Message {
 
 async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
 
-    let filter = match queue {
-
-        QueueType::Inbox       => UiFilter {
-            needs_sorted: true.into(),
-
-            ..Default::default()
-        },
-
-        QueueType::Actionables => UiFilter {
-
-            // TODO: make this configurable from the UI
-            by_action: FilterByList::Include(vec![
-                FmAction::Todo,
-                FmAction::Backlog,
-                // FmAction::MaybeSomeday,
-                // FmAction::WaitingFor,
-
-            ]),
-            has_project: false.into(),
-            by_status:   FilterByList::Exclude(vec![
-                FmStatus::Archived,
-            ]),
-            // is_open:   true.into(),
-
-
-            ..Default::default()
-        },
-    };
+    let filter = load_filter(queue);
 
     send_vault_cmd(
         &vault,
@@ -402,7 +414,7 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
     .into()
 }
 
-async fn load_projects(vault: Sender<VaultCommand>) -> HashSet<String> {
+async fn load_projects(vault: Sender<VaultCommand>) -> HashMap<String, usize> {
     send_vault_cmd(
         &vault,
         GetProjects {}

@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, slice};
 
 use crate::vault::FileView;
 
@@ -30,5 +30,9 @@ impl Debug for Files {
 impl Files {
     pub fn to_list(self) -> Vec<FileView> {
         self.into()
+    }
+
+    pub fn iter(&self) -> slice::Iter<'_, FileView> {
+        self.files.iter()
     }
 }

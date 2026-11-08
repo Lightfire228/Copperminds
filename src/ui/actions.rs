@@ -51,7 +51,7 @@ impl UiAction {
 impl Display for UiAction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UiAction::SetTypeInfo  => write!(f, "Set Type Info"),
+            UiAction::SetTypeInfo   => write!(f, "Set Type Info"),
             UiAction::SetAction (a) => write!(f, "Set Action {a}"),
             UiAction::SetStatus (s) => write!(f, "Set Status {s}"),
             UiAction::SetProject(p) => write!(f, "Set Project {p}"),

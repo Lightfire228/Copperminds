@@ -11,7 +11,7 @@ use crate::{config::Config, file_shit, obsidian, vault::{command::{ModifyFile, M
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug};
-use std::{collections::HashSet, env, mem, path::{Path, PathBuf}, sync::LazyLock, usize};
+use std::{collections::{HashMap, HashSet}, env, mem, path::{Path, PathBuf}, sync::LazyLock, usize};
 use crate::prelude::*;
 
 use tokio::{select, sync::{mpsc::{self, Sender, Receiver, channel}}};
@@ -75,12 +75,22 @@ impl Index {
             .collect()
     }
 
-    fn get_vault_projects(&self) -> HashSet<String> {
-        self
+    fn get_vault_projects(&self) -> HashMap<String, usize> {
+
+        let mut result = HashMap::new();
+
+        let files = self
             .ecs
             .get_all   ()
+            .filter    (|f| f.is_open())
             .filter_map(|f| f.project.map(|p| p.name.clone()))
-            .collect   ()
+        ;
+
+        for f in files {
+            *result.entry(f).or_insert_with(|| 0) += 1;
+        }
+
+        result
     }
 
     pub fn handle_command(&mut self, command: VaultCommand) {

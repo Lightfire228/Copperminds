@@ -1,6 +1,6 @@
 use enum_iterator::Sequence;
 
-use crate::vault::{ecs::EcsFileView, fm::{FmAction, FmStatus, FmType}};
+use crate::vault::{ecs::EcsFileView, fm::{FmAction, FmProject, FmStatus, FmType}};
 
 
 #[derive(Debug, Default)]
@@ -8,9 +8,9 @@ pub struct UiFilter {
     pub by_type:      FilterByList<FmType>,
     pub by_action:    FilterByList<FmAction>,
     pub by_status:    FilterByList<FmStatus>,
+    pub by_project:   FilterByList<String>,
     pub needs_sorted: Option<bool>,
     pub is_open:      Option<bool>,
-    pub has_project:  Option<bool>,
 }
 
 #[derive(Debug)]
@@ -22,11 +22,11 @@ pub enum FilterByList<T> {
     Exclude(Vec<T>),
 }
 
-impl<T> FilterByList<T>
+impl<Value> FilterByList<Value>
 where
-    T: PartialEq
+    Value: PartialEq
 {
-    pub fn matches(&self, value: Option<&T>) -> bool {
+    pub fn matches(&self, value: Option<&Value>) -> bool {
         match self {
             FilterByList::All            => true,
             FilterByList::None           => value.is_none(),
@@ -34,18 +34,31 @@ where
             FilterByList::Exclude(items) => value.is_none_or (|v| !items.contains(v)),
         }
     }
+
+    pub fn matches_by<Func, T>(&self, value: Option<&T>, selector: Func) -> bool
+    where
+        Func:  Fn(&T) -> &Value,
+        Value: PartialEq,
+    {
+        match self {
+            FilterByList::All            => true,
+            FilterByList::None           => value.is_none(),
+            FilterByList::Include(items) => value.is_some_and(|v|  items.iter().any(|i| i == selector(v))),
+            FilterByList::Exclude(items) => value.is_none_or (|v| !items.iter().any(|i| i == selector(v))),
+        }
+    }
 }
 
 impl UiFilter {
     pub fn matches(&self, file: &EcsFileView) -> bool {
         all(&[
-            self.by_type  .matches(file.type_),
-            self.by_action.matches(file.action),
-            self.by_status.matches(file.status),
+            self.by_type   .matches   (file.type_),
+            self.by_action .matches   (file.action),
+            self.by_status .matches   (file.status),
+            self.by_project.matches_by(file.project, |p: &FmProject| &p.name),
 
             self.needs_sorted.is_none_or(|x| x == file.needs_sorting()),
             self.is_open     .is_none_or(|x| x == file.is_open      ()),
-            self.has_project .is_none_or(|x| x == file.project.is_some()),
 
         ])
     }
