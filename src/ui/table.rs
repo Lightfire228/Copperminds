@@ -2,14 +2,16 @@
 use std::marker::PhantomData;
 
 use iced::advanced::graphics::core::event;
+use iced::advanced::renderer::Quad;
 use iced::border::Radius;
 use iced::widget::{Text, text};
-use iced::{Border, Element, Length, Shadow, Size, color};
+use iced::{Border, Color, Element, Length, Shadow, Size, color};
 use iced::advanced::{self, Widget, renderer};
 use iced::advanced::widget::{Tree, tree};
 use iced::advanced::layout::{Limits, Node};
 use crate::prelude::*;
 
+const ALT_ROW_COLOR: Color = color!(0, 0, 0, 0.25);
 
 pub struct Table<'a, Message, Theme, Renderer, CallBack>
 where
@@ -283,6 +285,10 @@ where
                 height,
             };
 
+            if y % 2 == 0 {
+                draw_alt_row_background(renderer, viewport);
+            }
+
             cell.as_widget().draw(
                 &tree.children[i],
                 renderer,
@@ -333,4 +339,21 @@ where
     fn from(value: Table<'a, Message, Theme, Renderer, CallBack>) -> Self {
         Element::new(value)
     }
+}
+
+
+fn draw_alt_row_background<'a, Renderer>(
+    renderer: &mut Renderer,
+    viewport: &iced::Rectangle
+)
+where
+    Renderer: 'a + advanced::Renderer + iced::advanced::text::Renderer,
+{
+    renderer.fill_quad(
+        Quad {
+            bounds: *viewport,
+            ..Default::default()
+        },
+        ALT_ROW_COLOR,
+    );
 }
