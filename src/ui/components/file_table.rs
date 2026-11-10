@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::marker::PhantomData;
 use std::usize;
 
@@ -7,8 +8,8 @@ use iced::{Renderer, color};
 use iced::advanced::{Widget};
 use iced::{Alignment, Color, Length, Size, border, keyboard};
 use iced::{Element, keyboard::Key};
-use iced::widget::{container, sensor, text};
-use log::{debug, trace};
+use iced::widget::{Space, container, sensor, text};
+use log::{debug, info, trace};
 
 use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
@@ -17,7 +18,7 @@ use crate::ui::{table};
 use crate::vault::FileView;
 
 
-pub struct FileList {
+pub struct FileTable {
     files:        Vec<FileView>,
     cursor:       usize,
     rows_visible: usize,
@@ -52,7 +53,7 @@ const SORT_BY: SortBy = SortBy::Name;
 
 type _Task = iced::Task<Message>;
 
-impl FileList {
+impl FileTable {
 
 
 
@@ -83,38 +84,51 @@ impl FileList {
 
                 text!("{cursor}")
                     .wrapping(text::Wrapping::None)
-                    .into()
+                    .align_y (Alignment::Center)
+                    .into    ()
             }};
         }
 
         fn get_file_name<'a>(file: &FileView) -> Element<'a, Message> {
             text!("{}", file.name)
                 .wrapping(text::Wrapping::None)
-                .into()
+                .align_y (Alignment::Center)
+                .into    ()
+        }
+
+        fn get_row_num<'a>(row: usize) -> Element<'a, Message> {
+            text!("{row:>4}")
+                .wrapping(text::Wrapping::None)
+                .align_y (Alignment::Center)
+                .align_x (Alignment::Start)
+                .into    ()
         }
 
         let files = self
             .files
-            .iter     ()
-            .skip     (self.scroll)
-            .take     (self.rows_visible)
+            .iter()
+            .skip(self.scroll)
+            .take(self.rows_visible)
         ;
 
         let table: Element<'_, Message> = table::Table::new(
-            25.0,
+            30.0,
             &[
                 ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, "> ")},
+                ColInfo { size: Length::Shrink,      col: &|row: Row<FileView>| get_row_num  (row.y + self.scroll)},
+                // TODO: cell padding
+                ColInfo { size: Length::Fixed(5.0),  col: &|row: Row<FileView>| Space::new().into()},
                 ColInfo { size: Length::Fill,        col: &|row: Row<FileView>| get_file_name(row.data)},
                 ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, " <")},
             ],
-            files,
+            files.map(|f| f),
             Message::RowsVisible,
         )
             .into()
         ;
 
-        // table.explain(color!(125, 255, 255))
         table
+            // .explain(color!(125, 255, 255))
 
     }
 

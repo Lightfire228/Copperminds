@@ -1,11 +1,12 @@
 
 use std::marker::PhantomData;
+use std::mem;
 
 use iced::advanced::graphics::core::event;
 use iced::advanced::renderer::Quad;
 use iced::border::Radius;
 use iced::widget::{Text, text};
-use iced::{Border, Color, Element, Length, Shadow, Size, color};
+use iced::{Border, Color, Element, Length, Padding, Shadow, Size, color};
 use iced::advanced::{self, Widget, renderer};
 use iced::advanced::widget::{Tree, tree};
 use iced::advanced::layout::{Limits, Node};
@@ -37,7 +38,7 @@ macro_rules! i_to_xy {
 }
 
 
-macro_rules! _xy_to_i {
+macro_rules! xy_to_i {
     ($self:expr, $x:expr, $y:expr) => {
         $self.cols.len() * $y + $x
     };
@@ -98,7 +99,6 @@ where
             rows_message,
         }
     }
-
 }
 
 impl<'a, Message, Theme, Renderer, CallBack>
@@ -112,7 +112,7 @@ where
 
     fn size(&self) -> Size<Length> {
         Size {
-            width:  Length::Fill,
+            width:  Length::Shrink,
             height: Length::Fill,
         }
     }
@@ -149,91 +149,119 @@ where
 
         state.rows_visible = (limits.max().height / self.row_height).floor() as usize;
 
-        let mut cols_sizes: Vec<_> = self.cols.iter().map(|_| 0.0).collect();
-
-        // size fixed cols
-        let fixed = self
-            .cols
-            .iter      ()
-            .enumerate ()
-            .filter_map(|c| match c.1 {
-                Length::Fixed(f) => Some((c.0, *f)),
-                _                => None
-            })
-        ;
-
-        for (i, size) in fixed {
-            cols_sizes[i] = size;
+        if self.cells.is_empty() {
+            return Node::new(limits.min());
         }
 
-        let fixed_size_sum = cols_sizes.iter().sum();
+        debug!("rows visible: {}", state.rows_visible);
 
-        let mut child_limits = limits.shrink(Size {
-            width: fixed_size_sum,
-            height: 0.0,
-        });
+        let rows = (self.cells.len() / self.cols.len()).min(state.rows_visible);
 
-        // minimium size non-fixed cols
-        let shrink = self
-            .cols
-            .iter      ()
-            .enumerate ()
-            .filter_map(|c| match c.1 {
-                Length::Shrink         => Some(c.0),
-                Length::Fill           => Some(c.0),
-                Length::FillPortion(_) => Some(c.0),
-                _                      => None
-            })
-        ;
+        let mut cols_sizes: Vec<f32>  = vec![];
+        let mut children:   Vec<Node> = vec![];
 
-        for col in shrink {
-            let mut max_width: f32 = 0.0;
+        cols_sizes.resize(self.cols .len(), 0.0);
+        children  .resize(self.cells.len(), Node::default());
 
-            for i in (col..self.cells.len()).step_by(self.cols.len()) {
-                let     cell  = &mut self.cells[i];
-                let mut state = &mut tree.children[i];
+        let mut fixed_cols  = vec![];
+        let mut shrink_cols = vec![];
+        let mut grow_cols   = vec![];
 
-                let size  = cell.as_widget_mut().layout(&mut state, renderer, &child_limits);
+        let width_available = limits.max().width;
 
-                max_width = max_width.max(size.size().width);
+        for (i, col) in self.cols.iter().enumerate() {
+            match col {
+                Length::Fill           => grow_cols  .push(i),
+                Length::FillPortion(_) => grow_cols  .push(i),
+                Length::Shrink         => shrink_cols.push(i),
+                Length::Fixed(x)       => fixed_cols .push((i, x)),
+            }
+        }
+
+        // Layout fixed width cols
+        for (x, width) in fixed_cols {
+            for y in 0..rows {
+                let i = xy_to_i!(self, x, y);
+
+                let limits = limits.height(self.row_height).width(Length::Fixed(*width));
+                let node   = self
+                    .cells[i]
+                    .as_widget_mut()
+                    .layout       (&mut tree.children[i], renderer, &limits)
+                ;
+
+                children[i] = node;
             }
 
-            cols_sizes[col] = max_width;
-            child_limits          = child_limits.shrink(Size {
-                width:  max_width,
-                height: 0.0,
-            });
+            cols_sizes[x] = *width;
         }
 
-        // BUG: multiple columns with Fill sizing don't work
 
-        let children = self
-            .cells
-            .iter_mut ()
-            .enumerate()
-            .map      (|(i, cell)| {
+        // Layout min width shrink and grow cols
+        for x in shrink_cols.iter().chain(&grow_cols) {
 
-                let (x, y) = i_to_xy!(self, i);
+            let consumed_width: f32 = cols_sizes.iter().sum();
 
-                let cell_size = Size {
-                    width:  cols_sizes[x].min(limits.max().width),
-                    height: self.row_height,
-                };
+            let mut col_width = 0.0;
 
-                let cell_limits = Limits::new(cell_size, cell_size);
+            for y in 0..rows {
+                let i = xy_to_i!(self, x, y);
 
-                let x = cols_sizes.iter().take(x).sum();
-                let y = y as f32 * cell_size.height;
-
-                cell
+                let limits = limits.height(self.row_height).max_width(width_available - consumed_width);
+                let node   = self
+                    .cells[i]
                     .as_widget_mut()
-                    .layout       (&mut tree.children[i], renderer, &cell_limits)
-                    .move_to      ((x, y))
-            })
-            .collect()
-        ;
+                    .layout(&mut tree.children[i], renderer, &limits)
+                ;
 
-        Node::with_children(limits.max(), children)
+                if col_width < node.size().width {
+                    col_width = node.size().width;
+                }
+
+                children[i] = node;
+            }
+
+            cols_sizes[*x] = col_width;
+        }
+
+        // Layout grow width cols
+
+        let consumed_width: f32 = cols_sizes.iter().sum();
+        let remaining           = width_available - consumed_width;
+
+        // TODO: multiple growing containers not yet supported
+        for x in grow_cols {
+            cols_sizes[x] += remaining;
+        }
+
+        info!("col sizes {:?}", &cols_sizes);
+
+        fn grow_node(node: &mut Node, new_width: f32) {
+            let mut tmp = Node::default();
+
+            mem::swap(node, &mut tmp);
+            let padding = new_width - tmp.size().width;
+
+            let mut tmp = Node::container(tmp, Padding::ZERO.right(padding));
+            mem::swap(node, &mut tmp);
+
+        }
+
+        // Position cols
+        for (i, node) in children.iter_mut().enumerate() {
+            let (x, y) = i_to_xy!(self, i);
+
+            let x_offset = cols_sizes.iter().take(x).sum();
+
+            grow_node(node, cols_sizes[x]);
+
+            node.move_to_mut((x_offset, y as f32 * self.row_height));
+
+        }
+
+        let limits = limits.min_width(cols_sizes.iter().sum()).min_height(rows as f32 * self.row_height);
+
+        Node::with_children(limits.min(), children)
     }
 
 
@@ -349,11 +377,22 @@ fn draw_alt_row_background<'a, Renderer>(
 where
     Renderer: 'a + advanced::Renderer + iced::advanced::text::Renderer,
 {
+    draw_background(renderer, viewport, ALT_ROW_COLOR);
+}
+
+fn draw_background<'a, Renderer>(
+    renderer: &mut Renderer,
+    viewport: &iced::Rectangle,
+    color:    Color,
+)
+where
+    Renderer: 'a + advanced::Renderer + iced::advanced::text::Renderer,
+{
     renderer.fill_quad(
         Quad {
             bounds: *viewport,
             ..Default::default()
         },
-        ALT_ROW_COLOR,
+        color,
     );
 }

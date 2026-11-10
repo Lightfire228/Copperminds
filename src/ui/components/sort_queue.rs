@@ -12,7 +12,7 @@ use iced::widget::{Space, column, row, text};
 use crate::collections::Files;
 use crate::command_parser::{CommandExpr, CommandGroup};
 use crate::ui::actions::UiAction;
-use crate::ui::components::file_list::{self, FileList};
+use crate::ui::components::file_table::{self, FileTable};
 use crate::ui::components::prompt::{self, Prompt};
 use crate::ui::key_event::KeyPressed;
 use crate::ui::filter::{UiFilter, FilterByList};
@@ -28,7 +28,7 @@ pub struct SortQueue {
     vault:        Sender<VaultCommand>,
     queue_type:   QueueType,
 
-    file_list:    FileList,
+    file_list:    FileTable,
     prompt:       Prompt,
     projects:     Vec<(String, usize)>,
     // command_list: Vec<MenuCommand<UiAction>>
@@ -54,7 +54,10 @@ fn load_filter(queue: QueueType) -> UiFilter {
                 // FmAction::WaitingFor,
             ]),
             by_project: FilterByList::Include(vec![
-                "home".to_owned(),
+                "home" .to_owned(),
+                "car"  .to_owned(),
+                "phone".to_owned(),
+
             ]),
             is_open:   true.into(),
 
@@ -72,9 +75,9 @@ impl SortQueue {
         (
             Self {
                 vault:     vault.clone(),
-                file_list: FileList::new(),
-                prompt:    Prompt  ::new(),
-                projects:  Vec     ::new(),
+                file_list: FileTable::new(),
+                prompt:    Prompt   ::new(),
+                projects:  Vec      ::new(),
                 queue_type,
             },
             Task::batch([
@@ -170,7 +173,7 @@ impl SortQueue {
 
                 _debug_print_file_checklist(&files);
 
-                let message = file_list::Message::LoadFiles(files);
+                let message = file_table::Message::LoadFiles(files);
 
                 let action = self.file_list.update(message)?;
                 self.handle_file_list_action(action)?
@@ -204,9 +207,9 @@ impl SortQueue {
 
     }
 
-    fn handle_file_list_action(&mut self, action: file_list::Action) -> Option<Action> {
+    fn handle_file_list_action(&mut self, action: file_table::Action) -> Option<Action> {
         Some(match action {
-            file_list::Action::Selected(id) => self.open_obsidian(id),
+            file_table::Action::Selected(id) => self.open_obsidian(id),
         })
     }
 
@@ -378,7 +381,7 @@ impl From<SortQueue> for UIMode {
 #[derive(Debug)]
 pub enum Message {
     None,
-    FileListMessage (file_list::Message),
+    FileListMessage (file_table::Message),
     PromptMessage   (prompt   ::Message),
 
     LoadFiles   (Files),
