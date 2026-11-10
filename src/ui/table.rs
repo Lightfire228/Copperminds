@@ -153,15 +153,10 @@ where
             return Node::new(limits.min());
         }
 
-        debug!("rows visible: {}", state.rows_visible);
-
         let rows = (self.cells.len() / self.cols.len()).min(state.rows_visible);
 
-        let mut cols_sizes: Vec<f32>  = vec![];
-        let mut children:   Vec<Node> = vec![];
-
-        cols_sizes.resize(self.cols .len(), 0.0);
-        children  .resize(self.cells.len(), Node::default());
+        let mut cols_sizes: Vec<f32>  = vec![0.0;             self.cols .len()];
+        let mut children:   Vec<Node> = vec![Node::default(); self.cells.len()];
 
         let mut fixed_cols  = vec![];
         let mut shrink_cols = vec![];
@@ -197,7 +192,7 @@ where
         }
 
 
-        // Layout min width shrink and grow cols
+        // Layout shrink and min width grow cols
         for x in shrink_cols.iter().chain(&grow_cols) {
 
             let consumed_width: f32 = cols_sizes.iter().sum();
@@ -211,7 +206,7 @@ where
                 let node   = self
                     .cells[i]
                     .as_widget_mut()
-                    .layout(&mut tree.children[i], renderer, &limits)
+                    .layout       (&mut tree.children[i], renderer, &limits)
                 ;
 
                 if col_width < node.size().width {
@@ -224,27 +219,23 @@ where
             cols_sizes[*x] = col_width;
         }
 
-        // Layout grow width cols
+        // Resize grow cols
 
         let consumed_width: f32 = cols_sizes.iter().sum();
         let remaining           = width_available - consumed_width;
 
-        // TODO: multiple growing containers not yet supported
-        for x in grow_cols {
-            cols_sizes[x] += remaining;
+        // TODO:
+        if grow_cols.len() > 1 {
+            panic!("Mutliple grow cols not yet supported");
         }
 
-        info!("col sizes {:?}", &cols_sizes);
 
-        fn grow_node(node: &mut Node, new_width: f32) {
-            let mut tmp = Node::default();
+        for x in grow_cols {
+            cols_sizes[x] += remaining;
 
-            mem::swap(node, &mut tmp);
-            let padding = new_width - tmp.size().width;
-
-            let mut tmp = Node::container(tmp, Padding::ZERO.right(padding));
-            mem::swap(node, &mut tmp);
-
+            for node in children.iter_mut().skip(x).step_by(self.cols.len()) {
+                grow_node(node, cols_sizes[x]);
+            }
         }
 
         // Position cols
@@ -252,8 +243,6 @@ where
             let (x, y) = i_to_xy!(self, i);
 
             let x_offset = cols_sizes.iter().take(x).sum();
-
-            grow_node(node, cols_sizes[x]);
 
             node.move_to_mut((x_offset, y as f32 * self.row_height));
 
@@ -395,4 +384,15 @@ where
         },
         color,
     );
+}
+
+
+// TODO: 0.15 new layout nodes have grow support
+fn grow_node(node: &mut Node, new_width: f32) {
+    let mut tmp = Node::default();
+
+    mem::swap(node, &mut tmp);
+    let padding = new_width - tmp.size().width;
+
+    *node = Node::container(tmp, Padding::ZERO.right(padding));
 }
