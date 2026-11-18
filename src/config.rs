@@ -1,4 +1,4 @@
-use std::{env, fs, path::{self, PathBuf}};
+use std::{env, fs, path::{self, PathBuf}, time::Duration};
 use serde::{Deserialize, Serialize};
 
 
@@ -48,6 +48,9 @@ pub fn get_config(env: Env) -> Config {
         folder_excludes: config.folder_excludes,
         vault_path:      config.vault_folder,
         vault_name:      vault_name,
+
+        // TODO: read from file
+        open_timeout:    Duration::from_millis(250)
     }
 
 }
@@ -73,6 +76,7 @@ pub struct Config {
     /// derived from `vault_path`
     pub vault_name:      String,
 
+    pub open_timeout:    Duration,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone) ]
@@ -89,6 +93,7 @@ impl Default for Config {
             folder_excludes: Default::default(),
             vault_path:      Default::default(),
             vault_name:      Default::default(),
+            open_timeout:    Default::default(),
         }
     }
 }
