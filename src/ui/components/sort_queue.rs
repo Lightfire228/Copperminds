@@ -57,6 +57,8 @@ fn load_filter(queue: QueueType) -> UiFilter {
                 "home" .to_owned(),
                 "car"  .to_owned(),
                 "phone".to_owned(),
+                "pets" .to_owned(),
+                "none" .to_owned(),
 
             ]),
             is_open:   true.into(),
@@ -171,7 +173,7 @@ impl SortQueue {
 
             Message::LoadFiles(files) => {
 
-                _debug_print_file_checklist(&files);
+                // _debug_print_file_checklist(&files);
 
                 let message = file_table::Message::LoadFiles(files);
 
@@ -341,7 +343,6 @@ impl SortQueue {
         Ok(commands)
     }
 
-    // TODO: debounce this while holding the up/down keys
     fn open_obsidian(&self, id: FileId) -> Action {
 
         let tx = self.vault.clone();

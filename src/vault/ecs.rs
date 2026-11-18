@@ -143,12 +143,13 @@ impl Ecs {
         EcsFileView {
             id,
             file,
-            md_text:  self.get_component(id).ok(),
-            empty:    self.get_component::<EmptyFileComponent>(id).is_ok(),
-            type_:    fm.and_then(|fm| fm.type_  .value.as_ref()),
-            action:   fm.and_then(|fm| fm.action .value.as_ref()),
-            status:   fm.and_then(|fm| fm.status .value.as_ref()),
-            project:  fm.and_then(|fm| fm.project.value.as_ref()),
+            md_text:      self.get_component(id).ok(),
+            empty:        self.get_component::<EmptyFileComponent>(id)  .is_ok(),
+            illegal_name: self.get_component::<IllegalNameComponent>(id).is_ok(),
+            type_:        fm.and_then(|fm| fm.type_  .value.as_ref()),
+            action:       fm.and_then(|fm| fm.action .value.as_ref()),
+            status:       fm.and_then(|fm| fm.status .value.as_ref()),
+            project:      fm.and_then(|fm| fm.project.value.as_ref()),
             fm,
         }
     }

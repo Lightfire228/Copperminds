@@ -440,12 +440,26 @@ impl PartialEq for FileView {
 
 impl<'a> From<EcsFileView<'a>> for FileView {
     fn from(value: EcsFileView) -> Self {
+
+        let mut props = vec![];
+
+        if value.illegal_name {
+            props.push(Property::IllegalName);
+        }
+
+        if let Some(proj) = value.project {
+            props.push(Property::Project(proj.name.clone()));
+        }
+
         FileView {
             id:   value.id,
             name: value.file.name.clone(),
+            props,
         }
     }
 }
+
+
 
 
 #[cfg(test)]

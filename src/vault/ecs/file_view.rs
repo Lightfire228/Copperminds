@@ -5,15 +5,16 @@ use crate::{prelude::build_regex, vault::{ecs::{File, FileId, components::*}, fm
 
 #[derive(Debug)]
 pub struct EcsFileView<'a> {
-    pub id:       FileId,
-    pub file:     &'a File,
-    pub fm:       Option<&'a FmComponent>,
-    pub md_text:  Option<&'a MdTextComponent>,
-    pub empty:    bool,
-    pub type_:    Option<&'a FmType>,
-    pub action:   Option<&'a FmAction>,
-    pub status:   Option<&'a FmStatus>,
-    pub project:  Option<&'a FmProject>,
+    pub id:           FileId,
+    pub file:         &'a File,
+    pub fm:           Option<&'a FmComponent>,
+    pub md_text:      Option<&'a MdTextComponent>,
+    pub empty:        bool,
+    pub type_:        Option<&'a FmType>,
+    pub action:       Option<&'a FmAction>,
+    pub status:       Option<&'a FmStatus>,
+    pub project:      Option<&'a FmProject>,
+    pub illegal_name: bool,
 }
 
 

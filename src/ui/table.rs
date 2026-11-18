@@ -153,9 +153,11 @@ where
             return Node::new(limits.min());
         }
 
-        let rows = (self.cells.len() / self.cols.len()).min(state.rows_visible);
+        let cols = self.cols.len();
+        let rows = (self.cells.len() / cols).min(state.rows_visible);
 
-        let mut cols_sizes: Vec<f32>  = vec![0.0;             self.cols .len()];
+
+        let mut cols_sizes: Vec<f32>  = vec![0.0;             cols];
         let mut children:   Vec<Node> = vec![Node::default(); self.cells.len()];
 
         let mut fixed_cols  = vec![];
@@ -233,7 +235,7 @@ where
         for x in grow_cols {
             cols_sizes[x] += remaining;
 
-            for node in children.iter_mut().skip(x).step_by(self.cols.len()) {
+            for node in children.iter_mut().skip(x).step_by(cols) {
                 grow_node(node, cols_sizes[x]);
             }
         }

@@ -15,7 +15,7 @@ use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
 use crate::ui::table::{ColInfo, Row, Table};
 use crate::ui::{table};
-use crate::vault::FileView;
+use crate::vault::{FileView, Property};
 
 
 pub struct FileTable {
@@ -104,6 +104,32 @@ impl FileTable {
                 .into    ()
         }
 
+        fn get_proj<'a>(file: &FileView) -> Element<'a, Message> {
+            let proj = file
+                .props
+                .iter()
+                .filter_map(|x| match x {
+                    Property::Project(proj) => Some(proj.as_str()),
+
+                    _ => None
+                })
+                .next()
+                .unwrap_or("")
+            ;
+
+            text!("{proj}")
+                .wrapping(text::Wrapping::None)
+                .align_y (Alignment::Center)
+                .align_x (Alignment::Start)
+                .into    ()
+        }
+
+        let divider = || text!(" | ")
+            .wrapping(text::Wrapping::None)
+            .align_y (Alignment::Center)
+            .into    ()
+        ;
+
         let files = self
             .files
             .iter()
@@ -111,13 +137,18 @@ impl FileTable {
             .take(self.rows_visible)
         ;
 
+        // TODO: this uses a butt-ton of cpu when scrolling
         let table: Element<'_, Message> = table::Table::new(
             30.0,
             &[
                 ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, "> ")},
+                // TODO: cell padding and column dividers
                 ColInfo { size: Length::Shrink,      col: &|row: Row<FileView>| get_row_num  (row.y + self.scroll)},
-                // TODO: cell padding
-                ColInfo { size: Length::Fixed(5.0),  col: &|row: Row<FileView>| Space::new().into()},
+                ColInfo { size: Length::Shrink,      col: &|_:   Row<FileView>| divider()},
+
+                ColInfo { size: Length::Shrink,      col: &|row: Row<FileView>| get_proj     (row.data)},
+                ColInfo { size: Length::Shrink,      col: &|_:   Row<FileView>| divider()},
+
                 ColInfo { size: Length::Fill,        col: &|row: Row<FileView>| get_file_name(row.data)},
                 ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, " <")},
             ],
