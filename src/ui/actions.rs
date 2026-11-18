@@ -1,10 +1,11 @@
+#![allow(dead_code)]
+
 use std::fmt::Display;
 
 use enum_iterator::Sequence;
 
 use crate::{command_parser::{CommandExpr, CommandGroup}, ui::components::sort_queue::SortQueue, vault::fm::{FmAction, FmStatus}};
 use crate::ui::queue_type::QueueType;
-
 
 type Ua = UiAction;
 type Fa = FmAction;
@@ -19,6 +20,7 @@ pub enum UiAction {
     FilterBy  (FmAction),
     DeleteFile,
 }
+
 
 impl UiAction {
 

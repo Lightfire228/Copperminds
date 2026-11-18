@@ -2,6 +2,7 @@ use yaml_serde::{Mapping, Value, to_value};
 
 use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProject, FmProperty, FmStatus, FmType, GetKey}};
 
+#[allow(dead_code)]
 impl Ecs {
 
     pub fn replicate_changes_to_fm(&mut self, id: FileId) {
@@ -23,7 +24,6 @@ impl Ecs {
         };
     }
 
-    #[allow(dead_code)]
     pub fn remove_action(&mut self, id: FileId) {
         let fm = self.get_fm_mut(id);
 
@@ -42,7 +42,6 @@ impl Ecs {
         };
     }
 
-    #[allow(dead_code)]
     pub fn remove_status(&mut self, id: FileId) {
         let fm = self.get_fm_mut(id);
 
@@ -96,7 +95,6 @@ impl Ecs {
         fm
     }
 
-    #[allow(dead_code)]
     pub fn remove_type(&mut self, id: FileId)  {
         let fm = self.get_fm_mut(id);
 

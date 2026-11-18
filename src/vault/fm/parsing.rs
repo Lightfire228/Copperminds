@@ -9,9 +9,6 @@ pub struct FrontmatterYaml {
     pub action:  Option<FmAction>,
     pub status:  Option<FmStatus>,
     pub project: Option<FmProject>,
-
-    // TODO: move this under `action`
-    pub clarified: Option<bool>,
 }
 
 
@@ -71,7 +68,7 @@ impl From<&Mapping> for FrontmatterYaml {
             type_:     parse_prop   (fm, FmProperty::Type),
             action:    parse_prop   (fm, FmProperty::Action),
             status:    parse_prop   (fm, FmProperty::Status),
-            clarified: parse_bool   (fm, FmProperty::Clarified),
+            // clarified: parse_bool   (fm, FmProperty::Clarified),
             project:   parse_project(fm, FmProperty::Project),
         }
     }
@@ -93,7 +90,7 @@ where
     Some(x)
 }
 
-fn parse_bool(fm: &Mapping, prop: FmProperty) -> Option<bool> {
+fn _parse_bool(fm: &Mapping, prop: FmProperty) -> Option<bool> {
 
     let prop_name = prop.get_key();
 

@@ -58,7 +58,7 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
-    pub const fn is_operator(&self) -> bool {
+    pub const fn _is_operator(&self) -> bool {
         matches!(self,
               TokenKind::Colon
             | TokenKind::At
@@ -90,8 +90,6 @@ impl Tokenizer {
 
     fn parse_expression(&mut self, chars: &[char]) -> TResult<bool> {
         self.skip_whitespace(chars);
-
-        type Tk = TokenKind;
 
         fn s(str: &str) -> String {
             str.to_string()
