@@ -6,7 +6,7 @@ mod to_text;
 pub mod file_view;
 pub mod components;
 
-use std::{any::{Any, TypeId}, collections::HashMap, path::{Path, PathBuf}};
+use std::{any::{Any, TypeId}, collections::{HashMap, hash_map}, path::{Path, PathBuf}};
 use yaml_serde::Mapping;
 
 
@@ -44,14 +44,27 @@ pub struct File {
 
 trait ComponentList: Any + Send + 'static {
     fn remove(&mut self, id: &FileId);
+
+    fn is_fm_component(&self) -> bool;
+
+    fn iter_mut(&mut self) -> Vec<&mut dyn Component>;
 }
 
-impl<'a, T> ComponentList for HashMap<FileId, T>
+
+impl<T> ComponentList for HashMap<FileId, T>
 where
     T: Component,
 {
     fn remove(&mut self, id: &FileId) {
         self.remove(id);
+    }
+
+    fn is_fm_component(&self) -> bool {
+        self.iter().next().is_some_and(|x| x.1.fm_component().is_some())
+    }
+
+    fn iter_mut(&mut self) -> Vec<&mut dyn Component> {
+        self.values_mut().map(|x| x as &mut dyn Component).collect()
     }
 }
 
@@ -126,30 +139,41 @@ impl Ecs {
 
             .entry         (comp_id)
             .or_insert_with(func)
+    }
 
+    pub fn set_component<T>(&mut self, comp_id: FileId, value: T)
+    where
+        T: Component
+    {
+
+        self
+            .get_comp_list_or_insert()
+
+            .entry       (comp_id)
+            .insert_entry(value)
+        ;
     }
 
     pub fn remove_component<T: Component>(&mut self, comp_id: FileId) -> Result<T, ComponentError> {
         let list = self.get_comp_list_mut().ok_or(ComponentError::NoComponentsOfThatType)?;
 
         list.remove(&comp_id).ok_or(ComponentError::ComponentNotFound)
-
-
     }
 
     fn to_file_view<'a>(&'a self, id: FileId, file: &'a File) -> EcsFileView<'a> {
-        let fm: Option<&FmComponent> = self.get_component(id).ok();
+        let fm: Option<&FmYamlComponent> = self.get_component(id).ok();
 
         EcsFileView {
             id,
             file,
             md_text:      self.get_component(id).ok(),
-            empty:        self.get_component::<EmptyFileComponent>(id)  .is_ok(),
+            empty:        self.get_component::<EmptyFileComponent>  (id).is_ok(),
             illegal_name: self.get_component::<IllegalNameComponent>(id).is_ok(),
-            type_:        fm.and_then(|fm| fm.type_  .value.as_ref()),
-            action:       fm.and_then(|fm| fm.action .value.as_ref()),
-            status:       fm.and_then(|fm| fm.status .value.as_ref()),
-            project:      fm.and_then(|fm| fm.project.value.as_ref()),
+
+            type_:        self.get_component::<FmTypeComponent>     (id).ok().and_then(|p| p.0.value.as_ref()),
+            action:       self.get_component::<FmActionComponent>   (id).ok().and_then(|p| p.0.value.as_ref()),
+            status:       self.get_component::<FmStatusComponent>   (id).ok().and_then(|p| p.0.value.as_ref()),
+            project:      self.get_component::<FmProjectComponent>  (id).ok().and_then(|p| p.0.value.as_ref()),
             fm,
         }
     }

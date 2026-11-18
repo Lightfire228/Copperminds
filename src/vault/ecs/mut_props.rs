@@ -1,3 +1,5 @@
+use std::mem;
+
 use yaml_serde::{Mapping, Value, to_value};
 
 use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProject, FmProperty, FmStatus, FmType, GetKey}};
@@ -6,175 +8,111 @@ use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProject, 
 impl Ecs {
 
     pub fn replicate_changes_to_fm(&mut self, id: FileId) {
-        if let Ok(fm) = self.get_component_mut::<FmComponent>(id) {
-            fm.update();
+
+        let fm = self.get_component_or_insert::<FmYamlComponent, _>(id, || FmYamlComponent(FmProp::new_modified(Mapping::new())));
+        let fm = fm.0.value.get_or_insert_with(|| Mapping::new());
+
+        let mut fm = mem::take(fm);
+
+        let fm_components = self
+            .components
+            .iter_mut()
+            .filter  (|x| x.1.is_fm_component())
+            .flat_map(|x| x.1.iter_mut())
+            .map     (|x| x.fm_component_mut().unwrap())
+        ;
+
+        for comp in fm_components {
+            comp.replicate_changes(&mut fm);
         }
+
+        self.set_component(id, FmYamlComponent(FmProp::new_modified(fm)));
+
     }
 
     pub fn set_info(&mut self, id: FileId) {
+        self.remove_empty_flag(id);
+
         self.set_type(id, FmType::Info);
     }
 
     pub fn set_action(&mut self, id: FileId, action: FmAction) {
-        let fm = self.set_type(id, FmType::Action);
+        self.remove_empty_flag(id);
 
-        fm.action = FmProp {
-            value:    Some(action),
-            modified: true,
-        };
+        self.set_type     (id, FmType::Action);
+        self.set_component(id, FmActionComponent(FmProp::new_modified(action)));
     }
 
     pub fn remove_action(&mut self, id: FileId) {
-        let fm = self.get_fm_mut(id);
-
-        fm.action = FmProp {
-            value:    None,
-            modified: true,
-        };
+        _ = self
+            .get_component_mut::<FmActionComponent>(id)
+            .map(|x| x.0.clear())
+        ;
     }
 
     pub fn set_status(&mut self, id: FileId, status: FmStatus) {
-        let fm = self.get_fm_mut(id);
+        self.remove_empty_flag(id);
 
-        fm.status = FmProp {
-            value:    Some(status),
-            modified: true,
-        };
+        self.set_component(id, FmStatusComponent(FmProp::new_modified(status)));
     }
 
     pub fn remove_status(&mut self, id: FileId) {
-        let fm = self.get_fm_mut(id);
-
-        fm.status = FmProp {
-            value:    None,
-            modified: true,
-        };
+        _ = self
+            .get_component_mut::<FmStatusComponent>(id)
+            .map(|x| x.0.clear())
+        ;
     }
 
     pub fn set_project_name(&mut self, id: FileId, name: String) {
-        let fm = self.get_fm_mut(id);
+        self.remove_empty_flag(id);
 
-        let project = fm.project.value.take().unwrap_or_else(|| FmProject {
+        let is_workspace = self
+            .get_component::<FmProjectComponent>(id)
+
+            .map      (|x| x.0.value.as_ref().is_some_and(|x| x.is_workspace))
+            .unwrap_or(false)
+        ;
+
+        self.set_project(id, FmProject{
             name,
-            is_workspace: false
+            is_workspace,
         });
 
-        fm.project = FmProp {
-            value:    Some(project),
-            modified: true,
-        };
     }
 
     pub fn set_project(&mut self, id: FileId, project: FmProject) {
-        let fm = self.get_fm_mut(id);
+        self.remove_empty_flag(id);
 
-        fm.project = FmProp {
-            value:    Some(project),
-            modified: true,
-        };
+        self.set_component(id, FmProjectComponent(FmProp::new_modified(project)));
     }
 
     #[allow(dead_code)]
     pub fn remove_project(&mut self, id: FileId) {
-        let fm = self.get_fm_mut(id);
-
-        fm.project = FmProp {
-            value:    None,
-            modified: true,
-        };
+        _ = self
+            .get_component_mut::<FmProjectComponent>(id)
+            .map(|x| x.0.clear())
+        ;
     }
 
-    fn set_type(&mut self, id: FileId, type_: FmType) -> &mut FmComponent {
-        let fm = self.get_fm_mut(id);
+    fn set_type(&mut self, id: FileId, type_: FmType) {
+        self.remove_empty_flag(id);
 
-        fm.type_ = FmProp {
-            value:    Some(type_),
-            modified: true,
-        };
-
-        fm
+        self.set_component(id, FmTypeComponent(FmProp::new_modified(type_)));
     }
 
     pub fn remove_type(&mut self, id: FileId)  {
-        let fm = self.get_fm_mut(id);
-
-        fm.type_ = FmProp {
-            value:    None,
-            modified: true,
-        };
+        _ = self
+            .get_component_mut::<FmTypeComponent>(id)
+            .map(|x| x.0.clear())
+        ;
     }
 
-
-    fn get_fm_mut(&mut self, id: FileId) -> &mut FmComponent {
-        self.remove_empty_flag(id);
-
-        self.get_component_or_insert(id, || Default::default())
-    }
 
     fn remove_empty_flag(&mut self, id: FileId) {
         _ = self.remove_component::<EmptyFileComponent>(id);
     }
 
 }
-
-impl FmComponent {
-    fn update(&mut self) {
-        update_prop_str (&mut self.fm, FmProperty::Type,    &mut self.type_);
-        update_prop_str (&mut self.fm, FmProperty::Action,  &mut self.action);
-        update_prop_str (&mut self.fm, FmProperty::Status,  &mut self.status);
-        update_prop_proj(&mut self.fm, FmProperty::Project, &mut self.project);
-    }
-
-}
-
-fn update_prop_str<'a, T: GetKey>(fm: &mut Mapping, prop: FmProperty, value: &mut FmProp<T>) {
-    if !value.modified {
-        return;
-    }
-
-    value.modified = false;
-
-    let key = Value::String(prop.get_key());
-
-    let Some(value) = &value.value else {
-        fm.remove(key);
-        return;
-    };
-
-    let value = Value::String(value.get_key());
-
-    let slot = fm.entry(key).or_insert_with(|| Value::Null);
-
-    *slot = value;
-}
-
-fn update_prop_proj<'a>(fm: &mut Mapping, prop: FmProperty, value: &mut FmProp<FmProject>) {
-    if !value.modified {
-        return;
-    }
-
-    value.modified = false;
-
-    let key = Value::String(prop.get_key());
-
-    let Some(value) = &value.value else {
-        fm.remove(key);
-        return;
-    };
-
-
-    let value = if value.is_workspace {
-        to_value(value).expect("Unable to serialize FmProject")
-    }
-    else {
-        Value::String(value.name.clone())
-    };
-
-    let slot = fm.entry(key).or_insert_with(|| Value::Null);
-
-    *slot = value;
-}
-
 
 
 
@@ -191,7 +129,13 @@ mod tests {
 
 
     fn get_fm(ecs: &Ecs, id: FileId) -> &Mapping {
-        &ecs.get_component::<FmComponent>(id).unwrap().fm
+        &ecs
+            .get_component::<FmYamlComponent>(id)
+            .expect("missing fm yaml component")
+            .0
+            .value
+            .as_ref()
+            .expect("missing fm yaml value")
     }
 
     #[test]

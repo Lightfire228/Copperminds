@@ -3,7 +3,9 @@ pub mod parsing;
 use std::{collections::HashMap, fmt::Display, sync::LazyLock};
 
 use enum_iterator::{Sequence, all};
-use yaml_serde::{Mapping, Value};
+use yaml_serde::{Mapping, Value, to_value};
+
+use crate::vault::ecs::components::FmProp;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FmProperty {
@@ -245,4 +247,57 @@ impl FmStatus {
             _ => None?
         })
     }
+}
+
+
+
+
+pub fn update_prop_str<'a, T: GetKey>(fm: &mut Mapping, prop: FmProperty, value: &mut FmProp<T>) {
+    if !value.modified {
+        return;
+    }
+
+    value.modified = false;
+
+    let key = Value::String(prop.get_key());
+
+    let Some(value) = &value.value else {
+        fm.remove(key);
+        return;
+    };
+
+    let value = Value::String(value.get_key());
+
+    let slot = fm.entry(key).or_insert_with(|| Value::Null);
+
+    *slot = value;
+}
+
+
+
+pub fn update_prop_proj<'a>(fm: &mut Mapping, prop: FmProperty, value: &mut FmProp<FmProject>) {
+    if !value.modified {
+        return;
+    }
+
+    value.modified = false;
+
+    let key = Value::String(prop.get_key());
+
+    let Some(value) = &value.value else {
+        fm.remove(key);
+        return;
+    };
+
+
+    let value = if value.is_workspace {
+        to_value(value).expect("Unable to serialize FmProject")
+    }
+    else {
+        Value::String(value.name.clone())
+    };
+
+    let slot = fm.entry(key).or_insert_with(|| Value::Null);
+
+    *slot = value;
 }

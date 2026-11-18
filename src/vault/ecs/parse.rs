@@ -50,16 +50,13 @@ impl Ecs {
 
             let parsed: FrontmatterYaml = (&fm).into();
 
-            let modified = false;
-            self.add_component(file.id, FmComponent {
-                fm,
-                type_:    FmProp { value: parsed.type_,   modified },
-                action:   FmProp { value: parsed.action,  modified },
-                status:   FmProp { value: parsed.status,  modified },
-                project:  FmProp { value: parsed.project, modified },
+            self.add_component(file.id, FmYamlComponent(FmProp::new_unmodified(fm)));
 
-                modified: false,
-            });
+            parsed.type_  .map(|type_|   self.add_component(file.id, FmTypeComponent   (FmProp::new_unmodified(type_))));
+            parsed.action .map(|action|  self.add_component(file.id, FmActionComponent (FmProp::new_unmodified(action))));
+            parsed.status .map(|status|  self.add_component(file.id, FmStatusComponent (FmProp::new_unmodified(status))));
+            parsed.project.map(|project| self.add_component(file.id, FmProjectComponent(FmProp::new_unmodified(project))));
+
         }
 
         if is_empty {

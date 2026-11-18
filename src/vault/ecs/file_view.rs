@@ -7,7 +7,7 @@ use crate::{prelude::build_regex, vault::{ecs::{File, FileId, components::*}, fm
 pub struct EcsFileView<'a> {
     pub id:           FileId,
     pub file:         &'a File,
-    pub fm:           Option<&'a FmComponent>,
+    pub fm:           Option<&'a FmYamlComponent>,
     pub md_text:      Option<&'a MdTextComponent>,
     pub empty:        bool,
     pub type_:        Option<&'a FmType>,

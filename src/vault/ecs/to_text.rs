@@ -3,7 +3,7 @@ use std::fs;
 
 use yaml_serde::{Mapping, Value};
 
-use crate::vault::{ecs::{Ecs, EcsFileView, File, FileId, components::{EmptyFileComponent, FmComponent, FmProp}}, fm::{FmProperty, GetKey}};
+use crate::vault::{ecs::{Ecs, EcsFileView, File, FileId, components::{EmptyFileComponent, FmComponent, FmProp, FmYamlComponent}}, fm::{FmProperty, GetKey}};
 
 
 
@@ -40,14 +40,16 @@ impl<'a> EcsFileView<'a> {
     pub fn to_file_text(&self) -> String {
         let md = self.get_md_text();
 
-        let Some(FmComponent { fm, .. }) = self.fm else {
+        let Some(FmYamlComponent(fm)) = self.fm else {
+            return md;
+        };
+
+        let Some(fm) = &fm.value else {
             return md;
         };
 
 
-
-
-        format!("---\n{}---\n{}", fm_to_text(&fm), md)
+        format!("---\n{}---\n{}", fm_to_text(fm), md)
     }
 
 
