@@ -47,6 +47,8 @@ trait ComponentList: Any + Send + 'static {
 
     fn is_fm_component(&self) -> bool;
 
+    fn get_component_mut(&mut self, id: &FileId) -> Option<&mut dyn Component>;
+
     fn iter_mut(&mut self) -> Vec<&mut dyn Component>;
 }
 
@@ -63,9 +65,14 @@ where
         self.iter().next().is_some_and(|x| x.1.fm_component().is_some())
     }
 
+    fn get_component_mut(&mut self, id: &FileId) -> Option<&mut dyn Component> {
+        self.get_mut(id).map(|x| x as &mut dyn Component)
+    }
+
     fn iter_mut(&mut self) -> Vec<&mut dyn Component> {
         self.values_mut().map(|x| x as &mut dyn Component).collect()
     }
+
 }
 
 type ComponentMap<T> = HashMap<FileId, T>;

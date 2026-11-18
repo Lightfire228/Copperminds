@@ -17,9 +17,12 @@ impl Ecs {
         let fm_components = self
             .components
             .iter_mut()
-            .filter  (|x| x.1.is_fm_component())
-            .flat_map(|x| x.1.iter_mut())
-            .map     (|x| x.fm_component_mut().unwrap())
+            .filter_map(|x| x
+                .1
+                .get_component_mut(&id)
+                .map(|x| x.fm_component_mut())
+                .flatten()
+            )
         ;
 
         for comp in fm_components {
