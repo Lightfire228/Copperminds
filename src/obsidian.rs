@@ -1,9 +1,13 @@
 use std::process::Command;
 
+use crate::prelude::*;
+
 use crate::config::Config;
 
 
 pub fn open_in_obsidian(config: &Config, file_name: &str) {
+
+    trace!("open file in obsidian: {file_name}");
 
     let vault = &config.vault_name;
 

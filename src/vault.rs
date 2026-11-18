@@ -7,38 +7,56 @@ mod watch;
 mod generator;
 
 
-use crate::{config::Config, file_shit, obsidian, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate}, ecs::{Ecs, EcsFileView, NewFile, components::*}, fm::*}};
+use crate::{config::Config, file_shit, obsidian::{self, open_in_obsidian}, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, Responder, VaultCommand, VaultUpdate}, ecs::{Ecs, EcsFileView, NewFile, components::*}, fm::*}};
 use file_id::FileId;
 use futures::future::join_all;
-use log::{debug};
-use std::{collections::{HashMap, HashSet}, env, mem, path::{Path, PathBuf}, sync::LazyLock, usize};
+use log::{debug, logger};
+use std::{borrow::Cow, collections::{HashMap, HashSet}, env, mem, path::{Path, PathBuf}, sync::LazyLock, time::Duration, usize};
 use crate::prelude::*;
 
-use tokio::{select, sync::{mpsc::{self, Sender, Receiver, channel}}};
+use tokio::{select, sync::mpsc::{self, Receiver, Sender, channel}, time::{Instant, sleep}};
 use walkdir::{DirEntry, WalkDir};
+
+type OpenMessage = (Config, String);
 
 pub struct Index {
     subscribers: Vec<Sender<VaultUpdate>>,
     ecs:         Ecs,
     config:      Config,
+    debounce_tx: Sender<OpenMessage>
 }
 
 #[derive(Debug, Clone, Eq)]
 pub struct FileView {
-    pub id:   FileId,
-    pub name: String,
+    pub id:    FileId,
+    pub name:  String,
+    pub props: Vec<Property>,
 }
 
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Property {
+    Project(String),
+    IllegalName,
+}
+
+
+
 impl Index {
-    pub fn build(config: Config) -> Self {
+    pub fn build(config: Config) -> (Self, Receiver<OpenMessage>) {
         let ecs = build_ecs(&config);
 
-        Self {
-            subscribers: vec![],
-            ecs,
-            config,
-        }
+        let (tx, rx) = mpsc::channel(100);
+
+        (
+            Self {
+                subscribers: vec![],
+                ecs,
+                config,
+                debounce_tx: tx,
+            },
+            rx,
+        )
     }
 
     pub fn rebuild_index(&mut self) {
@@ -116,7 +134,14 @@ impl Index {
     fn handle_open_in_obsidian(&self, opts: OpenInObsidian) {
         let file = self.ecs.get(opts.id).unwrap();
 
-        obsidian::open_in_obsidian(&self.config, &file.file.name);
+        // TODO: revenge of the clones
+        let config = self.config.clone();
+        let name   = file.file.name.clone();
+        let tx     = self.debounce_tx.clone();
+
+        tokio::spawn(async move {
+            _ = tx.send((config, name)).await;
+        });
     }
 
     fn handle_register(&mut self) -> Receiver<VaultUpdate> {
@@ -241,7 +266,7 @@ fn is_excluded(path: &Path, config: &Config) -> bool {
 
 pub fn serve(config: &Config) -> Sender<VaultCommand> {
 
-    let mut index = Index::build(config.clone());
+    let (mut index, open_rx) = Index::build(config.clone());
 
     // Do this before setting up the file watch
     index.delete_empty_unnamed_files();
@@ -251,19 +276,22 @@ pub fn serve(config: &Config) -> Sender<VaultCommand> {
 
     let watcher = watch::Watcher::new(config.vault_path.clone()).unwrap();
 
-    tokio::spawn(async move {
-        handle_serve(index, rx, watcher).await;
-    });
+    tokio::spawn(handle_open(open_rx));
+    tokio::spawn(handle_serve(index, rx, watcher));
 
     tx
 }
 
-async fn handle_serve(mut index: Index, mut rx: mpsc::Receiver<VaultCommand>, mut watcher: watch::Watcher) {
+async fn handle_serve(
+    mut index:    Index,
+    mut vault_rx: mpsc::Receiver<VaultCommand>,
+    mut watcher:  watch::Watcher
+) {
 
     loop {
 
         select! {
-            command = rx.recv() => {
+            command = vault_rx.recv() => {
                 if let Some(command) = command {
                     index.handle_command(command);
                 }
@@ -272,6 +300,31 @@ async fn handle_serve(mut index: Index, mut rx: mpsc::Receiver<VaultCommand>, mu
                 index.handle_external_fs_event(event).await;
             }
         };
+
+    }
+}
+
+async fn handle_open(mut open_rx: mpsc::Receiver<OpenMessage>) {
+
+    loop {
+
+        let (config, mut name) = open_rx.recv().await.expect("debounce borken");
+
+        loop {
+            // TODO move this to config
+            let timeout = sleep(Duration::from_millis(250));
+
+            select! {
+                _ = timeout => {
+                    break;
+                }
+                Some((_, n)) = open_rx.recv() => {
+                    name = n;
+                }
+            };
+        }
+
+        open_in_obsidian(&config, &name);
 
     }
 }
@@ -360,6 +413,8 @@ fn build_ecs(config: &Config) -> Ecs {
 
     ecs
 }
+
+
 
 
 #[derive(Debug, Default)]
