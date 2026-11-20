@@ -2,7 +2,7 @@ use std::mem;
 
 use yaml_serde::{Mapping, Value, to_value};
 
-use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProject, FmProperty, FmStatus, FmType, GetKey}};
+use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProject, FmProperty, FmStatus, FmTags, FmType, GetKey}};
 
 #[allow(dead_code)]
 impl Ecs {
@@ -27,6 +27,7 @@ impl Ecs {
 
         for comp in fm_components {
             comp.replicate_changes(&mut fm);
+            comp.set_modified     (false);
         }
 
         self.set_component(id, FmYamlComponent(FmProp::new_modified(fm)));
@@ -89,7 +90,6 @@ impl Ecs {
         self.set_component(id, FmProjectComponent(FmProp::new_modified(project)));
     }
 
-    #[allow(dead_code)]
     pub fn remove_project(&mut self, id: FileId) {
         _ = self
             .get_component_mut::<FmProjectComponent>(id)
@@ -106,6 +106,62 @@ impl Ecs {
     pub fn remove_type(&mut self, id: FileId)  {
         _ = self
             .get_component_mut::<FmTypeComponent>(id)
+            .map(|x| x.0.clear())
+        ;
+    }
+
+    fn add_tag(&mut self, id: FileId, tag: String) {
+        self.remove_empty_flag(id);
+
+        // TODO: need some convenience functions for constructing components
+        let prop = &mut self.get_component_or_insert(id, || FmTagsComponent(FmProp::new_modified(Default::default()))).0;
+        let tags = &mut prop.value.get_or_insert_default().tags;
+
+        // TODO: case?
+        if tags.iter().find(|x| **x == tag).is_some() {
+            return;
+        }
+
+        prop.modified = true;
+        tags.push(tag);
+    }
+
+    pub fn remove_tag(&mut self, id: FileId, tag: &str)  {
+        let Ok(prop) = self.get_component_mut::<FmTagsComponent>(id) else {
+            return;
+        };
+
+        let prop = &mut prop.0;
+
+        let Some(tags) = &mut prop.value else {
+            return;
+        };
+
+        let tags = &mut tags.tags;
+
+        let found = tags
+            .iter      ()
+            .enumerate ()
+            .rfind     (|(_, x)| *x == tag)
+        ;
+
+        let Some(found) = found else {
+            return;
+        };
+
+        prop.modified = true;
+        tags.remove(found.0);
+
+
+        if tags.is_empty() {
+            prop.value = None;
+        }
+
+    }
+
+    pub fn clear_tags(&mut self, id: FileId) {
+        _ = self
+            .get_component_mut::<FmTagsComponent>(id)
             .map(|x| x.0.clear())
         ;
     }
@@ -186,6 +242,8 @@ mod tests {
             FmProperty::Project => "proj",
         ));
 
+
+
         ecs.set_project(id, FmProject {
             name:         "proj".to_string(),
             is_workspace: true,
@@ -203,7 +261,77 @@ mod tests {
         ));
 
 
+
+        ecs.add_tag(id, "tag1".to_owned());
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Type    => FmType  ::Action,
+            FmProperty::Status  => FmStatus::Archived,
+            FmProperty::Action  => FmAction::Backlog,
+            FmProperty::Project => fm!(
+                "name"         => "proj",
+                "is_workspace" => true,
+            ),
+            FmProperty::Tags    => FmTags {
+                tags: vec!["tag1".to_owned()]
+            },
+        ));
+
+        ecs.add_tag(id, "tag2".to_owned());
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Type    => FmType  ::Action,
+            FmProperty::Status  => FmStatus::Archived,
+            FmProperty::Action  => FmAction::Backlog,
+            FmProperty::Project => fm!(
+                "name"         => "proj",
+                "is_workspace" => true,
+            ),
+            FmProperty::Tags    => FmTags {
+                tags: vec![
+                    "tag1".to_owned(),
+                    "tag2".to_owned(),
+                ]
+            },
+        ));
+
+
         // Remove props
+        ecs.remove_tag             (id, "tag1");
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Type    => FmType  ::Action,
+            FmProperty::Status  => FmStatus::Archived,
+            FmProperty::Action  => FmAction::Backlog,
+            FmProperty::Project => fm!(
+                "name"         => "proj",
+                "is_workspace" => true,
+            ),
+            FmProperty::Tags    => FmTags {
+                tags: vec![
+                    "tag2".to_owned(),
+                ]
+            },
+        ));
+
+        ecs.remove_tag             (id, "tag2");
+        ecs.replicate_changes_to_fm(id);
+
+        assert_eq!(get_fm(&ecs, id), &fm!(
+            FmProperty::Type    => FmType  ::Action,
+            FmProperty::Status  => FmStatus::Archived,
+            FmProperty::Action  => FmAction::Backlog,
+            FmProperty::Project => fm!(
+                "name"         => "proj",
+                "is_workspace" => true,
+            ),
+        ));
+
+
+
         ecs.remove_project         (id);
         ecs.replicate_changes_to_fm(id);
 

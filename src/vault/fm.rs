@@ -12,8 +12,8 @@ pub enum FmProperty {
     Status,
     Type,
     Action,
-    Clarified,
     Project,
+    Tags,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Sequence)]
@@ -34,6 +34,12 @@ pub enum FmAction {
 pub enum FmStatus {
     Completed,
     Archived,
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize, Default)]
+pub struct FmTags {
+    pub tags: Vec<String>,
 }
 
 
@@ -96,7 +102,7 @@ impl_get_key!(FmProperty,
     Type      => "type",
     Action    => "action",
     Project   => "project",
-    Clarified => "clarified",
+    Tags      => "tag",
 );
 
 impl_get_key!(FmType,
@@ -205,7 +211,7 @@ impl FmAction {
 }
 
 
-macro_rules! impl_from {
+macro_rules! impl_value_from_str {
     ($ident:ident) => {
 
         impl From<$ident> for Value {
@@ -217,10 +223,19 @@ macro_rules! impl_from {
     };
 }
 
-impl_from!(FmProperty);
-impl_from!(FmType);
-impl_from!(FmAction);
-impl_from!(FmStatus);
+impl_value_from_str!(FmProperty);
+impl_value_from_str!(FmType);
+impl_value_from_str!(FmAction);
+impl_value_from_str!(FmStatus);
+
+
+impl From<FmTags> for Value {
+    fn from(value: FmTags) -> Self {
+        let sequence: Vec<_> = value.tags.iter().map(|x| Value::String(x.clone())).collect();
+        Value::Sequence(sequence.into())
+    }
+}
+
 
 
 impl FmAction {
@@ -252,16 +267,10 @@ impl FmStatus {
 
 
 
-pub fn update_prop_str<'a, T: GetKey>(fm: &mut Mapping, prop: FmProperty, value: &mut FmProp<T>) {
-    if !value.modified {
-        return;
-    }
-
-    value.modified = false;
-
+pub fn update_prop_str<'a, T: GetKey>(fm: &mut Mapping, prop: FmProperty, value: Option<&T>) {
     let key = Value::String(prop.get_key());
 
-    let Some(value) = &value.value else {
+    let Some(value) = value else {
         fm.remove(key);
         return;
     };
@@ -275,16 +284,10 @@ pub fn update_prop_str<'a, T: GetKey>(fm: &mut Mapping, prop: FmProperty, value:
 
 
 
-pub fn update_prop_proj<'a>(fm: &mut Mapping, prop: FmProperty, value: &mut FmProp<FmProject>) {
-    if !value.modified {
-        return;
-    }
-
-    value.modified = false;
-
+pub fn update_prop_proj<'a>(fm: &mut Mapping, prop: FmProperty, value: Option<&FmProject>) {
     let key = Value::String(prop.get_key());
 
-    let Some(value) = &value.value else {
+    let Some(value) = value else {
         fm.remove(key);
         return;
     };
@@ -296,6 +299,22 @@ pub fn update_prop_proj<'a>(fm: &mut Mapping, prop: FmProperty, value: &mut FmPr
     else {
         Value::String(value.name.clone())
     };
+
+    let slot = fm.entry(key).or_insert_with(|| Value::Null);
+
+    *slot = value;
+}
+
+pub fn update_prop_list<'a>(fm: &mut Mapping, prop: FmProperty, values: Option<&[String]>) {
+
+    let key = Value::String(prop.get_key());
+
+    let Some(values) = values else {
+        fm.remove(key);
+        return;
+    };
+
+    let value: Value = to_value(values).expect("unable to serialize list: {prop:?}");
 
     let slot = fm.entry(key).or_insert_with(|| Value::Null);
 

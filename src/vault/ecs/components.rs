@@ -3,14 +3,15 @@ use yaml_serde::Mapping;
 use crate::{config::Config, vault::{ecs::{File, FileId}, fm::*}};
 
 pub trait Component: Send + 'static {
+    #[allow(dead_code)]
     fn fm_component    (&    self) -> Option<&    dyn FmComponent> { None }
     fn fm_component_mut(&mut self) -> Option<&mut dyn FmComponent> { None }
 }
 
 pub trait FmComponent {
-    fn replicate_changes(&mut self, fm: &mut Mapping);
+    fn replicate_changes(&self, fm: &mut Mapping);
 
-    // fn set_modified(&mut self, value: bool);
+    fn set_modified(&mut self, modified: bool);
 }
 
 
@@ -20,12 +21,21 @@ pub struct FmProp<T> {
     pub modified: bool,
 }
 
+macro_rules! def_fm_component {
+    ($name:ident, $kind:ident) => {
 
-#[derive(Debug)] pub struct FmYamlComponent   (pub FmProp<Mapping>);
-#[derive(Debug)] pub struct FmTypeComponent   (pub FmProp<FmType>);
-#[derive(Debug)] pub struct FmActionComponent (pub FmProp<FmAction>);
-#[derive(Debug)] pub struct FmStatusComponent (pub FmProp<FmStatus>);
-#[derive(Debug)] pub struct FmProjectComponent(pub FmProp<FmProject>);
+        #[derive(Debug)]
+        pub struct $name(pub FmProp<$kind>);
+
+    };
+}
+
+def_fm_component!(FmYamlComponent,    Mapping);
+def_fm_component!(FmTypeComponent,    FmType);
+def_fm_component!(FmActionComponent,  FmAction);
+def_fm_component!(FmStatusComponent,  FmStatus);
+def_fm_component!(FmProjectComponent, FmProject);
+def_fm_component!(FmTagsComponent,    FmTags);
 
 #[derive(Debug)]
 pub struct MdTextComponent {
@@ -40,15 +50,6 @@ pub struct EmptyFileComponent;
 #[derive(Debug)]
 pub struct IllegalNameComponent;
 
-
-// impl<T> Default for FmProp<T> {
-//     fn default() -> Self {
-//         Self {
-//             value:    None,
-//             modified: false,
-//         }
-//     }
-// }
 
 impl<T> FmProp<T> {
     pub fn new_modified(value: T) -> Self {
@@ -78,6 +79,22 @@ impl<T> FmProp<T> {
     }
 }
 
+macro_rules! impl_component {
+    ($ty:ty) => {
+        impl Component for $ty {
+            fn fm_component    (&    self) -> Option<&    dyn FmComponent> { None }
+
+            fn fm_component_mut(&mut self) -> Option<&mut dyn FmComponent> { None }
+        }
+    };
+}
+
+impl_component!(FmYamlComponent);
+impl_component!(MdTextComponent);
+impl_component!(EmptyFileComponent);
+impl_component!(IllegalNameComponent);
+
+
 macro_rules! impl_component_with_fm {
     ($ty:ty) => {
         impl Component for $ty {
@@ -93,49 +110,74 @@ macro_rules! impl_component_with_fm {
     };
 }
 
-macro_rules! impl_component {
-    ($ty:ty) => {
-        impl Component for $ty {
-            fn fm_component    (&    self) -> Option<&    dyn FmComponent> { None }
-
-            fn fm_component_mut(&mut self) -> Option<&mut dyn FmComponent> { None }
-        }
-    };
-}
 
 impl_component_with_fm!(FmTypeComponent);
 impl_component_with_fm!(FmActionComponent);
 impl_component_with_fm!(FmStatusComponent);
 impl_component_with_fm!(FmProjectComponent);
+impl_component_with_fm!(FmTagsComponent);
 
-impl_component!(FmYamlComponent);
-impl_component!(MdTextComponent);
-impl_component!(EmptyFileComponent);
-impl_component!(IllegalNameComponent);
-
-
-
-
-impl FmComponent for FmTypeComponent {
-    fn replicate_changes(&mut self, fm: &mut Mapping) {
-        update_prop_str(fm, FmProperty::Type, &mut self.0);
-    }
+macro_rules! def_set_modified {
+    () => {
+        fn set_modified(&mut self, value: bool) {
+            self.0.modified = value;
+        }
+    };
 }
 
-impl FmComponent for FmActionComponent {
-    fn replicate_changes(&mut self, fm: &mut Mapping) {
-        update_prop_str(fm, FmProperty::Action, &mut self.0);
-    }
+
+macro_rules! impl_fm_component_prop_str {
+    ($name:ident, $kind:ident) => {
+
+        impl FmComponent for $name {
+
+            fn replicate_changes(&self, fm: &mut Mapping) {
+
+                if !self.0.modified {
+                    return;
+                }
+
+                update_prop_str(fm, FmProperty::$kind, self.0.value.as_ref());
+            }
+
+            def_set_modified!();
+        }
+    };
 }
 
-impl FmComponent for FmStatusComponent {
-    fn replicate_changes(&mut self, fm: &mut Mapping) {
-        update_prop_str(fm, FmProperty::Status, &mut self.0);
-    }
-}
+impl_fm_component_prop_str!(FmTypeComponent,   Type);
+impl_fm_component_prop_str!(FmActionComponent, Action);
+impl_fm_component_prop_str!(FmStatusComponent, Status);
+
 
 impl FmComponent for FmProjectComponent {
-    fn replicate_changes(&mut self, fm: &mut Mapping) {
-        update_prop_proj(fm, FmProperty::Project, &mut self.0);
+
+    fn replicate_changes(&self, fm: &mut Mapping) {
+        if !self.0.modified {
+            return;
+        }
+
+        update_prop_proj(fm, FmProperty::Project, self.0.value.as_ref());
     }
+
+    def_set_modified!();
+}
+
+impl FmComponent for FmTagsComponent {
+
+    fn replicate_changes(&self, fm: &mut Mapping) {
+        if !self.0.modified {
+            return;
+        }
+
+        let tags = self.0
+            .value
+            .as_ref()
+            .map   (|x| x.tags.as_slice())
+        ;
+
+        update_prop_list(fm, FmProperty::Tags, tags);
+    }
+
+    def_set_modified!();
 }
