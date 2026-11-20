@@ -41,7 +41,7 @@ pub struct File {
     pub raw_text: String,
 }
 
-
+#[allow(dead_code)]
 trait ComponentList: Any + Send + 'static {
     fn remove(&mut self, id: &FileId);
 

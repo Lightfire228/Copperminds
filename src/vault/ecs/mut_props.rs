@@ -204,53 +204,44 @@ mod tests {
 
         let id = fm!(ecs, );
 
+        macro_rules! and_test {
+            ($test:expr) => {
+                ecs.replicate_changes_to_fm(id);
+
+                assert_eq!(get_fm(&ecs, id), &$test);
+            };
+        }
+
         // Add props
-        ecs.set_info               (id);
-        ecs.replicate_changes_to_fm(id);
+        ecs.set_info(id);
+        and_test!(fm!(FmProperty::Type => FmType::Info));
 
-        assert_eq!(get_fm(&ecs, id), &fm!(FmProperty::Type => FmType::Info));
-
-
-
-        ecs.set_status             (id, FmStatus::Archived);
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        ecs.set_status(id, FmStatus::Archived);
+        and_test!(fm!(
             FmProperty::Type   => FmType  ::Info,
             FmProperty::Status => FmStatus::Archived,
         ));
 
-
-
-        ecs.set_action             (id, FmAction::Backlog);
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        ecs.set_action(id, FmAction::Backlog);
+        and_test!(fm!(
             FmProperty::Type   => FmType  ::Action,
             FmProperty::Status => FmStatus::Archived,
             FmProperty::Action => FmAction::Backlog,
         ));
 
-
         ecs.set_project_name(id, "proj".to_string());
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        and_test!(fm!(
             FmProperty::Type    => FmType  ::Action,
             FmProperty::Status  => FmStatus::Archived,
             FmProperty::Action  => FmAction::Backlog,
             FmProperty::Project => "proj",
         ));
 
-
-
         ecs.set_project(id, FmProject {
             name:         "proj".to_string(),
             is_workspace: true,
         });
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        and_test!(fm!(
             FmProperty::Type    => FmType  ::Action,
             FmProperty::Status  => FmStatus::Archived,
             FmProperty::Action  => FmAction::Backlog,
@@ -260,12 +251,8 @@ mod tests {
             ),
         ));
 
-
-
         ecs.add_tag(id, "tag1".to_owned());
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        and_test!(fm!(
             FmProperty::Type    => FmType  ::Action,
             FmProperty::Status  => FmStatus::Archived,
             FmProperty::Action  => FmAction::Backlog,
@@ -279,9 +266,7 @@ mod tests {
         ));
 
         ecs.add_tag(id, "tag2".to_owned());
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        and_test!(fm!(
             FmProperty::Type    => FmType  ::Action,
             FmProperty::Status  => FmStatus::Archived,
             FmProperty::Action  => FmAction::Backlog,
@@ -298,11 +283,10 @@ mod tests {
         ));
 
 
-        // Remove props
-        ecs.remove_tag             (id, "tag1");
-        ecs.replicate_changes_to_fm(id);
 
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        // Remove props
+        ecs.remove_tag(id, "tag1");
+        and_test!(fm!(
             FmProperty::Type    => FmType  ::Action,
             FmProperty::Status  => FmStatus::Archived,
             FmProperty::Action  => FmAction::Backlog,
@@ -317,10 +301,8 @@ mod tests {
             },
         ));
 
-        ecs.remove_tag             (id, "tag2");
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        ecs.remove_tag(id, "tag2");
+        and_test!(fm!(
             FmProperty::Type    => FmType  ::Action,
             FmProperty::Status  => FmStatus::Archived,
             FmProperty::Action  => FmAction::Backlog,
@@ -330,42 +312,26 @@ mod tests {
             ),
         ));
 
-
-
-        ecs.remove_project         (id);
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        ecs.remove_project(id);
+        and_test!(fm!(
             FmProperty::Type   => FmType  ::Action,
             FmProperty::Status => FmStatus::Archived,
             FmProperty::Action => FmAction::Backlog,
         ));
 
-
-
-        ecs.remove_type            (id);
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        ecs.remove_type(id);
+        and_test!(fm!(
             FmProperty::Status => FmStatus::Archived,
             FmProperty::Action => FmAction::Backlog,
         ));
 
-
-
-        ecs.remove_action          (id);
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!(
+        ecs.remove_action(id);
+        and_test!(fm!(
             FmProperty::Status => FmStatus::Archived,
         ));
 
-
-
-        ecs.remove_status          (id);
-        ecs.replicate_changes_to_fm(id);
-
-        assert_eq!(get_fm(&ecs, id), &fm!());
+        ecs.remove_status(id);
+        and_test!(fm!());
     }
 
     #[test]
