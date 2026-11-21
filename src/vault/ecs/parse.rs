@@ -56,6 +56,7 @@ impl Ecs {
             parsed.action .map(|action|  self.add_component(file.id, FmActionComponent (FmProp::new_unmodified(action))));
             parsed.status .map(|status|  self.add_component(file.id, FmStatusComponent (FmProp::new_unmodified(status))));
             parsed.project.map(|project| self.add_component(file.id, FmProjectComponent(FmProp::new_unmodified(project))));
+            parsed.tags   .map(|tags|    self.add_component(file.id, FmTagsComponent   (FmProp::new_unmodified(tags))));
 
         }
 

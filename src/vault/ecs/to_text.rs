@@ -3,24 +3,34 @@ use std::fs;
 
 use yaml_serde::{Mapping, Value};
 
-use crate::vault::{ecs::{Ecs, EcsFileView, File, FileId, components::{EmptyFileComponent, FmComponent, FmProp, FmYamlComponent}}, fm::{FmProperty, GetKey}};
+use crate::vault::{ecs::{Components, Ecs, EcsFileView, File, FileId, components::{EmptyFileComponent, FmComponent, FmProp, FmYamlComponent}}, fm::{FmProperty, GetKey}};
 
 
 
 
-impl Ecs {
+impl Components {
 
-    pub fn write_to_disk(&mut self, id: FileId) {
+    pub fn write_to_disk(&mut self, id: FileId, file: &File) {
 
         self.replicate_changes_to_fm(id);
 
-        let file = self.get(id).unwrap();
+        let file = self.to_file_view(id, file);
         let text = file.to_file_text();
         let file = file.file;
 
         // MAYBE: lock the file before writing to it?
         file.assert_unmodified();
         fs::write(&file.path, &text).unwrap();
+    }
+}
+
+impl Ecs {
+    pub fn write_to_disk(&mut self, id: FileId) {
+        let Some(file) = self.file.get(&id) else {
+            return;
+        };
+
+        self.components.write_to_disk(id, file);
     }
 }
 

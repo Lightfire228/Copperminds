@@ -9,7 +9,7 @@ mod serve;
 
 pub use serve::serve;
 
-use crate::{config::Config, file_shit, obsidian::{self, open_in_obsidian}, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, Responder, VaultCommand, VaultUpdate}, ecs::{Ecs, EcsFileView, NewFile, components::*}, fm::*}};
+use crate::{config::Config, file_shit, obsidian::{self, open_in_obsidian}, vault::{command::{ModifyFile, ModifyFileKind, OpenInObsidian, Responder, VaultCommand, VaultUpdate}, ecs::{Ecs, EcsFileView, NewFile, components::{self, *}}, fm::{FmProperty::Project, *}}};
 use file_id::FileId;
 use futures::future::join_all;
 use log::{debug, logger};
@@ -39,6 +39,7 @@ pub struct FileView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Property {
     Project(String),
+    Tag    (String),
     IllegalName,
 }
 
@@ -226,6 +227,35 @@ impl Index {
         //     })
         // ;
     }
+
+    fn move_project_to_tags(&mut self) {
+        debug!("move_project_to_tags");
+
+        self.ecs.iter_files_mut(|id, file, components| {
+            let project = components.get_component::<FmProjectComponent>(id);
+
+            let Ok(project) = project else {
+                return;
+            };
+
+            let Some(project) = &project.0.value else {
+                return;
+            };
+
+            if project.name.is_empty() {
+                return;
+            }
+
+            let name = project.name.clone();
+
+            components.add_tag                (id, name);
+            components.remove_project         (id);
+            components.replicate_changes_to_fm(id);
+            components.write_to_disk          (id, file);
+        });
+    }
+
+
 }
 
 fn scan_vault(config: &Config) -> impl Iterator<Item = DirEntry> {
@@ -381,6 +411,10 @@ impl<'a> From<EcsFileView<'a>> for FileView {
 
         if let Some(proj) = value.project {
             props.push(Property::Project(proj.name.clone()));
+        }
+
+        for tag in value.tags {
+            props.push(Property::Tag(tag.to_owned()));
         }
 
         FileView {

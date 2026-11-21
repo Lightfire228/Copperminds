@@ -24,7 +24,7 @@ use crate::config::Env;
 
 #[tokio::main]
 async fn main() {
-    let env = Env::Dev;
+    let env = Env::Prod;
 
     // let log_level = log::LevelFilter::Info;
     let log_level = log::LevelFilter::Trace;

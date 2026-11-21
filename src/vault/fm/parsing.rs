@@ -1,7 +1,7 @@
 
-use yaml_serde::{Mapping, Value, from_value};
+use yaml_serde::{Mapping, Value, from_value, to_value};
 
-use crate::{prelude::*, vault::fm::{FmAction, FmProject, FmProperty, FmStatus, FmType, GetKey}};
+use crate::{prelude::*, vault::fm::{FmAction, FmProject, FmProperty, FmStatus, FmTags, FmType, GetKey}};
 
 
 pub struct FrontmatterYaml {
@@ -9,6 +9,7 @@ pub struct FrontmatterYaml {
     pub action:  Option<FmAction>,
     pub status:  Option<FmStatus>,
     pub project: Option<FmProject>,
+    pub tags:    Option<FmTags>,
 }
 
 
@@ -68,8 +69,8 @@ impl From<&Mapping> for FrontmatterYaml {
             type_:     parse_prop   (fm, FmProperty::Type),
             action:    parse_prop   (fm, FmProperty::Action),
             status:    parse_prop   (fm, FmProperty::Status),
-            // clarified: parse_bool   (fm, FmProperty::Clarified),
             project:   parse_project(fm, FmProperty::Project),
+            tags:      parse_tags   (fm, FmProperty::Tags),
         }
     }
 }
@@ -124,6 +125,42 @@ fn parse_project(fm: &Mapping, prop: FmProperty) -> Option<FmProject> {
             })
             .ok()?
         ,
+
+        _ => {
+            warn!("unknown {prop_name} prop: {x:?}");
+            None?
+        }
+    })
+}
+
+fn parse_tags(fm: &Mapping, prop: FmProperty) -> Option<FmTags> {
+
+    let prop_name = prop.get_key();
+
+    let x = fm.get(&prop_name)?;
+
+    Some(match x {
+        Value::Null       => None?,
+        Value::String (s) => FmTags { tags: vec![s.clone()] },
+        Value::Mapping(_) => from_value(x.clone())
+            .inspect_err(|_| {
+                // TODO: should these panic instead?
+                // they might get overwritten by accident otherwise
+                warn!("unknown {prop_name} prop: {x:?}");
+            })
+            .ok()?
+        ,
+        Value::Sequence(x) => {
+            let tags = x.iter().map(yaml_val_to_str).collect();
+
+            let Ok(tags) = tags else {
+                warn!("unable to convert {prop_name} prop: {x:?}");
+                None?
+            };
+
+
+            FmTags { tags }
+        }
 
         _ => {
             warn!("unknown {prop_name} prop: {x:?}");
@@ -347,6 +384,24 @@ use crate::test_utils::{id, load_file};
     #[ignore = "TODO"]
     fn test_parsing_project() {
         todo!()
+    }
+
+    #[test]
+    fn test_parsing_tags() {
+        let fm_yaml = from_yaml(r#"
+            tags:
+              - tag_1
+              - tag_2
+        "#);
+
+        let fm_parsed: FrontmatterYaml = (&fm_yaml).into();
+
+        assert_eq!(fm_parsed.tags, Some(FmTags { tags: vec![
+            "tag_1".into(),
+            "tag_2".into(),
+        ]}));
+
+
     }
 
     fn from_yaml(text: &str) -> Mapping {

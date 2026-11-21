@@ -2,10 +2,11 @@ use std::mem;
 
 use yaml_serde::{Mapping, Value, to_value};
 
-use crate::vault::{ecs::{Ecs, FileId, components::*}, fm::{FmAction, FmProject, FmProperty, FmStatus, FmTags, FmType, GetKey}};
+use crate::vault::{ecs::{Components, Ecs, FileId, components::*}, fm::{FmAction, FmProject, FmProperty, FmStatus, FmTags, FmType, GetKey}};
+
 
 #[allow(dead_code)]
-impl Ecs {
+impl Components {
 
     pub fn replicate_changes_to_fm(&mut self, id: FileId) {
 
@@ -16,12 +17,12 @@ impl Ecs {
 
         let fm_components = self
             .components
-            .iter_mut()
+            .iter_mut  ()
             .filter_map(|x| x
                 .1
                 .get_component_mut(&id)
-                .map(|x| x.fm_component_mut())
-                .flatten()
+                .map              (|x| x.fm_component_mut())
+                .flatten          ()
             )
         ;
 
@@ -31,7 +32,6 @@ impl Ecs {
         }
 
         self.set_component(id, FmYamlComponent(FmProp::new_modified(fm)));
-
     }
 
     pub fn set_info(&mut self, id: FileId) {
@@ -110,15 +110,20 @@ impl Ecs {
         ;
     }
 
-    fn add_tag(&mut self, id: FileId, tag: String) {
+    pub fn add_tag(&mut self, id: FileId, tag: String) {
         self.remove_empty_flag(id);
 
         // TODO: need some convenience functions for constructing components
         let prop = &mut self.get_component_or_insert(id, || FmTagsComponent(FmProp::new_modified(Default::default()))).0;
         let tags = &mut prop.value.get_or_insert_default().tags;
 
-        // TODO: case?
-        if tags.iter().find(|x| **x == tag).is_some() {
+        let exists = tags
+            .iter   ()
+            .find   (|x| eq_tags(x, &tag))
+            .is_some()
+        ;
+
+        if exists {
             return;
         }
 
@@ -142,7 +147,7 @@ impl Ecs {
         let found = tags
             .iter      ()
             .enumerate ()
-            .rfind     (|(_, x)| *x == tag)
+            .rfind     (|(_, x)| eq_tags(x, tag))
         ;
 
         let Some(found) = found else {
@@ -156,7 +161,6 @@ impl Ecs {
         if tags.is_empty() {
             prop.value = None;
         }
-
     }
 
     pub fn clear_tags(&mut self, id: FileId) {
@@ -171,6 +175,37 @@ impl Ecs {
         _ = self.remove_component::<EmptyFileComponent>(id);
     }
 
+}
+
+macro_rules! impl_api {
+    ($name:ident($($args:tt: $ty:ty),* $(,)?)) => {
+        impl Ecs {
+
+            #[allow(dead_code)]
+            pub fn $name(&mut self, $($args: $ty),*) {
+                self.components.$name($($args),*)
+            }
+        }
+    };
+}
+
+impl_api!(replicate_changes_to_fm(id: FileId));
+impl_api!(set_info               (id: FileId));
+impl_api!(set_action             (id: FileId, action:  FmAction));
+impl_api!(remove_action          (id: FileId));
+impl_api!(set_status             (id: FileId, status:  FmStatus));
+impl_api!(remove_status          (id: FileId));
+impl_api!(set_project_name       (id: FileId, name:    String));
+impl_api!(set_project            (id: FileId, project: FmProject));
+impl_api!(remove_project         (id: FileId));
+impl_api!(remove_type            (id: FileId));
+impl_api!(add_tag                (id: FileId, tag:     String));
+impl_api!(remove_tag             (id: FileId, tag:     &str));
+impl_api!(clear_tags             (id: FileId));
+
+fn eq_tags(a: &str, b: &str) -> bool {
+    // TODO: case?
+    a == b
 }
 
 
@@ -189,6 +224,7 @@ mod tests {
 
     fn get_fm(ecs: &Ecs, id: FileId) -> &Mapping {
         &ecs
+            .components
             .get_component::<FmYamlComponent>(id)
             .expect("missing fm yaml component")
             .0

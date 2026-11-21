@@ -104,12 +104,12 @@ impl FileTable {
                 .into    ()
         }
 
-        fn get_proj<'a>(file: &FileView) -> Element<'a, Message> {
-            let proj = file
+        fn get_tags<'a>(file: &FileView) -> Element<'a, Message> {
+            let tag = file
                 .props
                 .iter()
                 .filter_map(|x| match x {
-                    Property::Project(proj) => Some(proj.as_str()),
+                    Property::Tag(tag) => Some(tag.as_str()),
 
                     _ => None
                 })
@@ -117,7 +117,7 @@ impl FileTable {
                 .unwrap_or("")
             ;
 
-            text!("{proj}")
+            text!("{tag}")
                 .wrapping(text::Wrapping::None)
                 .align_y (Alignment::Center)
                 .align_x (Alignment::Start)
@@ -146,7 +146,7 @@ impl FileTable {
                 ColInfo { size: Length::Shrink,      col: &|row: Row<FileView>| get_row_num  (row.y + self.scroll)},
                 ColInfo { size: Length::Shrink,      col: &|_:   Row<FileView>| divider()},
 
-                ColInfo { size: Length::Shrink,      col: &|row: Row<FileView>| get_proj     (row.data)},
+                ColInfo { size: Length::Shrink,      col: &|row: Row<FileView>| get_tags     (row.data)},
                 ColInfo { size: Length::Shrink,      col: &|_:   Row<FileView>| divider()},
 
                 ColInfo { size: Length::Fill,        col: &|row: Row<FileView>| get_file_name(row.data)},

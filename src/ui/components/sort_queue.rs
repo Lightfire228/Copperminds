@@ -53,7 +53,7 @@ fn load_filter(queue: QueueType) -> UiFilter {
                 // FmAction::MaybeSomeday,
                 // FmAction::WaitingFor,
             ]),
-            by_project: FilterByList::Include(vec![
+            by_tags: FilterByList::Include(vec![
                 "home" .to_owned(),
                 "car"  .to_owned(),
                 "phone".to_owned(),

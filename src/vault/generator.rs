@@ -179,8 +179,8 @@ fn generate_actionable(opts: &GeneratorOpts) -> Option<()> {
     ;
 
     let state = match rand::random_range(0.0 .. 1.0) {
-        0.00 .. 0.33 => ActionableState::None,
-        0.33 .. 0.66 => ActionableState::Unsorted,
+        0.00 .. 0.01 => ActionableState::None,
+        0.01 .. 0.02 => ActionableState::Unsorted,
         _            => ActionableState::Sorted,
     };
 
@@ -197,10 +197,17 @@ fn generate_actionable(opts: &GeneratorOpts) -> Option<()> {
             type: action
             action: {action}
         "#),
-
     };
 
-    let fm: Option<Mapping> = yaml_serde::from_str(&fm).ok();
+    let mut fm: Option<Mapping> = yaml_serde::from_str(&fm).ok();
+
+    if let Some(fm) = &mut fm {
+        match rand::random_range(0.0 .. 1.0) {
+            0.00 .. 0.20 => { fm.insert("tags".into(), vec!["tag_1"].into()); },
+            0.20 .. 0.40 => { fm.insert("tags".into(), vec!["tag_1", "tag_2"].into()); },
+            _ => {},
+        }
+    }
 
     let fm = match fm {
         None     => String::new(),

@@ -102,7 +102,7 @@ impl_get_key!(FmProperty,
     Type      => "type",
     Action    => "action",
     Project   => "project",
-    Tags      => "tag",
+    Tags      => "tags",
 );
 
 impl_get_key!(FmType,

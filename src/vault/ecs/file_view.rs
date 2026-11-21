@@ -14,6 +14,7 @@ pub struct EcsFileView<'a> {
     pub action:       Option<&'a FmAction>,
     pub status:       Option<&'a FmStatus>,
     pub project:      Option<&'a FmProject>,
+    pub tags:         Vec<&'a str>,
     pub illegal_name: bool,
 }
 

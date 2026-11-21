@@ -9,3 +9,6 @@ thingy:
 list:
   - hi
   - there
+tags:
+  - tag_1
+  - tag_2

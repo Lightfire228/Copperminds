@@ -25,6 +25,11 @@ pub struct Ecs {
 
     file:       HashMap<FileId, File>,
 
+    components: Components,
+}
+
+#[derive(Default)]
+pub struct Components {
     components: HashMap<TypeId, Box<dyn ComponentList>>,
 }
 
@@ -85,7 +90,7 @@ impl Ecs {
     }
 
     pub fn add_component<T: Component>(&mut self, comp_id: FileId, value: T) {
-        let list = self.get_comp_list_or_insert();
+        let list = self.components.get_comp_list_or_insert();
 
         list.insert(comp_id, value);
     }
@@ -93,13 +98,54 @@ impl Ecs {
     // --- queries
 
     pub fn get_all(&self) -> impl Iterator<Item = EcsFileView<'_>> {
-        self.file.iter().map(|x| self.to_file_view(*x.0, x.1))
+        self.file.iter().map(|x| self.components.to_file_view(*x.0, x.1))
     }
 
     pub fn get(&self, id: FileId) -> Option<EcsFileView<'_>> {
-        self.file.get(&id).map(|x| self.to_file_view(id, x))
+        self.file.get(&id).map(|x| self.components.to_file_view(id, x))
     }
 
+    pub fn _to_file_view<'a>(&'a self, id: FileId) -> Option<EcsFileView<'a>> {
+        let file = self.file.get(&id)?;
+
+        Some(self.components.to_file_view(id, file))
+    }
+
+    pub fn get_component_counts<'a, T: Component>(&'a self) -> usize {
+        self.components.get_component_counts::<T>()
+    }
+
+    pub fn _iter_files(&self) -> impl Iterator<Item = (&FileId, &File)> {
+        self.file.iter()
+    }
+
+    pub fn iter_files_mut<F>(&mut self, f: F)
+    where
+        F: Fn(FileId, &mut File, &mut Components) -> ()
+    {
+        for (id, file) in self.file.iter_mut() {
+            f(*id, file, &mut self.components);
+        }
+    }
+
+    /// Removes file from all components.
+    /// NOTE: does not delete file from disk
+    pub fn remove_file(&mut self, id: FileId) -> File {
+        self
+            .components
+            .components
+            .iter_mut()
+            .for_each(|x| {
+                x.1.remove(&id);
+            })
+        ;
+
+        self.file.remove(&id).unwrap()
+    }
+
+}
+
+impl Components {
     pub fn _iter_components<T: Component>(&self) -> impl Iterator<Item = (&FileId, &T)> {
         self.get_comp_list().unwrap().iter()
     }
@@ -108,6 +154,41 @@ impl Ecs {
         self.get_comp_list_mut().unwrap().iter_mut()
     }
 
+
+    fn to_file_view<'a>(&'a self, id: FileId, file: &'a File) -> EcsFileView<'a> {
+        let fm: Option<&FmYamlComponent> = self.get_component(id).ok();
+
+        macro_rules! get_fm_prop {
+            ($ty:ty) => {
+                self.get_component::<$ty>(id).ok().and_then(|p| p.0.value.as_ref())
+            };
+        }
+
+        EcsFileView {
+            id,
+            file,
+            md_text:      self.get_component(id).ok(),
+            empty:        self.get_component::<EmptyFileComponent>  (id).is_ok(),
+            illegal_name: self.get_component::<IllegalNameComponent>(id).is_ok(),
+
+            type_:        get_fm_prop!(FmTypeComponent),
+            action:       get_fm_prop!(FmActionComponent),
+            status:       get_fm_prop!(FmStatusComponent),
+            project:      get_fm_prop!(FmProjectComponent),
+            tags:         get_fm_prop!(FmTagsComponent)
+                .map_or_default(|x| x.tags.iter().map(|x| x.as_str()).collect())
+            ,
+            fm,
+        }
+    }
+
+    pub fn get_component_counts<'a, T: Component>(&'a self) -> usize {
+        self.get_comp_list::<T>().map_or_else(|| 0, |x| x.len())
+    }
+
+}
+
+impl Components {
 
     pub fn get_component<T: Component>(&self, comp_id: FileId) -> Result<&T, ComponentError> {
         type Er = ComponentError;
@@ -167,47 +248,8 @@ impl Ecs {
         list.remove(&comp_id).ok_or(ComponentError::ComponentNotFound)
     }
 
-    fn to_file_view<'a>(&'a self, id: FileId, file: &'a File) -> EcsFileView<'a> {
-        let fm: Option<&FmYamlComponent> = self.get_component(id).ok();
 
-        EcsFileView {
-            id,
-            file,
-            md_text:      self.get_component(id).ok(),
-            empty:        self.get_component::<EmptyFileComponent>  (id).is_ok(),
-            illegal_name: self.get_component::<IllegalNameComponent>(id).is_ok(),
-
-            type_:        self.get_component::<FmTypeComponent>     (id).ok().and_then(|p| p.0.value.as_ref()),
-            action:       self.get_component::<FmActionComponent>   (id).ok().and_then(|p| p.0.value.as_ref()),
-            status:       self.get_component::<FmStatusComponent>   (id).ok().and_then(|p| p.0.value.as_ref()),
-            project:      self.get_component::<FmProjectComponent>  (id).ok().and_then(|p| p.0.value.as_ref()),
-            fm,
-        }
-    }
-
-    pub fn get_component_counts<'a, T: Component>(&'a self) -> usize {
-        self.get_comp_list::<T>().map_or_else(|| 0, |x| x.len())
-    }
-
-    // --- writes
-
-    /// Removes file from all components.
-    /// NOTE: does not delete file from disk
-    pub fn remove_file(&mut self, id: FileId) -> File {
-        self
-            .components
-            .iter_mut()
-            .for_each(|x| {
-                x.1.remove(&id);
-            })
-        ;
-
-        self.file.remove(&id).unwrap()
-    }
-
-
-    // --- utils
-
+    // utils
     fn get_comp_list<T: Component>(&self) -> Option<&ComponentMap<T>> {
         let type_id = map_id::<T>();
 
@@ -247,8 +289,6 @@ impl Ecs {
     }
 
 }
-
-
 
 #[inline(always)]
 fn map_id<T: Component>() -> TypeId {

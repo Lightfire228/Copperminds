@@ -1,6 +1,8 @@
+use std::ops::Deref;
+
 use enum_iterator::Sequence;
 
-use crate::vault::{ecs::EcsFileView, fm::{FmAction, FmProject, FmStatus, FmType}};
+use crate::vault::{ecs::EcsFileView, fm::{FmAction, FmProject, FmStatus, FmTags, FmType}};
 
 
 #[derive(Debug, Default)]
@@ -9,6 +11,7 @@ pub struct UiFilter {
     pub by_action:    FilterByList<FmAction>,
     pub by_status:    FilterByList<FmStatus>,
     pub by_project:   FilterByList<String>,
+    pub by_tags:      FilterByList<String>,
     pub needs_sorted: Option<bool>,
     pub is_open:      Option<bool>,
 }
@@ -38,7 +41,6 @@ where
     pub fn matches_by<Func, T>(&self, value: Option<&T>, selector: Func) -> bool
     where
         Func:  Fn(&T) -> &Value,
-        Value: PartialEq,
     {
         match self {
             FilterByList::All            => true,
@@ -47,15 +49,31 @@ where
             FilterByList::Exclude(items) => value.is_none_or (|v| !items.iter().any(|i| i == selector(v))),
         }
     }
+
+    pub fn matches_any(&self, value: &[String]) -> bool
+    where
+        Value: ToString
+    {
+        match self {
+            FilterByList::All            => true,
+            FilterByList::None           => value.is_empty(),
+            FilterByList::Include(items) => value.iter().any(|v|  items.iter().any(|i| i.to_string() == *v)),
+            FilterByList::Exclude(items) => value.iter().any(|v| !items.iter().any(|i| i.to_string() == *v)),
+        }
+    }
 }
 
 impl UiFilter {
     pub fn matches(&self, file: &EcsFileView) -> bool {
+
+        let tags: Vec<_> = file.tags.iter().map(|x| x.to_string()).collect();
+
         all(&[
-            self.by_type   .matches   (file.type_),
-            self.by_action .matches   (file.action),
-            self.by_status .matches   (file.status),
-            self.by_project.matches_by(file.project, |p: &FmProject| &p.name),
+            self.by_type   .matches    (file.type_),
+            self.by_action .matches    (file.action),
+            self.by_status .matches    (file.status),
+            self.by_project.matches_by (file.project, |p: &FmProject| &p.name),
+            self.by_tags   .matches_any(tags.as_slice()),
 
             self.needs_sorted.is_none_or(|x| x == file.needs_sorting()),
             self.is_open     .is_none_or(|x| x == file.is_open      ()),

@@ -14,9 +14,7 @@ pub fn serve(config: &Config) -> Sender<VaultCommand> {
 
     let (mut index, open_rx) = Index::build(config.clone());
 
-    // Do this before setting up the file watch
-    index.delete_empty_unnamed_files();
-
+    index.on_startup();
 
     let (tx, rx) = mpsc::channel::<VaultCommand>(1000);
 
@@ -27,6 +25,17 @@ pub fn serve(config: &Config) -> Sender<VaultCommand> {
 
     tx
 }
+
+impl Index {
+
+    /// Do this before setting up the file watch
+    fn on_startup(&mut self) {
+        self.delete_empty_unnamed_files();
+
+        // self.move_project_to_tags();
+    }
+}
+
 
 async fn handle_serve(
     mut index:    Index,
