@@ -228,6 +228,7 @@ impl Index {
         // ;
     }
 
+    #[allow(dead_code)]
     fn move_project_to_tags(&mut self) {
         debug!("move_project_to_tags");
 

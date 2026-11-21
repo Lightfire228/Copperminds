@@ -113,6 +113,7 @@ impl FileTable {
 
                     _ => None
                 })
+                // TODO: display more than one tag
                 .next()
                 .unwrap_or("")
             ;

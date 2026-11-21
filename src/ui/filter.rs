@@ -50,30 +50,27 @@ where
         }
     }
 
-    pub fn matches_any(&self, value: &[String]) -> bool
+    pub fn matches_any<'a, T>(&'a self, value: &[T]) -> bool
     where
-        Value: ToString
+        Value: PartialEq<T>,
     {
         match self {
             FilterByList::All            => true,
             FilterByList::None           => value.is_empty(),
-            FilterByList::Include(items) => value.iter().any(|v|  items.iter().any(|i| i.to_string() == *v)),
-            FilterByList::Exclude(items) => value.iter().any(|v| !items.iter().any(|i| i.to_string() == *v)),
+            FilterByList::Include(items) => value.iter().any(|v|  items.iter().any(|i| i == v)),
+            FilterByList::Exclude(items) => value.iter().any(|v| !items.iter().any(|i| i == v)),
         }
     }
 }
 
 impl UiFilter {
     pub fn matches(&self, file: &EcsFileView) -> bool {
-
-        let tags: Vec<_> = file.tags.iter().map(|x| x.to_string()).collect();
-
         all(&[
             self.by_type   .matches    (file.type_),
             self.by_action .matches    (file.action),
             self.by_status .matches    (file.status),
             self.by_project.matches_by (file.project, |p: &FmProject| &p.name),
-            self.by_tags   .matches_any(tags.as_slice()),
+            self.by_tags   .matches_any(file.tags.as_slice()),
 
             self.needs_sorted.is_none_or(|x| x == file.needs_sorting()),
             self.is_open     .is_none_or(|x| x == file.is_open      ()),
@@ -92,7 +89,6 @@ impl<T> Default for FilterByList<T> {
         FilterByList::All
     }
 }
-
 
 #[cfg(test)]
 mod tests {
