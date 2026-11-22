@@ -114,6 +114,26 @@ impl Index {
         result
     }
 
+    fn get_vault_tags(&self) -> HashMap<String, usize> {
+
+        let mut result = HashMap::new();
+
+        let files = self
+            .ecs
+            .get_all ()
+            .filter  (|f| f.is_open())
+            .map     (|f| f.tags)
+            .flatten ()
+            .map     (|t| t.to_string())
+        ;
+
+        for f in files {
+            *result.entry(f).or_insert_with(|| 0) += 1;
+        }
+
+        result
+    }
+
     pub fn handle_command(&mut self, command: VaultCommand) {
 
         macro_rules! send {
@@ -131,6 +151,7 @@ impl Index {
             VaultCommand::NukeActionables(_,    resp) => send!(resp => self.nuke_action_property   ()),
             VaultCommand::GetVaultStats  (_,    resp) => send!(resp => self.calc_vault_stats_ecs   ()),
             VaultCommand::GetProjects    (_,    resp) => send!(resp => self.get_vault_projects     ()),
+            VaultCommand::GetTags        (_,    resp) => send!(resp => self.get_vault_tags         ()),
         }
     }
 

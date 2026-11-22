@@ -14,6 +14,7 @@ pub enum VaultCommand {
     Register        (Register,         Responder<Subscriber<VaultUpdate>>),
     GetVaultStats   (GetVaultStats,    Responder<VaultStats>),
     GetProjects     (GetProjects,      Responder<HashMap<String, usize>>),
+    GetTags         (GetTags,          Responder<HashMap<String, usize>>),
     NukeActionables (NukeActionables,  Responder<()>),
 
     ModifyFile      (ModifyFile,       Responder<Result<(), String>>),
@@ -61,6 +62,9 @@ pub struct GetVaultStats {
 pub struct GetProjects {}
 
 #[derive(Debug)]
+pub struct GetTags {}
+
+#[derive(Debug)]
 pub struct NukeActionables {}
 
 
@@ -80,6 +84,7 @@ macro_rules! to_command {
     };
 }
 
+// TODO: clean this up
 to_command!(IterFilesWith,    Vec<FileView>);
 to_command!(OpenInObsidian,   ());
 to_command!(Register,         Subscriber<VaultUpdate>);
@@ -88,6 +93,7 @@ to_command!(ModifyFile,       Result<(), String>);
 to_command!(DeleteFile,       ());
 to_command!(NukeActionables,  ());
 to_command!(GetProjects,      HashMap<String, usize>);
+to_command!(GetTags,          HashMap<String, usize>);
 
 impl<T> Cmd<T> for VaultCommand {
     fn to_command(self, _: Responder<T>) -> VaultCommand {

@@ -18,7 +18,7 @@ use crate::ui::key_event::KeyPressed;
 use crate::ui::filter::{UiFilter, FilterByList};
 use crate::ui::{self, UIMode, send_vault_cmd};
 use crate::ui::queue_type::QueueType;
-use crate::vault::command::{DeleteFile, GetProjects, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
+use crate::vault::command::{DeleteFile, GetProjects, GetTags, IterFilesWith, ModifyFile, ModifyFileKind, OpenInObsidian, VaultCommand, VaultUpdate};
 use crate::vault::ecs::EcsFileView;
 use crate::vault::fm::*;
 
@@ -30,7 +30,7 @@ pub struct SortQueue {
 
     file_list:    FileTable,
     prompt:       Prompt,
-    projects:     Vec<(String, usize)>,
+    tags:     Vec<(String, usize)>,
     // command_list: Vec<MenuCommand<UiAction>>
 }
 
@@ -79,12 +79,12 @@ impl SortQueue {
                 vault:     vault.clone(),
                 file_list: FileTable::new(),
                 prompt:    Prompt   ::new(),
-                projects:  Vec      ::new(),
+                tags:  Vec      ::new(),
                 queue_type,
             },
             Task::batch([
                 Task::perform(load_files   (vault.clone(), queue_type), Message::LoadFiles),
-                Task::perform(load_projects(vault),                     Message::LoadProjects),
+                Task::perform(load_tags(vault),                     Message::LoadTags),
             ])
 
         )
@@ -115,10 +115,10 @@ impl SortQueue {
             .map(|x| x.into())
         ;
 
-        let projects = self
-            .projects
+        let tags = self
+            .tags
             .iter()
-            .map(|p| text!("- {:<20} - {:>3}", p.0, p.1).into())
+            .map(|t| text!("- {:<20} - {:>3}", t.0, t.1).into())
         ;
 
         container(
@@ -130,9 +130,9 @@ impl SortQueue {
                         column(options),
                         text!(""),
 
-                        text!("Projects"),
+                        text!("Tags"),
                         text!("==="),
-                        column(projects),
+                        column(tags),
 
                         Space::new().height(Fill),
 
@@ -181,10 +181,10 @@ impl SortQueue {
                 self.handle_file_list_action(action)?
             }
 
-            Message::LoadProjects(projects) => {
-                self.projects = projects.into_iter().collect();
+            Message::LoadTags(tags) => {
+                self.tags = tags.into_iter().collect();
 
-                self.projects.sort();
+                self.tags.sort();
 
                 None?
             }
@@ -204,7 +204,7 @@ impl SortQueue {
 
         Task::batch([
             Task::perform(load_files   (vault(), self.queue_type), Message::LoadFiles),
-            Task::perform(load_projects(vault()),                  Message::LoadProjects),
+            Task::perform(load_tags(vault()),                  Message::LoadTags),
         ])
 
     }
@@ -386,7 +386,7 @@ pub enum Message {
     PromptMessage   (prompt   ::Message),
 
     LoadFiles   (Files),
-    LoadProjects(HashMap<String, usize>),
+    LoadTags    (HashMap<String, usize>),
     VaultUpdate (VaultUpdate),
 }
 
@@ -418,10 +418,10 @@ async fn load_files(vault: Sender<VaultCommand>, queue: QueueType) -> Files {
     .into()
 }
 
-async fn load_projects(vault: Sender<VaultCommand>) -> HashMap<String, usize> {
+async fn load_tags(vault: Sender<VaultCommand>) -> HashMap<String, usize> {
     send_vault_cmd(
         &vault,
-        GetProjects {}
+        GetTags {}
     )
     .await
     .into()
