@@ -241,6 +241,7 @@ pub enum CommandExpr {
     SetAction (FmAction),
     SetStatus (FmStatus),
     SetProject(String),
+    AddTag    (String),
     SetInfo,
     Delete,
 }
@@ -316,9 +317,10 @@ impl CommandGroup {
         Ok(match (self.operator.kind, self.target.lexeme.as_str()) {
             (Tk::Colon, "d") => CommandExpr::Delete,
             (Tk::Colon, "i") => CommandExpr::SetInfo,
-            (Tk::Colon, "a") => self.parse_set_action()?,
-            (Tk::Colon, "s") => self.parse_set_status()?,
+            (Tk::Colon, "a") => self.parse_set_action ()?,
+            (Tk::Colon, "s") => self.parse_set_status ()?,
             (Tk::Colon, "p") => self.parse_set_project()?,
+            (Tk::Colon, "t") => self.parse_add_tag    ()?,
             _ => parse_err!(self.operator, UnknownTarget)?
         })
     }
@@ -362,6 +364,16 @@ impl CommandGroup {
 
 
         Ok(CommandExpr::SetProject(value.lexeme))
+    }
+
+    fn parse_add_tag(self) -> Result<CommandExpr, ParseError> {
+
+        let Some(value) = self.value else {
+            return parse_err!(self.target, MissingValue);
+        };
+
+
+        Ok(CommandExpr::AddTag(value.lexeme))
     }
 }
 

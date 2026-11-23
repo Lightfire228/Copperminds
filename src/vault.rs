@@ -186,6 +186,7 @@ impl Index {
                 ModifyFileKind::SetAction (a) => self.ecs.set_action      (opts.id, a),
                 ModifyFileKind::SetStatus (s) => self.ecs.set_status      (opts.id, s),
                 ModifyFileKind::SetProject(p) => self.ecs.set_project_name(opts.id, p),
+                ModifyFileKind::AddTag    (t) => self.ecs.add_tag         (opts.id, t),
             }
         }
 
@@ -208,6 +209,7 @@ impl Index {
                 ModifyFileKind::SetAction (_) => action  .push(cmd),
                 ModifyFileKind::SetStatus (_) => status  .push(cmd),
                 ModifyFileKind::SetProject(_) => projects.push(cmd),
+                ModifyFileKind::AddTag    (_) => {},
             }
         }
 

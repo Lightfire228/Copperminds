@@ -113,6 +113,7 @@ pub enum ModifyFileKind {
     SetAction (FmAction),
     SetStatus (FmStatus),
     SetProject(String),
+    AddTag    (String),
 }
 
 

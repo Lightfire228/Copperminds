@@ -17,6 +17,7 @@ pub enum UiAction {
     SetAction (FmAction),
     SetStatus (FmStatus),
     SetProject(String),
+    AddTag    (String),
     FilterBy  (FmAction),
     DeleteFile,
 }
@@ -39,6 +40,7 @@ impl UiAction {
             Ua::SetStatus (Fs::Completed)     => "status    - complete",
             Ua::SetStatus (Fs::Archived)      => "status    - archived",
             Ua::SetProject(_)                 => "project   -",
+            Ua::AddTag    (_)                 => "tag       - add tag",
             Ua::DeleteFile                    => "command   - delete file",
             Ua::FilterBy (Fa::Todo)           => "filter by - todo",
             Ua::FilterBy (Fa::Backlog)        => "filter by - backlog",
@@ -57,6 +59,7 @@ impl Display for UiAction {
             UiAction::SetAction (a) => write!(f, "Set Action {a}"),
             UiAction::SetStatus (s) => write!(f, "Set Status {s}"),
             UiAction::SetProject(p) => write!(f, "Set Project {p}"),
+            UiAction::AddTag    (t) => write!(f, "Add Tag {t}"),
             UiAction::DeleteFile    => write!(f, "Delete File"),
             UiAction::FilterBy  (x) => write!(f, "Filter By {x}"),
         }
@@ -68,10 +71,11 @@ impl From<CommandExpr> for UiAction {
     fn from(expr: CommandExpr) -> Self {
         match expr {
             CommandExpr::Delete        => UiAction::DeleteFile,
-            CommandExpr::SetAction(x)  => UiAction::SetAction(x),
-            CommandExpr::SetStatus(x)  => UiAction::SetStatus(x),
+            CommandExpr::SetAction (x) => UiAction::SetAction (x),
+            CommandExpr::SetStatus (x) => UiAction::SetStatus (x),
             CommandExpr::SetInfo       => UiAction::SetTypeInfo,
             CommandExpr::SetProject(p) => UiAction::SetProject(p),
+            CommandExpr::AddTag    (t) => UiAction::AddTag    (t),
         }
     }
 }

@@ -30,7 +30,7 @@ pub struct SortQueue {
 
     file_list:    FileTable,
     prompt:       Prompt,
-    tags:     Vec<(String, usize)>,
+    tags:         Vec<(String, usize)>,
     // command_list: Vec<MenuCommand<UiAction>>
 }
 
@@ -79,12 +79,12 @@ impl SortQueue {
                 vault:     vault.clone(),
                 file_list: FileTable::new(),
                 prompt:    Prompt   ::new(),
-                tags:  Vec      ::new(),
+                tags:      Vec      ::new(),
                 queue_type,
             },
             Task::batch([
-                Task::perform(load_files   (vault.clone(), queue_type), Message::LoadFiles),
-                Task::perform(load_tags(vault),                     Message::LoadTags),
+                Task::perform(load_files(vault.clone(), queue_type), Message::LoadFiles),
+                Task::perform(load_tags (vault),                     Message::LoadTags),
             ])
 
         )
@@ -108,6 +108,7 @@ impl SortQueue {
             text!(":s archive        -"),
             text!(""),
             text!(":p [project name] -"),
+            text!(":t [tag     name] -"),
             text!(""),
             text!(":d                - delete file"),
         ]
@@ -437,6 +438,7 @@ impl TryInto<ModifyFileKind> for UiAction {
             UiAction::SetAction (a) => ModifyFileKind::SetAction (a),
             UiAction::SetStatus (s) => ModifyFileKind::SetStatus (s),
             UiAction::SetProject(p) => ModifyFileKind::SetProject(p),
+            UiAction::AddTag    (t) => ModifyFileKind::AddTag    (t),
             _                       => Err(())?,
         })
     }

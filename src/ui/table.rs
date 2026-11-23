@@ -28,6 +28,8 @@ where
 pub struct TableState {
     rows_visible:  usize,
     last_callback: usize,
+
+    col_widths: Vec<f32>,
 }
 
 macro_rules! i_to_xy {
@@ -129,6 +131,8 @@ where
         tree::State::new(TableState {
             rows_visible:  0,
             last_callback: 0,
+
+            col_widths: vec![],
         })
     }
 
@@ -240,6 +244,7 @@ where
             }
         }
 
+
         // Position cols
         for (i, node) in children.iter_mut().enumerate() {
             let (x, y) = i_to_xy!(self, i);
@@ -251,6 +256,8 @@ where
         }
 
         let limits = limits.min_width(cols_sizes.iter().sum()).min_height(rows as f32 * self.row_height);
+
+        state.col_widths = cols_sizes;
 
         Node::with_children(limits.min(), children)
     }
@@ -266,6 +273,8 @@ where
         cursor:    iced::advanced::mouse::Cursor,
         viewport: &iced::Rectangle,
     ) {
+
+        let state: &TableState = tree.state.downcast_ref();
 
         let bounds = layout.bounds();
 
@@ -289,7 +298,7 @@ where
 
             let layout = layout_iter.next().unwrap();
 
-            let width  = layout.bounds().width;
+            let width  = state.col_widths[x];
             let height = layout.bounds().height;
 
             if x == 0 {
