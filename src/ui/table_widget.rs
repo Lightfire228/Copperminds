@@ -51,7 +51,14 @@ pub struct Row<'a, Data> {
     pub data: &'a Data,
 }
 
-pub struct ColInfo<'a, 'widget, Message, Theme, Renderer, Data> {
+pub struct ColInfo<
+    'a,
+    'widget,
+    Data,
+    Message,
+    Theme    = iced::Theme,
+    Renderer = iced::Renderer
+> {
     pub size: Length,
     pub col:  &'a dyn Fn(Row<'a, Data>) -> Element<'widget, Message, Theme, Renderer>,
 }
@@ -67,7 +74,7 @@ where
 
     pub fn new<'a, Data>(
         row_height:    f32,
-        col_select:    &[ColInfo<'a, 'widget, Message, Theme, Renderer, Data>],
+        col_select:    &[ColInfo<'a, 'widget, Data, Message, Theme, Renderer>],
         data:          impl Iterator<Item = &'a Data>,
         rows_message:  CallBack,
     )
@@ -291,24 +298,20 @@ where
             .enumerate()
         ;
 
-        let mut x_offset: f32 = 0.0;
-
         for (i, cell) in children {
             let (x, y) = i_to_xy!(self, i);
 
-            let layout = layout_iter.next().unwrap();
 
             let width  = state.col_widths[x];
-            let height = layout.bounds().height;
+            let height = self.row_height;
 
-            if x == 0 {
-                x_offset = 0.0;
-            }
+            let x_offset: f32 = state.col_widths.iter().take(x).sum();
+            let y_offset: f32 = y as f32 * self.row_height;
 
             // calculate new viewport to clip content overflow
             let viewport = &iced::Rectangle {
                 x: bounds.x + x_offset,
-                y: bounds.y + (y as f32 * layout.bounds().height),
+                y: bounds.y + y_offset,
                 width,
                 height,
             };
@@ -316,6 +319,8 @@ where
             if y % 2 == 0 {
                 draw_alt_row_background(renderer, viewport);
             }
+
+            let layout = layout_iter.next().unwrap();
 
             cell.as_widget().draw(
                 &tree.children[i],
@@ -326,8 +331,6 @@ where
                 cursor,
                 viewport,
             );
-
-            x_offset += width;
         }
     }
 

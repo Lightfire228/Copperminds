@@ -204,8 +204,8 @@ impl SortQueue {
         let vault = || self.vault.clone();
 
         Task::batch([
-            Task::perform(load_files   (vault(), self.queue_type), Message::LoadFiles),
-            Task::perform(load_tags(vault()),                  Message::LoadTags),
+            Task::perform(load_files(vault(), self.queue_type), Message::LoadFiles),
+            Task::perform(load_tags (vault()),                  Message::LoadTags),
         ])
 
     }

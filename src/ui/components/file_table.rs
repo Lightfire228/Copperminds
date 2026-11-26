@@ -13,8 +13,8 @@ use log::{debug, info, trace};
 
 use crate::collections::Files;
 use crate::ui::key_event::KeyPressed;
-use crate::ui::table::{ColInfo, Row, Table};
-use crate::ui::{table};
+use crate::ui::table_widget::{ColInfo, Row, Table};
+use crate::ui::{table_widget};
 use crate::vault::{FileView, Property};
 
 
@@ -105,7 +105,7 @@ impl FileTable {
         }
 
         fn get_tags<'a>(file: &FileView) -> Element<'a, Message> {
-            let tag = file
+            let tags: Vec<_> = file
                 .props
                 .iter()
                 .filter_map(|x| match x {
@@ -113,12 +113,12 @@ impl FileTable {
 
                     _ => None
                 })
-                // TODO: display more than one tag
-                .next()
-                .unwrap_or("")
+                .collect()
             ;
 
-            text!("{tag}")
+            let tags = tags.join(", ");
+
+            text!("{tags}")
                 .wrapping(text::Wrapping::None)
                 .align_y (Alignment::Center)
                 .align_x (Alignment::Start)
@@ -138,8 +138,7 @@ impl FileTable {
             .take(self.rows_visible)
         ;
 
-        // TODO: this uses a butt-ton of cpu when scrolling
-        let table: Element<'_, Message> = table::Table::new(
+        let table: Element<'_, Message> = table_widget::Table::new(
             30.0,
             &[
                 ColInfo { size: Length::Fixed(20.0), col: &|row: Row<FileView>| get_cursor!  (row.y, "> ")},
@@ -181,6 +180,9 @@ impl FileTable {
 
             Message::RowsVisible(rows) => {
                 self.rows_visible = rows;
+
+                self.scroll = self.scroll.min(self.calc_max_scroll());
+                self.cursor = self.cursor.min(self.calc_max_cursor());
 
                 None
             }

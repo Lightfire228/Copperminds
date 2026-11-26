@@ -1,7 +1,7 @@
 mod components;
 mod vault_subscription;
 mod key_event;
-mod table;
+mod table_widget;
 mod actions;
 mod queue_type;
 mod filter;
