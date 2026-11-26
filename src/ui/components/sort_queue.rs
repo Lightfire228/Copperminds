@@ -11,6 +11,7 @@ use iced::widget::{Space, column, row, text};
 
 use crate::collections::Files;
 use crate::command_parser::{CommandExpr, CommandGroup};
+use crate::config::{self, Config, Env};
 use crate::ui::actions::UiAction;
 use crate::ui::components::file_table::{self, FileTable};
 use crate::ui::components::prompt::{self, Prompt};
@@ -36,36 +37,15 @@ pub struct SortQueue {
 
 
 fn load_filter(queue: QueueType) -> UiFilter {
+
+    // TODO: pass in config
+    let config = config::get_config(Env::Prod);
+
     match queue {
 
-        QueueType::Inbox       => UiFilter {
-            needs_sorted: true.into(),
+        QueueType::Inbox       => config.queues.iter().find(|q| q.name == "Inbox")           .unwrap().filter.clone(),
 
-            ..Default::default()
-        },
-
-        QueueType::Actionables => UiFilter {
-
-            // TODO: make this configurable from the UI
-            by_action: FilterByList::Include(vec![
-                FmAction::Todo,
-                // FmAction::Backlog,
-                // FmAction::MaybeSomeday,
-                // FmAction::WaitingFor,
-            ]),
-            by_tags: FilterByList::Include(vec![
-                "home" .to_owned(),
-                "car"  .to_owned(),
-                "phone".to_owned(),
-                "pets" .to_owned(),
-                "none" .to_owned(),
-
-            ]),
-            is_open:   true.into(),
-
-
-            ..Default::default()
-        },
+        QueueType::Actionables => config.queues.iter().find(|q| q.name == "Open Actionables").unwrap().filter.clone(),
     }
 }
 

@@ -1,6 +1,6 @@
 pub mod parsing;
 
-use std::{collections::HashMap, fmt::Display, sync::LazyLock};
+use std::{collections::HashMap, convert::Infallible, fmt::Display, sync::LazyLock};
 
 use enum_iterator::{Sequence, all};
 use yaml_serde::{Mapping, Value, to_value};
@@ -173,13 +173,16 @@ macro_rules! try_from_get_key {
     ($name:ident) => {
 
         impl TryFrom<&str> for $name {
-            type Error = ();
+            type Error = String;
 
             fn try_from(value: &str) -> Result<$name, Self::Error> {
 
                 static TABLE: LazyLock<HashMap<String, $name>> = LazyLock::new(|| $name::all().into_iter().map(|x| (x.get_key(), x)).collect());
 
-                TABLE.get(value).cloned().ok_or(())
+                TABLE
+                    .get(value)
+                    .cloned()
+                    .ok_or_else(|| format!("Unknown value '{value}' for '{}'", stringify!($name)))
             }
         }
 
@@ -236,6 +239,12 @@ impl From<FmTags> for Value {
     }
 }
 
+
+impl From<Vec<String>> for FmTags {
+    fn from(value: Vec<String>) -> Self {
+        FmTags { tags: value }
+    }
+}
 
 
 impl FmAction {

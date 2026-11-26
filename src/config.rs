@@ -1,6 +1,9 @@
-use std::{env, fs, path::{self, PathBuf}, time::Duration};
+use std::{collections::HashMap, env, fs, path::{self, PathBuf}, time::Duration};
 use serde::{Deserialize, Serialize};
 
+mod yaml;
+
+use crate::ui::filter::{UiFilter};
 
 #[allow(dead_code)] // reason: prod select via const in main
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,7 +23,7 @@ impl Env {
 }
 
 
-use crate::{file_shit};
+use crate::{backup, file_shit};
 
 pub fn get_config(env: Env) -> Config {
 
@@ -30,29 +33,7 @@ pub fn get_config(env: Env) -> Config {
         panic!("unable to read config file: {file:?}")
     };
 
-    let mut config: YamlConfig = yaml_serde::from_str(&text)
-        .inspect_err(|err| panic!("unable to parse config file: {err}"))
-        .unwrap()
-    ;
-
-    config.vault_folder = file_shit::resolve_tilde(config.vault_folder);
-
-    if !config.vault_folder.exists() {
-        panic!("vault folder does not exist");
-    }
-
-    let vault_name = file_shit::get_folder_name(&config.vault_folder);
-
-    Config {
-        env,
-        folder_excludes: config.folder_excludes,
-        vault_path:      config.vault_folder,
-        vault_name:      vault_name,
-
-        // TODO: read from file
-        open_timeout:    Duration::from_millis(250)
-    }
-
+    yaml::parse_config_file(env, &text)
 }
 
 pub fn get_config_file(env: Env) -> PathBuf {
@@ -76,15 +57,18 @@ pub struct Config {
     /// derived from `vault_path`
     pub vault_name:      String,
 
+    /// determines how long to wait before issuing another obsidian cli command
     pub open_timeout:    Duration,
+
+    pub queues:          Vec<ConfigQueue>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone) ]
-pub struct YamlConfig {
-    pub folder_excludes: Vec<String>,
-
-    pub vault_folder:    PathBuf,
+#[derive(Debug, Clone)]
+pub struct ConfigQueue {
+    pub name:   String,
+    pub filter: UiFilter,
 }
+
 
 impl Default for Config {
     fn default() -> Self {
@@ -94,6 +78,7 @@ impl Default for Config {
             vault_path:      Default::default(),
             vault_name:      Default::default(),
             open_timeout:    Default::default(),
+            queues:          Default::default(),
         }
     }
 }

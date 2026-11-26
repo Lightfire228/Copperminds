@@ -4,7 +4,7 @@ mod key_event;
 mod table_widget;
 mod actions;
 mod queue_type;
-mod filter;
+pub mod filter; // TODO: not pub
 
 
 use std::fmt::Display;

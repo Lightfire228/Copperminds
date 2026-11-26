@@ -5,7 +5,7 @@ use enum_iterator::Sequence;
 use crate::vault::{ecs::EcsFileView, fm::{FmAction, FmProject, FmStatus, FmTags, FmType}};
 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct UiFilter {
     pub by_type:      FilterByList<FmType>,
     pub by_action:    FilterByList<FmAction>,
@@ -16,7 +16,7 @@ pub struct UiFilter {
     pub is_open:      Option<bool>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum FilterByList<T> {
     All,

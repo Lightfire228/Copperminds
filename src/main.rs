@@ -7,7 +7,7 @@ pub mod prelude;
 mod cli;
 mod collections;
 mod obsidian;
-mod ui;
+pub mod ui; // TODO: not pub
 mod vault;
 mod command_parser;
 
